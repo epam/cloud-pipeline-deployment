@@ -1,0 +1,191 @@
+{{- if .Values.enabled }}
+{{- $mode := .Values.srv.mode | default "default" -}}
+{{- $logsPath := .Values.srv.logsHostPath | default "" -}}
+{{- if eq $logsPath "" -}}
+{{- if eq $mode "nfsEvents" -}}
+{{- $logsPath = "/opt/search-nfs-events/logs" -}}
+{{- else if eq $mode "nfsOnly" -}}
+{{- $logsPath = "/opt/search-nfs-only/logs" -}}
+{{- else -}}
+{{- $logsPath = "/opt/search/logs" -}}
+{{- end -}}
+{{- end -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-search-srv
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-search-srv: "true"
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ index .Values.config "CP_SEARCH_INTERNAL_PORT" | default "30093" | int }}
+      targetPort: 8080
+      name: cp-search-srv-port
+  selector:
+    cloud-pipeline/cp-search-srv: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-search-srv
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-search-srv: "true"
+    cloud-pipeline/core-component: Deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-search-srv: "true"
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-search-srv: "true"
+        cloud-pipeline/core-component: Deployment
+    spec:
+      {{- with .Values.nodeSelector.srv }}
+      nodeSelector:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-search-srv
+          image: "{{ .Values.srv.image.repository }}:{{ .Values.srv.image.tag }}"
+          imagePullPolicy: {{ .Values.srv.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/init"]
+          ports:
+            - containerPort: 8080
+          env:
+            {{- if eq $mode "default" }}
+            - name: CP_SEARCH_DISABLE_NFS_FILE
+              value: "false"
+            - name: CP_SEARCH_DISABLE_NFS_OBSERVER_SYNC
+              value: "true"
+            {{- else if eq $mode "nfsEvents" }}
+            - name: CP_SEARCH_SYNC_TIMEOUT
+              value: "60000"
+            - name: CP_SEARCH_DISABLE_AZ_BLOB_FILE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_AZ_BLOB_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_NFS_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_RUN
+              value: "true"
+            - name: CP_SEARCH_DISABLE_S3_FILE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_GS_FILE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_GS_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_S3_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_TOOL
+              value: "true"
+            - name: CP_SEARCH_DISABLE_FOLER
+              value: "true"
+            - name: CP_SEARCH_DISABLE_TOOL_GROUP
+              value: "true"
+            - name: CP_SEARCH_DISABLE_DOCKER_REGISTRY
+              value: "true"
+            - name: CP_SEARCH_DISABLE_ISSUE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_METADATA
+              value: "true"
+            - name: CP_SEARCH_DISABLE_CONFIGURATION
+              value: "true"
+            - name: CP_SEARCH_DISABLE_PIPELINE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_NFS_FILE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_NFS_OBSERVER_SYNC
+              value: "false"
+            {{- else if eq $mode "nfsOnly" }}
+            - name: CP_SEARCH_SYNC_TIMEOUT
+              value: "86400000"
+            - name: CP_SEARCH_DISABLE_AZ_BLOB_FILE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_AZ_BLOB_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_NFS_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_RUN
+              value: "true"
+            - name: CP_SEARCH_DISABLE_S3_FILE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_GS_FILE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_GS_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_S3_STORAGE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_TOOL
+              value: "true"
+            - name: CP_SEARCH_DISABLE_FOLER
+              value: "true"
+            - name: CP_SEARCH_DISABLE_TOOL_GROUP
+              value: "true"
+            - name: CP_SEARCH_DISABLE_DOCKER_REGISTRY
+              value: "true"
+            - name: CP_SEARCH_DISABLE_ISSUE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_METADATA
+              value: "true"
+            - name: CP_SEARCH_DISABLE_CONFIGURATION
+              value: "true"
+            - name: CP_SEARCH_DISABLE_PIPELINE
+              value: "true"
+            - name: CP_SEARCH_DISABLE_NFS_FILE
+              value: "false"
+            - name: CP_SEARCH_DISABLE_NFS_OBSERVER_SYNC
+              value: "true"
+            {{- end }}
+            - name: LANG
+              value: en_US.UTF-8
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+            {{- with .Values.srv.extraEnv }}
+{{ toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - mountPath: /opt/search/logs
+              name: search-logs
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness.sh
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 4
+      volumes:
+        - name: search-logs
+          hostPath:
+            path: {{ $logsPath }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

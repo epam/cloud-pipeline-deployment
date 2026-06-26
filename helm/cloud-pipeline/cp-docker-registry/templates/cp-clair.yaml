@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-clair
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-clair: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: {{ .Values.config.CP_CLAIR_INTERNAL_PORT }}
+      targetPort: 8080
+      name: cp-clair-port-http
+  selector:
+    cloud-pipeline/cp-clair: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-clair
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-clair: "true"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-clair: "true"
+  replicas: 1
+  template:
+    metadata:
+      namespace: {{ include "lib.application.namespace" . }}
+      labels:
+        cloud-pipeline/cp-clair: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-clair: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-clair
+          image: {{ .Values.image.repository }}:{{ .Values.clair.image.tag }}
+          imagePullPolicy: {{ .Values.clair.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - mountPath: /opt/docker-registry/pki
+              name: docker-pki
+              readOnly: true
+            - mountPath: /opt/common/pki
+              name: common-pki
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.clair.healthEndpoint | quote }}
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: docker-pki
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: ssl-public-cert.pem
+                path: docker-public-cert.pem
+              - key: ssl-private-key.pem
+                path: docker-private-key.pem
+        - name: common-pki
+          secret:
+            secretName: cp-pki-secret
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret

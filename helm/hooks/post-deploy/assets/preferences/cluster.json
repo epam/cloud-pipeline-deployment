@@ -1,0 +1,71 @@
+{
+    "cluster.allowed.instance.types": {
+        "value": "m5.*,c5.*,r5.*,g5.*",
+        "visible": true
+    },
+    "cluster.allowed.instance.types.docker": {
+        "value": "m5.*,c5.*,r5.*,g5.*",
+        "visible": true
+    },
+    "cluster.autoscale.rate": {
+        "value": 20000,
+        "visible": false
+    },
+    "cluster.instance.hdd": {
+        "value": 50,
+        "visible": true
+    },
+    "cluster.instance.type": {
+        "value": "m5.large",
+        "visible": true
+    },
+    "cluster.allowed.price.types": {
+        "value": "spot,on_demand",
+        "visible": true
+    },
+    "cluster.allowed.price.types.master": {
+        "value": "spot,on_demand",
+        "visible": true
+    },
+    "cluster.spot": {
+        "value": "true",
+        "visible": true
+    },
+    "cluster.run.parameters.mapping": {
+        "value": {
+            "CP_CAP_TARGET_AVAILABILITY_ZONE": {
+                "argumentName": "--availability_zone"
+            },
+            "CP_CAP_TARGET_NETWORK_INTERFACE": {
+                "argumentName": "--network_interface"
+            },
+            "CP_CAP_DEDICATED_INSTANCE": {
+                "argumentName": "--dedicated",
+                "type": "BOOLEAN"
+            },
+            "CP_CAP_TARGET_SECURITY_GROUPS": {
+                "argumentName": "--security_groups"
+            },
+            "CP_CAP_TARGET_SUBNET_ID": {
+                "argumentName": "--subnet_id"
+            },
+            "CP_NODE_SSH_PORT": {
+                "argumentName": "--node_ssh_port"
+            },
+            "CP_CAP_EFA_ENABLED": {
+                "argumentName": "--performance_network",
+                "type": "BOOLEAN"
+            },
+            "CP_CAP_NODE_DOCKER_DATA_ROOT": {
+                "argumentName": "--docker_data_root"
+            },
+            "CP_CAP_NODE_DOCKER_STORAGE_DRIVER": {
+                "argumentName": "--docker_storage_driver"
+            },
+            "CP_CAP_NODE_DOCKER_SKIP_SYSTEM_IMAGES_LOAD": {
+                "argumentName": "--skip_system_images_load"
+            }
+        },
+        "visible": true
+    }
+}

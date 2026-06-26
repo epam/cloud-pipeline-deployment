@@ -1,0 +1,49 @@
+{{- if .Values.highAvailability.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cloud-pipeline/cp-redis: "true"
+  name: cp-redis
+  namespace: {{ include "lib.application.namespace" . }}
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.highAvailability.service.port }}
+      targetPort: 6379
+      name: cp-redis-port-http
+  selector:
+    cloud-pipeline/cp-redis: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-redis
+  namespace: {{ include "lib.application.namespace" . }}
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-redis: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-redis: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-redis: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+      containers:
+        - name: cp-redis
+          image: redis:6.0.5
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+{{- end }}

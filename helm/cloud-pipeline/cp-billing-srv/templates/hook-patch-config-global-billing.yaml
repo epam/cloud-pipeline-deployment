@@ -1,0 +1,31 @@
+{{- if .Values.enabled }}
+{{- $ns := include "lib.application.namespace" . -}}
+{{- $cfg := .Values.config | default dict -}}
+{{- $data := dict -}}
+{{- range $k, $v := $cfg }}
+{{- $_ := set $data $k ($v | toString) -}}
+{{- end }}
+{{- $billingHost := index $data "CP_BILLING_INTERNAL_HOST" | default "" | trim -}}
+{{- if eq $billingHost "" }}
+{{- $_ := set $data "CP_BILLING_INTERNAL_HOST" (printf "%s.%s.svc.cluster.local" .Values.service.name $ns) -}}
+{{- end }}
+{{- $billingPort := index $data "CP_BILLING_INTERNAL_PORT" | default "" | trim -}}
+{{- if eq $billingPort "" }}
+{{- $_ := set $data "CP_BILLING_INTERNAL_PORT" (.Values.service.port | toString) -}}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-billing-srv
+  namespace: {{ $ns }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $k, $v := $data }}
+  {{ $k }}: {{ $v | quote }}
+{{- end }}
+---
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-4") }}
+{{- end }}

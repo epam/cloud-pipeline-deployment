@@ -1,0 +1,6 @@
+{
+    "default.edge.region": {
+        "value": "eu-central-1",
+        "visible": true
+    }
+}

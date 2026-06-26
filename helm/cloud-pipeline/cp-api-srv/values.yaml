@@ -1,0 +1,117 @@
+service:
+  name: cp-api-srv
+  host:
+    external: ""
+    internal: cp-api-srv.default.svc.cluster.local
+  port:
+    external: "443"
+    internal: "443"
+
+highAvailability:
+  enabled: false
+  replicas: 2
+  service:
+    port: 30097
+
+patchDNS:
+  enabled: true
+
+image:
+  leaderElector:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: leader-elector-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+  apiServer:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: api-srv-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+db:
+  # internal (bundled Postgres pod) | external (RDS or managed Postgres)
+  type: internal
+  # When host is empty (common for internal DB), templates use defaultInternalHost.
+  host: ""
+  port: "5432"  # Postgres TCP port
+  version: "16.4"  # Postgres major.minor version (used for container image tag)
+  db: pipeline
+  user: pipeline
+  pass: ""
+  sharedBuffers: 128MB  # PostgreSQL shared_buffers; use M/MB/G/GB suffix
+  maxConnections: 100
+
+cloudRegion:
+  kmsKeyArn: ""             # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
+  kmsKeyId: ""              # Key ID (UUID portion of the ARN)
+  sshKeyName: ""            # AWS EC2 key pair name (not a file path)
+  tempCredentialsRole: ""   # IAM role ARN for temporary S3 credentials
+  backupDuration: 20        # S3 object backup retention in days
+  omicsServiceRole: ""      # IAM role ARN for AWS HealthOmics
+  omicsEcrUrl: ""           # ECR registry URL, e.g. <account>.dkr.ecr.<region>.amazonaws.com
+  corsRules: ""             # JSON string; empty = use hooks/post-deploy/assets/storage.cors.policy.json default (mounted at /assets)
+  fileShareMounts: []
+  # - mountRoot: "fs-xxx.efs.us-east-1.amazonaws.com:/"
+  #   mountType: "NFS"  # NFS | SMB
+  #   mountOptions: ""
+
+config:
+  CP_API_SRV_SSO_ENDPOINT_ID: ""
+  CP_API_SRV_CERT_DIR: /opt/api/pki
+  CP_API_SRV_FED_META_DIR: /opt/api/sso
+  CP_API_SRV_REPLICAS: "1"
+  CP_API_SRV_SAML_ALLOW_ANONYMOUS_USER: "true"  # "true" | "false"
+  # EXPLICIT (admin must approve) | AUTO (auto-create user from SAML assertion)
+  CP_API_SRV_SAML_AUTO_USER_CREATE: EXPLICIT
+  CP_API_SRV_SAML_GROUPS_ATTRIBUTE_NAME: Group
+  # urn:...HTTP-POST | urn:...HTTP-Redirect
+  CP_API_SRV_SSO_BINDING: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
+  CP_API_SRV_STATIC_DIR: /opt/api/static
+  CP_API_SRV_SYSTEM_FOLDER_NAME: SYSTEM
+  CP_API_SRV_SYSTEM_FOLDER_DESCRIPTION: '"Folder that holds system-level entities:
+    storages and pipelines, that are not accessed by the users directly"'
+  CP_API_SRV_SYSTEM_JOBS_PIPELINE_FRIENDLY_NAME: system-jobs-pipeline
+  CP_API_SRV_SYSTEM_JOBS_PIPELINE_VERSION: '"latest"'
+  CP_API_SRV_SYSTEM_JOBS_PIPELINE_DESCRIPTION: '"SystemJobs is a system pipeline that
+    is used to automated run of system actions on a platform"'
+  CP_API_SRV_SYSTEM_STORAGE_FRIENDLY_NAME: cloud-pipeline-etc
+  CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_DESCRIPTION: '"DataTransfer is a system pipeline
+    that is used to automated data transfers from the external sites"'
+  CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_FRIENDLY_NAME: data-transfer-pipeline
+  CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_VERSION: '"latest"'
+  CP_PREF_UI_PIPELINE_DEPLOYMENT_NAME: CloudPipeline
+  CP_PREF_CLUSTER_ALLOWED_INSTANCE_TYPES: "m5.*,c5.*,r5.*,g5.*"
+  CP_PREF_CLUSTER_INSTANCE_TYPE: m5.large
+  CP_PREF_CLUSTER_INSTANCE_TYPE_GPU: p2.xlarge
+  CP_PREF_CLUSTER_ALLOWED_PRICE_TYPES: "spot,on_demand"  # Comma-separated: spot, on_demand
+  CP_PREF_CLUSTER_ALLOWED_MASTER_PRICE_TYPES: "spot,on_demand"
+  CP_PREF_CLUSTER_PROXIES_DNS_POST: "10.96.0.10"
+  CP_PREF_API_ETC_DIRECTORY: /opt/api/etc
+  CP_PREF_API_STATIC_DIRECTORY_EXT: /opt/api/ext/templates/static
+  CP_PREF_CLUSTER_AUTOSCALE_RATE: "20000"
+  CP_PREF_CLUSTER_SSH_KEY_PATH: /etc/cp_ssh/deploy.pub
+  CP_PREF_COMMIT_DEPLOY_KEY: /etc/cp_ssh/deploy.key
+  CP_PREF_LAUNCH_CMD_TEMPLATE: '"sleep infinity"'
+  CP_PREF_LAUNCH_TASK_STATUS_UPDATE_RATE: "20000"
+  CP_PREF_SECURITY_TOOLS_JWT_TOKEN_EXPIRATION: "3600"
+  CP_PREF_SECURITY_TOOLS_POLICY_MAX_CRITICAL_VULNERABILITIES: "50"
+  CP_PREF_SECURITY_TOOLS_POLICY_MAX_HIGH_VULNERABILITIES: "100"
+  CP_PREF_SECURITY_TOOLS_POLICY_MAX_MEDIUM_VULNERABILITIES: "300"
+  CP_PREF_TEMPLATES_DIRECTORY_EXT: /opt/api/ext/templates/pipe-templates
+  CP_PREF_TEMPLATES_ERROR_PAGES_DIRECTORY_EXT: /opt/api/ext/templates/error-templates
+  CP_PREF_TEMPLATES_FOLDER_DIRECTORY_EXT: /opt/api/ext/templates/folder-templates
+  CP_PREF_STORAGE_SYSTEM_STORAGE_NAME: ""
+  CP_PREF_STORAGE_SCHEMA: s3  # s3 | az | gs
+  CP_PREF_STORAGE_FSBROWSER_ENABLED: "true"
+  CP_PREF_STORAGE_FSBROWSER_PORT: "8091"
+  CP_PREF_STORAGE_FSBROWSER_WD: /
+  CP_PREF_STORAGE_FSBROWSER_TMP: /tmp
+  CP_PREF_STORAGE_FSBROWSER_TRANSFER: ""
+
+backup:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: cp-bkp-worker-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+  schedule: "0 8 * * *"  # Cron schedule in server local time
+  retention: "10"         # Number of backup archives to keep
+  storageList: ""         # Comma-separated S3 paths for backup upload; empty = local only

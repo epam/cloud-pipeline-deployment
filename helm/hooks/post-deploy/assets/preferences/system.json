@@ -1,0 +1,38 @@
+{
+    "system.max.idle.timeout.minutes": {
+        "value": 1440,
+        "visible": false
+    },
+    "system.idle.action.timeout.minutes": {
+        "value": 480,
+        "visible": false
+    },
+    "system.resource.monitoring.period": {
+        "value": 300000,
+        "visible": false
+    },
+    "system.resource.monitoring.stats.retention.period": {
+        "value": 5,
+        "visible": false
+    },
+    "system.idle.action": {
+        "value": "NOTIFY",
+        "visible": false
+    },
+    "system.idle.cpu.threshold": {
+        "value": 1,
+        "visible": false
+    },
+    "system.memory.consume.threshold": {
+        "value": 95,
+        "visible": false
+    },
+    "system.disk.consume.threshold": {
+        "value": 95,
+        "visible": false
+    },
+    "system.monitoring.time.range": {
+        "value": 30,
+        "visible": false
+    }
+}

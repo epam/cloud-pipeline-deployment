@@ -1,0 +1,87 @@
+{{- if eq .Values.db.type "internal" }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cloud-pipeline/cp-api-db: "true"
+  name: cp-api-db
+  namespace: {{ include "lib.application.namespace" . }}
+spec:
+  ports:
+  - protocol: TCP
+    port: {{ .Values.db.port }}
+    targetPort: {{ .Values.db.port }}
+  selector:
+    cloud-pipeline/cp-api-db: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-api-db
+  namespace: {{ include "lib.application.namespace" . }}
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-api-db: "true"
+  replicas: 1
+  template:
+    metadata:
+      namespace: {{ include "lib.application.namespace" . }}
+      labels:
+        cloud-pipeline/cp-api-db: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-api-db: "true"
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      containers:
+        - name: cp-api-db
+          image: postgres:{{ .Values.db.version }}
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --shared_buffers={{ .Values.db.sharedBuffers }}
+            - --max_connections={{ .Values.db.maxConnections }}
+          ports:
+            - containerPort: {{ .Values.db.port }}
+          env:
+            - name: POSTGRES_DB
+              value: "postgres"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "postgres"
+            - name: PGDATA
+              value: /var/lib/postgresql/data
+            - name: DB_EXTENSION
+              value: pg_trgm
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: pgdata
+            - mountPath: /dev/shm
+              name: dshm
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.db.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.db.port }}
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            failureThreshold: 4
+      volumes:
+        - name: pgdata
+          hostPath:
+            path: /opt/postgresql/data
+            type: DirectoryOrCreate
+        - name: dshm
+          emptyDir:
+            medium: Memory
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret
+{{- end }}

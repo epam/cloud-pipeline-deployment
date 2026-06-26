@@ -1,0 +1,5 @@
+{{- include "lib.backupWorker.deployment" (dict "context" . "serviceName" "cp-git" "serviceWd" "/opt/gitlab/data/bkp" "initContainers" "cp-git.bkpWorkerInitContainers") }}
+{{- if and .Values.backup.enabled .Values.gitlabDb.enabled }}
+---
+{{- include "lib.backupWorker.deployment" (dict "context" . "serviceName" "cp-gitlab-db" "serviceWd" "/opt/gitlab-postgresql/data/bkp" "initContainers" "cp-git.bkpWorkerInitContainers") }}
+{{- end }}

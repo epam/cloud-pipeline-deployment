@@ -1,0 +1,65 @@
+# Used by lib.cpConfigGlobal.patchHookTemplate to derive the configmap-to-update-* name
+service:
+  name: cp-monitoring
+
+# Top-level toggle for helmfile installed:
+enabled: true
+
+heapster:
+  enabled: true
+
+  metricResolution: "30s"  # Kubernetes metrics scrape interval (e.g. 30s, 1m)
+
+  image:
+    repository: k8s.gcr.io/heapster-amd64
+    tag: v1.5.4
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+  service:
+    name: cp-heapster
+    port:
+      internal: "30095"
+
+  elk:
+    image:
+      repository: quay.io/lifescience/cloud-pipeline
+      tag: heapster-elk-0.17
+      pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+    service:
+      name: cp-heapster-elk
+      port:
+        internal: "30094"
+
+    dataHostPath: /opt/heapster-elk/data  # Node local path for Elasticsearch data
+    readinessTimeoutSec: 300  # Seconds to wait for Elasticsearch readiness before failing
+
+nodeLogger:
+  enabled: true
+
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: node-logger-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+nodeReporter:
+  enabled: true
+
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: node-reporter-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+  hostPath:
+    logs: /opt/node-reporter/logs
+    resources: /opt/node-reporter/resources
+
+vmMonitor:
+  enabled: true
+
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: vm-monitor-0.17
+    pullPolicy: Always  # IfNotPresent | Always | Never
+
+  logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files

@@ -1,0 +1,11 @@
+apiVersion: v2
+name: cp-docker-registry
+description: Cloud-Pipeline Docker Registry Service
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: lib
+    version: "1.0.0"
+    repository: "file://../lib"

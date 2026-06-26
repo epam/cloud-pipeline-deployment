@@ -1,0 +1,79 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-billing-srv: "true"
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port | int }}
+      targetPort: 8080
+      name: cp-billing-srv-port
+  selector:
+    cloud-pipeline/cp-billing-srv: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ include "lib.application.namespace" . }}
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-billing-srv: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-billing-srv: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-billing-srv: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-billing-srv
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/init"]
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          volumeMounts:
+            - mountPath: /opt/billing/logs
+              subPath: billing/logs
+              name: cp-system
+            {{- if .Values.cloudCredentials.enabled }}
+            - name: cp-cloud-credentials
+              mountPath: /root/.cloud
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: cp-system
+          hostPath:
+            path: {{ .Values.hostPath.basePath }}
+            type: DirectoryOrCreate
+        {{- if .Values.cloudCredentials.enabled }}
+        - name: cp-cloud-credentials
+          secret:
+            secretName: {{ .Values.cloudCredentials.secretName }}
+            optional: {{ .Values.cloudCredentials.optional | default true }}
+        {{- end }}
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret
+{{- end }}

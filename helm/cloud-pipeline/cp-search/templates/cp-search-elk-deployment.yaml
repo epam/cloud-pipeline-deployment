@@ -1,0 +1,100 @@
+{{- if and .Values.enabled .Values.elk.elasticsearch.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-search-elk
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-search-elk: "true"
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ index .Values.config "CP_SEARCH_ELK_ELASTIC_INTERNAL_PORT" | default "30091" | int }}
+      targetPort: 9200
+      name: cp-search-elk-elastic-port
+    - protocol: TCP
+      port: {{ index .Values.config "CP_SEARCH_ELK_TRANSPORT_INTERNAL_PORT" | default "30092" | int }}
+      targetPort: 9300
+      name: cp-search-elk-transport-port
+  selector:
+    cloud-pipeline/cp-search-elk: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-search-elk
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-search-elk: "true"
+    cloud-pipeline/core-component: Deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-search-elk: "true"
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-search-elk: "true"
+        cloud-pipeline/core-component: Deployment
+    spec:
+      {{- with .Values.nodeSelector.elk }}
+      nodeSelector:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-search-elk
+          image: "{{ .Values.elk.image.repository }}:{{ .Values.elk.image.tag }}"
+          imagePullPolicy: {{ .Values.elk.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["bash"]
+          args: ["-c", "/init.sh"]
+          env:
+            - name: ES_JAVA_OPTS
+              value: "-Xmx{{ .Values.elk.heapSize }} -Xms{{ .Values.elk.heapSize }} {{ .Values.elk.javaOptsExtra }}"
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - mountPath: /usr/share/elasticsearch/data
+              name: search-elk-data
+            - mountPath: /usr/share/elasticsearch/backup
+              name: search-elk-backup
+            {{- if .Values.cloudCredentials.enabled }}
+            - name: cp-cloud-credentials
+              mountPath: /root/.cloud
+              readOnly: true
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: search-elk-data
+          hostPath:
+            path: {{ .Values.elk.dataHostPath }}
+        - name: search-elk-backup
+          hostPath:
+            path: {{ .Values.elk.backupHostPath }}
+        {{- if .Values.cloudCredentials.enabled }}
+        - name: cp-cloud-credentials
+          secret:
+            secretName: {{ .Values.cloudCredentials.secretName }}
+            optional: {{ .Values.cloudCredentials.optional | default true }}
+        {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,65 @@
+{{- $config := .Values.config | default dict -}}
+{{- $dbInit := .Values.clair.dbInit | default dict -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-init-clair-db
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "2"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  init-clair-db.sh: |
+{{ .Files.Get "files/hooks/init-clair-db.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cp-clair-db-init
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: pre-install
+    # After configmap-to-update (weight 1) and patch-config-global job (weight 2) merge Clair keys into cp-config-global.
+    helm.sh/hook-weight: "3"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: init
+          image: "{{ index $dbInit "image" | default "postgres" }}:{{ index $dbInit "tag" | default "16.4" }}"
+          imagePullPolicy: {{ index $dbInit "pullPolicy" | default "IfNotPresent" }}
+          env:
+            # Same source as hook-patch-config-global (avoids reading cp-config-global before patch / stale passwords).
+            - name: CLAIR_HOST
+              value: {{ printf "cp-api-db.%s.svc.cluster.local" (include "lib.application.namespace" .) | quote }}
+            - name: CLAIR_DB
+              value: {{ index $config "CP_CLAIR_DATABASE_DATABASE" | default "clair" | quote }}
+            - name: CLAIR_USER
+              value: {{ index $config "CP_CLAIR_DATABASE_USERNAME" | default "clair" | quote }}
+            - name: CLAIR_PASS
+              value: {{ index $config "CP_CLAIR_DATABASE_PASSWORD" | default "clair" | quote }}
+            - name: CLAIR_PORT
+              value: {{ index $config "CP_CLAIR_DATABASE_PORT" | default "5432" | quote }}
+          command: ["/bin/bash", "/scripts/init-clair-db.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-init-clair-db
+            defaultMode: 0755

@@ -1,0 +1,71 @@
+service:
+  name: cp-docker-registry
+  host:
+    external: ""
+    internal: cp-docker-registry.default.svc.cluster.local
+  port:
+    external: "443"
+    internal: "443"
+
+patchDNS:
+  enabled: true
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: registry-0.17-default
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+dockerComp:
+  image:
+    tag: docker-comp-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+clair:
+  image:
+    tag: clair-v4-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+  healthEndpoint: /healthz
+  # cp-clair-db-init Job: official Postgres image (bundled psql/pg_isready). Align tag with cp-api-db db.version via Helmfile when using internal DB.
+  dbInit:
+    image: postgres
+    tag: "16.4"
+    pullPolicy: IfNotPresent
+
+# Registry TLS: cp-pki-secret ssl-*.pem mounted as docker-*.pem at CP_DOCKER_CERT_DIR
+
+# With subPath docker-registry/images on the registry volume → /opt/docker-registry/images on the node.
+hostPath:
+  basePath: /opt
+
+# S3: if true, chart sets CP_CLOUD_CREDENTIALS_LOCATION=/dev/null (use node/instance IAM role).
+useEc2InstanceRoleForS3: true  # true = use EC2 instance IAM role; false = use explicit key/secret
+
+config:
+  CP_DOCKER_CERT_DIR: /opt/docker-registry/pki
+  CP_DOCKER_REGISTRY_TYPE: default  # default (only supported value)
+  # Storage driver (update_config.sh): obj = cloud object store (S3/AZ/GCS), empty = local filesystem.
+  CP_DOCKER_STORAGE_TYPE: obj
+  # Bucket / container name for S3, Azure Blob, or GCS.
+  CP_DOCKER_STORAGE_CONTAINER: ""
+  # S3: region override; defaults to CP_CLOUD_REGION_ID when empty.
+  CP_DOCKER_STORAGE_REGION: ""
+  # S3/GCS: multipart upload chunk size in bytes; script default is 52428800 (50 MiB).
+  CP_DOCKER_STORAGE_CHUNKSIZE: ""
+  # Explicit cloud storage access key (AWS key ID or Azure storage account name).
+  # When empty, AWS falls back to reading CP_CLOUD_CREDENTIALS_LOCATION; Azure uses CP_AZURE_STORAGE_ACCOUNT.
+  CP_DOCKER_STORAGE_KEY_NAME: ""
+  # Explicit cloud storage secret (AWS secret key or Azure storage account key).
+  # When empty, AWS falls back to reading CP_CLOUD_CREDENTIALS_LOCATION; Azure uses CP_AZURE_STORAGE_KEY.
+  CP_DOCKER_STORAGE_KEY_SECRET: ""
+  # S3/GCS: path prefix inside the bucket; defaults to cloud-pipeline-<CP_DEPLOYMENT_ID> when empty.
+  CP_DOCKER_STORAGE_ROOT_DIR: ""
+  CP_DOCKER_COMP_INTERNAL_PORT: "31082"
+  CP_DOCKER_COMP_WORKING_DIR: /cloud-pipeline/docker-comp/wd
+  CP_CLAIR_DATABASE_DATABASE: clair
+  CP_CLAIR_DATABASE_PASSWORD: clair
+  CP_CLAIR_DATABASE_PORT: "5432"
+  CP_CLAIR_DATABASE_USERNAME: clair
+  CP_CLAIR_INTERNAL_PORT: "31083"
+  CP_CLAIR_VERSION: v4
+
+

@@ -1,0 +1,66 @@
+# Helmfile uses this for `installed:`; set false to skip the cp-git release.
+enabled: false
+
+patchDNS:
+  enabled: true
+
+service:
+  name: cp-git
+  host:
+    external: ""
+    internal: "cp-git.default.svc.cluster.local"
+  port:
+    external: "443"
+    internal: "443"
+  sshPort: 22  # SSH port for git clone over SSH
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: git-15-0.17
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+gitSync:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: api-srv-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+config:
+  CP_GITLAB_CERT_DIR: /opt/gitlab/pki
+  CP_GITLAB_SSO_ENDPOINT_ID: ""  # SAML EntityID for GitLab SP, e.g. https://<gitlab-host>/users/saml/metadata
+  CP_GITLAB_SSO_TARGET_URL: "" #Sets idp_sso_target_url value of the gitlab.rb
+  CP_GITLAB_SSO_TARGET_URL_TRAIL: "" # Allows to add a trailing part to the idp_sso_target_url
+  CP_GITLAB_IDP_CERT_PATH: /opt/idp/pki
+  CP_GITLAB_VERSION: "15"         # GitLab major version (must match image)
+  CP_GITLAB_API_VERSION: "v4"     # GitLab REST API version (v4 is current)
+  GITLAB_ROOT_USER: "root"
+  GITLAB_ROOT_PASSWORD: ""
+  GITLAB_DATABASE_ADAPTER: postgresql  # postgresql (only supported value)
+  GITLAB_DATABASE_ENCODING: utf8       # Database character encoding
+  GITLAB_DATABASE_PORT: "6543"         # Port exposed by the cp-gitlab-db Service
+  GITLAB_DATABASE_DATABASE: gitlabhq_production
+  GITLAB_DATABASE_USERNAME: gitlab
+  GITLAB_DATABASE_PASSWORD: gitlab
+  GITLAB_DATABASE_VERSION: "12.4"  # Postgres major.minor for cp-gitlab-db image tag
+  GITLAB_DATABASE_SHARED_BUFFERS: 256MB  # PostgreSQL shared_buffers; use M/MB/G/GB suffix
+  GITLAB_DATABASE_MAX_CONNECTIONS: "200"
+
+# Embedded Postgres (cp-gitlab-db) when enabled. App DB name/user/password and Postgres tuning come from config.GITLAB_DATABASE_* above.
+backup:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: cp-bkp-worker-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+  schedule: "0 8 * * *"  # Cron schedule in server local time
+  retention: "10"         # Number of backup archives to keep
+  storageList: ""         # Comma-separated S3 paths for backup upload; empty = local only
+
+gitlabDb:
+  enabled: true
+  image: postgres
+  imagePullPolicy: IfNotPresent
+  # Container listen port (Postgres default 5432). Service port = config GITLAB_DATABASE_PORT (e.g. 6543).
+  port: 5432
+  dataHostPath: /opt/gitlab-postgresql/data

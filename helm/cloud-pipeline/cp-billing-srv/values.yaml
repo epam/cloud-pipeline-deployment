@@ -1,0 +1,30 @@
+# Helmfile sets `installed:` from this flag; deploy values live under the `billing:` key in values.yaml.
+enabled: true
+
+service:
+  name: cp-billing-srv
+  port: "30096"
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: billing-srv-0.17
+  pullPolicy: Always
+
+# With subPath billing/logs on the cp-system volume → <basePath>/billing/logs on the node (default /opt/billing/logs).
+hostPath:
+  basePath: /opt
+
+# Mount cp-cloud-credentials. Disable if secret is absent.
+cloudCredentials:
+  enabled: false
+  secretName: cp-cloud-credentials
+  optional: true
+
+# Keys merged into cp-config-global via pre-upgrade hook (aligned with EPM-CMBI install-config + cloud-configs/aws).
+config:
+  CP_BILLING_INTERNAL_PORT: "30096"
+  CP_BILLING_CENTER_KEY: billing-center
+  CP_BILLING_DISABLE_AZURE_BLOB: "true"
+  CP_BILLING_DISABLE_AZURE_FILES: "true"
+  CP_BILLING_DISABLE_AZURE_NETAPP: "true"
+  CP_BILLING_DISABLE_GS: "true"

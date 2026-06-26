@@ -1,0 +1,196 @@
+# Optional post-install Job: patch kube-dns cp-dnsmasq-hosts (see lib.patchDNSJob).
+{{ include "lib.patchDNSJob" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-api-srv
+  namespace:  {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/core-component: "Deployment"
+    cloud-pipeline/cp-api-srv: "true"
+spec:
+  type: ClusterIP
+  selector:
+    cloud-pipeline/cp-api-srv: "true"
+  ports:
+    - name: cp-api-srv-port-https
+      port: 31080
+      targetPort: 8080
+      protocol: TCP
+    - name: cp-api-srv-port-https-443
+      port: 443
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-api-srv
+  namespace:  {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-api-srv: "true"
+spec:
+  replicas: {{ if .Values.highAvailability.enabled }}{{ .Values.highAvailability.replicas | default 1 }}{{ else }}1{{ end }}
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-api-srv: "true"
+  strategy:
+    rollingUpdate:
+      maxSurge: 1        # a second pod will be brought up
+      maxUnavailable: 0  # never kill the old pod before a new one is Ready
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-api-srv: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  cloud-pipeline/cp-api-srv: "true"
+              topologyKey: kubernetes.io/hostname
+      nodeSelector:
+        cloud-pipeline/cp-api-srv: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      terminationGracePeriodSeconds: 50    
+      containers:
+        - name: cp-api-srv-leader-elector
+          image: {{ .Values.image.leaderElector.repository }}:{{ .Values.image.leaderElector.tag }}
+          imagePullPolicy: {{ .Values.image.leaderElector.pullPolicy }}
+          command: ["/elector/init"]
+          env:
+            - name: HA_ELECTION_SERVICE_NAME
+              value: "cp-api-srv"
+            - name: HA_ELECTION_PERIOD_SEC
+              value: "5"
+            - name: HA_VOTE_EXPIRATION_PERIOD_SEC
+              value: "7"
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          ports:
+            - containerPort: 4040
+          securityContext:
+            privileged: true
+        - name: cp-api-srv
+          image: {{ .Values.image.apiServer.repository }}:{{ .Values.image.apiServer.tag }}
+          imagePullPolicy: {{ .Values.image.apiServer.pullPolicy }}
+          command: ["/init-api"]
+          env:
+            - name: CP_API_SRV_INTERNAL_HOST
+              value: cp-api-srv.{{ include "lib.application.namespace" . }}.svc.cluster.local
+            - name: CP_API_SRV_INTERNAL_PORT
+              value: "31080"
+            - name: CP_KUBE_MASTER_CHECK_URL
+              value: http://127.0.0.1:4040/
+            - name: CP_HA_DEPLOY_ENABLED
+              value: "true"
+            - name: CP_API_CURRENT_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CP_API_CURRENT_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CP_IDP_CERT_DIR
+              value: /opt/idp/pki
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "/liveness-api-srv.sh"]
+            initialDelaySeconds: 180
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "/liveness-api-srv.sh"]
+            initialDelaySeconds: 180
+            periodSeconds: 15
+            failureThreshold: 4
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "10"]
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /opt/api/pki
+              name: cp-api-secret
+            - mountPath: /opt/api/sso
+              name: cp-fed-metadata-secret  
+            - mountPath: /opt/idp/pki
+              name: cp-idp-pki
+              readOnly: true
+            - mountPath: /var/log/cp-api
+              name: api-logs
+            - mountPath: /opt/api/ext/templates/pipe-templates
+              name: api-pipe-templates
+            - mountPath: /opt/api/ext/templates/folder-templates
+              name: api-folder-templates
+            - mountPath: /opt/api/ext/templates/error-templates
+              name: api-error-templates
+            - mountPath: /opt/api/ext/templates/static
+              name: api-static-assets
+            - mountPath: /opt/api/etc
+              name: api-etc-assets  
+              # Using /etc/cp_ssh instead of a "general" ~/.ssh/ because it may break some of the openssh-created files (e.g. known hosts)
+              # as this volumes is mounted "read only"
+            - name: cp-cluster-ssh-key
+              mountPath: "/etc/cp_ssh"
+              readOnly: true   
+            - mountPath: /root/.kube
+              name: kube-config
+              readOnly: true
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
+      volumes:
+        - name: cp-api-secret
+          projected:
+            sources:
+              - secret:
+                  name: cp-pki-secret
+              - secret:
+                  name: cp-jwt-pki-secret
+        - name: cp-fed-metadata-secret
+          secret:
+            secretName: cp-fed-metadata-secret
+        - name: cp-idp-pki
+          secret:
+            secretName: cp-idp-secret
+        - name: api-logs
+          hostPath:
+            path: /opt/api/logs
+        - name: api-pipe-templates
+          hostPath:
+            path: /opt/api/templates/pipe-templates
+        - name: api-folder-templates
+          hostPath:
+            path: /opt/api/templates/folder-templates
+        - name: api-error-templates
+          hostPath:
+            path: /opt/api/templates/error-templates
+        - name: api-static-assets
+          hostPath:
+            path: /opt/api/templates/static 
+        - name: api-etc-assets
+          hostPath:
+            path: /opt/api/etc   
+        - name: cp-cluster-ssh-key
+          secret:
+            secretName: cp-cluster-ssh-key
+            defaultMode: 0400
+        - name: kube-config
+          hostPath:
+            path: /root/.kube

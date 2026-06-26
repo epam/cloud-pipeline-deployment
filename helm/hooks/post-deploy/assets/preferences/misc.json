@@ -1,0 +1,10 @@
+{
+    "misc.metadata.sensitive.keys": {
+        "value": "[]",
+        "visible": true
+    },
+    "misc.groups.ui.preferences": {
+        "value": "{}",
+        "visible": true
+    }
+}

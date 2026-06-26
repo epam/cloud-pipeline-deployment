@@ -1,0 +1,52 @@
+{{- $smtpNotificationConfig := .Values.smtp | default dict -}}
+{{- $smtpServer := index $smtpNotificationConfig "server" | default dict -}}
+{{- $uiNotificationConfig := .Values.ui | default dict -}}
+{{- $azureApiEmailNotificationConfig := .Values.azure | default dict -}}
+{{- $data := dict -}}
+{{- if hasKey $uiNotificationConfig "enabled" -}}
+{{- $_ := set $data "CP_NOTIFIER_UI_ENABLE" ((index $uiNotificationConfig "enabled") | toString) -}}
+{{- else -}}
+{{- $_ := set $data "CP_NOTIFIER_UI_ENABLE" (false | toString) -}}
+{{- end -}}
+{{- $smtpEnabled := true -}}
+{{- if hasKey $smtpNotificationConfig "enabled" -}}{{- $smtpEnabled = index $smtpNotificationConfig "enabled" -}}{{- end -}}
+{{- $azureEnabled := false -}}
+{{- if hasKey $azureApiEmailNotificationConfig "enabled" -}}{{- $azureEnabled = index $azureApiEmailNotificationConfig "enabled" -}}{{- end -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_ENABLE" ($smtpEnabled | toString) -}}
+{{- if $smtpEnabled -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_SERVER_HOST" ((index $smtpServer "host" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_SERVER_PORT" ((index $smtpServer "port" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_SSL_ON_CONNECT" ((index $smtpNotificationConfig "sslOnConnect" | default false) | toString) -}}
+{{- if hasKey $smtpNotificationConfig "startTls" -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_START_TLS" ((index $smtpNotificationConfig "startTls") | toString) -}}
+{{- else -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_START_TLS" (true | toString) -}}
+{{- end -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_FROM" ((index $smtpNotificationConfig "from" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_USER" ((index $smtpNotificationConfig "user" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_SMTP_PASS" ((index $smtpNotificationConfig "pass" | default "") | toString) -}}
+{{- end -}}
+{{- $_ := set $data "CP_NOTIFIER_AZ_ENABLE" ($azureEnabled | toString) -}}
+{{- if $azureEnabled -}}
+{{- $_ := set $data "CP_NOTIFIER_AZ_TENANT_ID" ((index $azureApiEmailNotificationConfig "tenantId" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_AZ_CLIENT_ID" ((index $azureApiEmailNotificationConfig "clientId" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_AZ_CLIENT_SECRET" ((index $azureApiEmailNotificationConfig "clientSecret" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_AZ_SCOPES" ((index $azureApiEmailNotificationConfig "scopes" | default "https://graph.microsoft.com/.default") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_AZ_SENDER" ((index $azureApiEmailNotificationConfig "sender" | default "") | toString) -}}
+{{- $_ := set $data "CP_NOTIFIER_AZ_DRY_RUN" ((index $azureApiEmailNotificationConfig "dryRun" | default false) | toString) -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-notifier
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "-11"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-10") }}

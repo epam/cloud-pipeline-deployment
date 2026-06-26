@@ -1,0 +1,155 @@
+# Optional post-install Job: patch kube-dns cp-dnsmasq-hosts (see lib.patchDNSJob).
+{{ include "lib.patchDNSJob" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-edge
+  namespace:  {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-edge: "true"
+    cloud-pipeline/role: "EDGE"
+    cloud-pipeline/core-component: "Service"
+    cloud-pipeline/external-host: {{ .Values.service.host.external | quote }}
+    cloud-pipeline/external-port: {{ .Values.service.port.external | toString | quote }}
+    cloud-pipeline/external-scheme: "https"
+    cloud-pipeline/region: {{ .Values.region | quote }}
+    {{- with .Values.labels }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    cloud-pipeline/cp-edge: "true"
+    cloud-pipeline/role: "EDGE"
+    cloud-pipeline/region: {{ .Values.region }}
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port.internal }}
+      targetPort: 8080
+      name: cp-edge-port-https
+    - protocol: TCP
+      port: {{ .Values.config.CP_EDGE_WEB_INTERNAL_PORT }}
+      targetPort: 8181
+      name: cp-edge-port-web
+    - protocol: TCP
+      port: {{ .Values.config.CP_EDGE_CONNECT_INTERNAL_PORT }}
+      targetPort: 8282
+      name: cp-edge-port-connect
+    - protocol: TCP
+      port: 31090
+      targetPort: 8888
+      name: cp-edge-health-check
+  externalIPs:
+  - {{ .Values.externalIP }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-edge
+  namespace:  {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-edge: "true"
+    cloud-pipeline/role: "EDGE"
+    cloud-pipeline/region: {{ .Values.region | quote }}
+    {{- with .Values.labels }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-edge: "true"
+      cloud-pipeline/role: "EDGE"
+      cloud-pipeline/region: {{ .Values.region }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1        # a second pod will be brought up
+      maxUnavailable: 0  # never kill the old pod before a new one is Ready
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/core-component: "Deployment"
+        cloud-pipeline/cp-edge: "true"
+        cloud-pipeline/role: "EDGE"
+        cloud-pipeline/region: {{ .Values.region | quote }}
+        {{- with .Values.labels }}
+        {{ toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- $gitCfg := .Values.git | default dict }}
+      {{- $gitOn := true }}
+      {{- if hasKey $gitCfg "enabled" }}
+      {{- $gitOn = index $gitCfg "enabled" }}
+      {{- end }}
+      nodeSelector:
+        cloud-pipeline/cp-edge: "true"
+        cloud-pipeline/region: {{ .Values.region }}
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: cp-edge
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/init"]
+          env:
+            - name: NODE_OPTIONS
+              value: "--max_old_space_size=4096"
+            - name: CP_EDGE_REGION
+              value: {{ .Values.region }}
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness.sh
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 4
+          volumeMounts:
+            - mountPath: /opt/api/pki
+              name: cp-api-secret
+              readOnly: true
+            - mountPath: /opt/idp/pki
+              name: cp-api-secret
+              readOnly: true
+            - mountPath: /opt/edge/pki
+              name: cp-api-secret
+              readOnly: true
+            {{- if $gitOn }}
+            - mountPath: /etc/gitlab/pki
+              name: cp-api-secret
+              readOnly: true
+            {{- end }}
+            - mountPath: /etc/docker-registry/pki
+              name: cp-docker-registry-pki
+              readOnly: true
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
+      volumes:
+        - name: cp-api-secret
+          projected:
+            sources:
+              - secret:
+                  name: cp-pki-secret
+              - secret:
+                  name: cp-jwt-pki-secret
+        - name: cp-docker-registry-pki
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: ssl-public-cert.pem
+                path: docker-public-cert.pem
+              - key: ssl-private-key.pem
+                path: docker-private-key.pem

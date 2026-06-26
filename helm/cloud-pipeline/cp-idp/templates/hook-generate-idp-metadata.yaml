@@ -1,0 +1,57 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-generate-idp-metadata
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "4"
+    helm.sh/hook-delete-policy: hook-succeeded
+data:
+  generate-idp-metadata.sh: |
+{{ .Files.Get "files/hooks/generate-idp-metadata.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-idp-fed-meta-secret
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: generate-idp-fed-meta-secret
+          image: {{ include "lib.hook.deploymentImage" . | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              value: {{ include "lib.application.namespace" . | quote }}
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          command: ["/bin/bash", "/scripts/generate-idp-metadata.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-generate-idp-metadata
+            defaultMode: 0755
+{{- end }}

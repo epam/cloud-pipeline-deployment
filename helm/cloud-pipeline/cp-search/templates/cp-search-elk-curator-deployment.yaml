@@ -1,0 +1,79 @@
+{{- if and .Values.enabled .Values.curator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-search-elk-curator
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-search-elk-curator: "true"
+    cloud-pipeline/core-component: Deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-search-elk-curator: "true"
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-search-elk-curator: "true"
+        cloud-pipeline/core-component: Deployment
+    spec:
+      {{- with .Values.nodeSelector.elk }}
+      nodeSelector:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-search-elk-curator
+          image: "{{ .Values.curator.image.repository }}:{{ .Values.curator.image.tag }}"
+          imagePullPolicy: {{ .Values.curator.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["bash"]
+          args: ["-c", "/init.sh"]
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness.sh
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness.sh
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /var/log/curator
+              name: search-elk-curator-log
+            {{- if .Values.cloudCredentials.enabled }}
+            - name: cp-cloud-credentials
+              mountPath: /root/.cloud
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: search-elk-curator-log
+          hostPath:
+            path: {{ .Values.curator.logHostPath }}
+        {{- if .Values.cloudCredentials.enabled }}
+        - name: cp-cloud-credentials
+          secret:
+            secretName: {{ .Values.cloudCredentials.secretName }}
+            optional: {{ .Values.cloudCredentials.optional | default true }}
+        {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

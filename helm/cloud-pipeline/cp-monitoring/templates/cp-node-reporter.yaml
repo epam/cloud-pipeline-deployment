@@ -1,0 +1,101 @@
+{{- if .Values.nodeReporter.enabled }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cp-node-reporter
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-node-reporter: "true"
+    cloud-pipeline/core-component: "DaemonSet"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-node-reporter: "true"
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-node-reporter: "true"
+        cloud-pipeline/core-component: "DaemonSet"
+    spec:
+      hostPID: true
+      nodeSelector:
+        beta.kubernetes.io/os: "linux"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-node-reporter
+          image: "{{ .Values.nodeReporter.image.repository }}:{{ .Values.nodeReporter.image.tag }}"
+          imagePullPolicy: {{ .Values.nodeReporter.image.pullPolicy }}
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CP_NODE_REPORTER_STATS_PORT
+              value: "8000"
+            - name: CP_NODE_REPORTER_OOM_HOSTS_INCLUDE
+              value: "*"
+            - name: CP_NODE_REPORTER_STATS_HOSTS_INCLUDE
+              value: "*"
+            - name: CP_NODE_REPORTER_STATS_PROCS_INCLUDE
+              value: "dockerd,docker-containerd,containerd"
+            - name: CP_LOGGING_LEVEL
+              value: "DEBUG"
+            - name: CP_LOGGING_DIR
+              value: "/opt/node-reporter/logs"
+            - name: CP_LOGGING_HISTORY
+              value: "10"
+            - name: CP_RESOURCES_DIR
+              value: "/opt/node-reporter/resources"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          volumeMounts:
+            - name: logs
+              mountPath: /opt/node-reporter/logs
+            - name: resources
+              mountPath: /opt/node-reporter/resources
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+            - name: docker-bin
+              mountPath: /usr/bin/docker
+      volumes:
+        - name: logs
+          hostPath:
+            path: /opt/node-reporter/logs
+            type: DirectoryOrCreate
+        - name: resources
+          hostPath:
+            path: /opt/node-reporter/resources
+            type: DirectoryOrCreate
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+        - name: docker-bin
+          hostPath:
+            path: /usr/bin/docker
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret
+{{- end }}

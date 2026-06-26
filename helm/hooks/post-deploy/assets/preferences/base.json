@@ -1,0 +1,26 @@
+{
+    "base.api.host": {
+        "value": "https://${CP_API_SRV_INTERNAL_HOST}:${CP_API_SRV_INTERNAL_PORT}/pipeline/restapi/",
+        "visible": true
+    },
+    "base.pipe.distributions.url": {
+        "value": "https://${CP_API_SRV_INTERNAL_HOST}:${CP_API_SRV_INTERNAL_PORT}/pipeline/",
+        "visible": true
+    },
+    "base.api.host.external": {
+        "value": "https://${CP_API_SRV_EXTERNAL_HOST}:${CP_API_SRV_EXTERNAL_PORT}/pipeline/restapi/",
+        "visible": true
+    },
+    "base.cloud.data.distribution.url": {
+        "value": {
+            "windows": "https://${CP_API_SRV_EXTERNAL_HOST}:${CP_API_SRV_EXTERNAL_PORT}/pipeline/cloud-data-win64.zip",
+            "linux": "https://${CP_API_SRV_EXTERNAL_HOST}:${CP_API_SRV_EXTERNAL_PORT}/pipeline/cloud-data-linux.tar.gz",
+            "macos": "https://${CP_API_SRV_EXTERNAL_HOST}:${CP_API_SRV_EXTERNAL_PORT}/pipeline/cloud-data-macos.tar.gz"
+        },
+        "visible": true
+    },
+    "base.dav.auth.url": {
+        "value": "https://${CP_EDGE_EXTERNAL_HOST}:${CP_EDGE_EXTERNAL_PORT}/webdav/auth-sso/",
+        "visible": true
+    }
+}

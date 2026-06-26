@@ -1,0 +1,78 @@
+# Job: register this Docker registry in the API after the Deployment exists.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-post-deploy-docker-registry
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "109"
+    "helm.sh/hook-delete-policy": hook-succeeded
+data:
+  post-deploy-docker-registry.sh: |
+{{ .Files.Get "files/hooks/post-deploy-docker-registry.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: post-deploy-docker-registry
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "110"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: post-deploy
+          image: {{ include "lib.hook.deploymentImage" . }}
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: NAMESPACE
+              value: {{ include "lib.application.namespace" . | quote }}
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: cp-api-token
+                  key: CP_API_JWT_ADMIN
+          command: ["/bin/bash", "/scripts/post-deploy-docker-registry.sh"]
+          volumeMounts:
+            - name: docker-cert
+              mountPath: /etc/post-deploy/docker-cert
+              readOnly: true
+            - name: api-cert
+              mountPath: /etc/post-deploy/api-cert
+              readOnly: true
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: docker-cert
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: ssl-public-cert.pem
+                path: docker-public-cert.pem
+              - key: ssl-private-key.pem
+                path: docker-private-key.pem
+        - name: api-cert
+          secret:
+            secretName: cp-pki-secret
+        - name: scripts
+          configMap:
+            name: cp-hook-script-post-deploy-docker-registry
+            defaultMode: 0755

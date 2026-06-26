@@ -1,0 +1,8 @@
+[
+  {
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["HEAD", "GET", "DELETE", "PUT", "POST"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag", "x-amz-meta-custom-header"]
+  }
+]

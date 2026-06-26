@@ -1,0 +1,10 @@
+{
+    "commit.username": {
+        "value": "pipeline",
+        "visible": false
+    },
+    "commit.timeout": {
+        "value": 18000,
+        "visible": true
+    }
+}

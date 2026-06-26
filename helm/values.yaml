@@ -1,0 +1,227 @@
+# deploymentNamespace: cloud-pipeline
+
+resources:
+  config:
+    CP_CLOUD_PLATFORM: aws  # aws | azure | gcp
+    CP_CLOUD_REGION_ID: ""  # Primary AWS region ID, e.g. us-east-1
+    CP_DEFAULT_ADMIN_NAME: ""
+    CP_DEFAULT_ADMIN_EMAIL: ""
+  customDNS:
+    entries: []
+    # - ip: "203.0.113.5"
+    #   host: "external-rds.corp.internal"
+
+# enabled: in-cluster IdP (Deployment and Service).
+idp:
+  enabled: false
+  service:
+    host:
+      external: ""
+
+# configuration for cp-api-srv deployment
+apiSrv:
+  service:
+    host:
+      external: ""
+
+  highAvailability:
+    enabled: false
+    replicas: 2
+
+  db:
+    # internal (bundled Postgres pod) | external (RDS or managed Postgres)
+    type: internal
+    db: pipeline
+    user: pipeline
+    pass: ""
+
+  cloudRegion:
+    kmsKeyArn: ""             # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
+    kmsKeyId: ""              # Key ID (UUID portion of the ARN)
+    sshKeyName: ""            # AWS EC2 key pair name (not a file path)
+    tempCredentialsRole: ""   # IAM role ARN for temporary S3 credentials
+    backupDuration: 20        # S3 object backup retention in days
+    omicsServiceRole: ""      # IAM role ARN for AWS HealthOmics
+    omicsEcrUrl: ""           # ECR registry URL, e.g. <account>.dkr.ecr.<region>.amazonaws.com
+    #corsRules: ""            # JSON string override; omit (keep commented out) to use hooks/post-deploy/assets/storage.cors.policy.json
+    fileShareMounts: []
+    # - mountRoot: "fs-xxx.efs.us-east-1.amazonaws.com"
+    #   mountType: "NFS"  # NFS | SMB
+    #   mountOptions: ""
+
+  config:
+    CP_PREF_UI_PIPELINE_DEPLOYMENT_NAME: ""
+    CP_KUBE_EXTERNAL_HOST: ""
+    CP_API_SRV_SSO_ENDPOINT_ID: ""
+    CP_PREF_STORAGE_SYSTEM_STORAGE_NAME: ""
+
+dockerRegistry:
+  enabled: true
+  service:
+    host:
+      external: ""
+  config:
+    CP_DOCKER_STORAGE_CONTAINER: ""
+
+edge:
+  region: ""      # AWS region of this edge node, e.g. us-east-1
+  externalIP: ""  # Public IP of edge node (used in DNS and run endpoints)
+  service:
+    host:
+      external: ""
+
+# GitLab (cp-git). Set enabled: false to skip the release (and cp-edge will not wait on cp-git).
+git:
+  enabled: true
+  patchDNS:
+    enabled: true
+  service:
+    host:
+      external: ""
+  gitlab:
+    internalHttpPort: 443
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: git-15-0.17
+    pullPolicy: IfNotPresent
+  config:
+    CP_GITLAB_SSO_ENDPOINT_ID: ""
+    CP_GITLAB_SSO_TARGET_URL: ""
+    CP_GITLAB_SSO_TARGET_URL_TRAIL: ""
+    GITLAB_ROOT_PASSWORD: ""
+
+# Search (cp-search-srv, cp-search-elk, cp-search-elk-curator). Matches EPM-CMBI deploy k8s/cp-search/*.yaml + install.sh cp-search block; label nodes cloud-pipeline/cp-search-srv / cp-search-elk.
+search:
+  enabled: false
+  elk:
+    elasticsearch:
+      enabled: true
+    image:
+      repository: quay.io/lifescience/cloud-pipeline
+      tag: search-elk-0.17
+  curator:
+    image:
+      repository: quay.io/lifescience/cloud-pipeline
+      tag: search-elk-curator-0.17
+  srv:
+    mode: default  # default | nfsEvents | nfsOnly
+    image:
+      repository: quay.io/lifescience/cloud-pipeline
+      tag: search-0.17
+
+# Billing report agent (cp-billing-srv). Syncs billing data to Elasticsearch; requires cloud-pipeline/cp-billing-srv=true on a node (see install.sh).
+billing:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: billing-srv-0.17
+    pullPolicy: Always
+
+# Email notifier (cp-notifier). Patches cp-config-global with CP_NOTIFIER_* from structured smtp/azure/ui settings; requires cloud-pipeline/cp-notifier=true on a node (see install.sh).
+notifier:
+  enabled: false
+  smtp:
+    enabled: false
+    server:
+      host: ""
+      port: ""  # e.g. 587 (STARTTLS) or 465 (SSL)
+    sslOnConnect: false  # true = SSL/TLS from first connect; false = plain or STARTTLS
+    startTls: true       # true = STARTTLS upgrade (used when sslOnConnect is false)
+    from: ""
+    user: ""
+    pass: ""
+  ui:
+    enabled: true
+  azure:
+    enabled: false
+    tenantId: ""
+    clientId: ""
+    clientSecret: ""
+    scopes: "https://graph.microsoft.com/.default"
+    sender: ""
+    dryRun: false  # true = log emails without sending (test mode)
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: notifier-0.17
+    pullPolicy: Always  # IfNotPresent | Always | Never
+
+monitoring:
+  enabled: true
+  heapster:
+    enabled: true
+    elk:
+      image:
+        repository: quay.io/lifescience/cloud-pipeline
+        tag: heapster-elk-0.17
+      dataHostPath: /opt/heapster-elk/data  # Node local path for Elasticsearch data
+  nodeLogger:
+    enabled: true
+    image:
+      repository: quay.io/lifescience/cloud-pipeline
+      tag: node-logger-0.17
+  nodeReporter:
+    enabled: true
+    image:
+      repository: quay.io/lifescience/cloud-pipeline
+      tag: node-reporter-0.17
+  vmMonitor:
+    enabled: true
+    image:
+      repository: quay.io/lifescience/cloud-pipeline
+      tag: vm-monitor-0.17
+    logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files
+
+postDeploy:
+  # Additional (non-default) AWS cloud regions to register after deployment.
+  # Each entry uses the same field names as apiSrv.cloudRegion; regionId and kmsKeyArn are required.
+  additionalCloudRegions: []
+  # - regionId: "us-east-2"          # AWS region ID (required)
+  #   kmsKeyArn: ""                   # Full ARN: arn:aws:kms:<region>:<account>:key/<id> (required)
+  #   kmsKeyId: ""                    # Key ID (UUID portion of the ARN)
+  #   sshKeyName: ""                  # AWS EC2 key pair name
+  #   tempCredentialsRole: ""         # IAM role ARN for temporary S3 credentials
+  #   backupDuration: 20              # S3 object backup retention in days
+  #   omicsServiceRole: ""            # IAM role ARN for AWS HealthOmics
+  #   omicsEcrUrl: ""                 # ECR registry URL
+  #   corsRules: ""                   # JSON string; empty = use hooks/post-deploy/assets/storage.cors.policy.json
+  #   fileShareMounts: []
+  #   # - mountRoot: "fs-xxx.efs.us-east-2.amazonaws.com:/"
+  #   #   mountType: "NFS"  # NFS | SMB
+  #   #   mountOptions: ""
+
+  # Path to a custom preferences JSON file or directory (same format as hooks/assets/preferences/).
+  # Merged after all defaults; entries here win on conflict. Leave empty to skip.
+  # Can also be set via the CP_SYSTEM_PREFERENCE_CONFIG env var before running helmfile.
+  systemPreferenceConfig: ""
+  # Docker tools to push to docker registry and register in Cloud-Pipeline as tools
+  dockers:
+    - "library/rockylinux:latest"
+    - "library/nextflow:latest"
+  # AWS region CORS defaults: hooks/assets/storage.cors.policy.json (read by upload-preferences.sh). Optional override: set CP_STORAGE_CORS_RULES in a ConfigMap or env.
+  # Defines the cluster.networks.config API preference for worker node pools.
+  # Leave empty ({}) to skip. Can also be set to a path of a JSON file with the same structure.
+  clusterNetworksConfig: {}
+  # tags: {}                    # Optional: instance tags applied to all worker nodes (key-value pairs).
+  #                             # Default: {<CP_VM_MONITOR_INSTANCE_TAG_NAME>: <value>} or {monitored: "true"}.
+  # regions:
+  #   - name: ""            # AWS region ID; omit or leave empty to use CP_CLOUD_REGION_ID
+  #     networks: {}            # Map of subnet-id to network-name, e.g. { "subnet-xxx": "my-net" }
+  #     amis:
+  #       - ami: "ami-..."      # Required: explicit AMI ID (null and empty are rejected)
+  #         # platform: linux   # linux (default) | windows
+  #         # instance_mask: "*"  # Instance type glob, e.g. "p*" for GPU instances
+  #         # init_script: ""   # Override default init script path for this AMI
+  #     securityGroupIds: []    # Security group IDs to attach to worker nodes
+  #     # proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]  # Default: CoreDNS from CP_EDGE_CLUSTER_RESOLVER
+  #     # swap: [{name: "swap_ratio", path: "0.01"}]               # Default: 0.01
+
+  # Email notification templates (register-email-templates.sh cleanup hook).
+  # Template names match hooks/post-deploy/assets/email-templates/configs/<NAME>.json
+  emailNotifications:
+    enabled: true   # false = skip the register-email-templates.sh hook
+    # If non-empty, only these types are enabled; all others get enabled=false (bodies still uploaded).
+    enableOnly: []
+    # enableOnly:
+    #   - IDLE_RUN
+    #   - LONG_RUNNING
+

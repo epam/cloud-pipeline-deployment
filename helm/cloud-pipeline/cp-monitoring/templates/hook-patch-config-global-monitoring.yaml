@@ -1,0 +1,27 @@
+{{- if .Values.heapster.enabled }}
+{{- $namespace := include "lib.application.namespace" . }}
+{{- $elkInternalHost := printf "%s.%s.svc.cluster.local" .Values.heapster.elk.service.name $namespace }}
+{{- $elkInternalPort := .Values.heapster.elk.service.port.internal | toString }}
+{{- $heapsterInternalHost := printf "%s.%s.svc.cluster.local" .Values.heapster.service.name $namespace }}
+{{- $heapsterInternalPort := .Values.heapster.service.port.internal | toString }}
+{{- $data := dict -}}
+{{- $_ := set $data "CP_HEAPSTER_ELK_INTERNAL_HOST" $elkInternalHost -}}
+{{- $_ := set $data "CP_HEAPSTER_ELK_INTERNAL_PORT" $elkInternalPort -}}
+{{- $_ := set $data "CP_HEAPSTER_INTERNAL_HOST" $heapsterInternalHost -}}
+{{- $_ := set $data "CP_HEAPSTER_INTERNAL_PORT" $heapsterInternalPort -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-monitoring
+  namespace: {{ $namespace }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "jobName" "patch-config-global-cp-monitoring" "hookWeight" "2" "activeDeadlineSeconds" 120) }}
+{{- end }}

@@ -1,0 +1,89 @@
+{{- if .Values.heapster.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.heapster.service.name }}
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-heapster: "true"
+    cloud-pipeline/core-component: "Service"
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.heapster.service.port.internal }}
+      targetPort: 8082
+      name: heapster
+  selector:
+    cloud-pipeline/cp-heapster: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-heapster
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-heapster: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-heapster: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-heapster: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-heapster: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: wait-for-elk
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              timeout={{ .Values.heapster.elk.readinessTimeoutSec }}
+              elapsed=0
+              until wget -qO- http://{{ .Values.heapster.elk.service.name }}.{{ include "lib.application.namespace" . }}.svc.cluster.local:{{ .Values.heapster.elk.service.port.internal }}/; do
+                echo "Waiting for cp-heapster-elk... (${elapsed}s / ${timeout}s)";
+                if [ "$elapsed" -ge "$timeout" ]; then
+                  echo "cp-heapster-elk did not become ready within ${timeout}s, aborting.";
+                  exit 1;
+                fi;
+                sleep 5;
+                elapsed=$((elapsed + 5));
+              done
+      containers:
+        - name: cp-heapster
+          image: "{{ .Values.heapster.image.repository }}:{{ .Values.heapster.image.tag }}"
+          imagePullPolicy: {{ .Values.heapster.image.pullPolicy }}
+          command: ["/heapster"]
+          args:
+            - --source=kubernetes:https://$(CP_KUBE_INTERNAL_HOST):$(CP_KUBE_INTERNAL_PORT)?useServiceAccount=true&kubeletHttps=true&kubeletPort=$(CP_KUBE_KUBELET_PORT)&insecure=true
+            - --sink=elasticsearch:http://{{ .Values.heapster.elk.service.name }}.{{ include "lib.application.namespace" . }}.svc.cluster.local:{{ .Values.heapster.elk.service.port.internal }}?sniff=false
+            - --metric_resolution={{ .Values.heapster.metricResolution }}
+          ports:
+            - containerPort: 8082
+          env:
+            - name: http_proxy
+              value: ""
+            - name: https_proxy
+              value: ""
+            - name: HTTP_PROXY
+              value: ""
+            - name: HTTPS_PROXY
+              value: ""
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+{{- end }}

@@ -1,0 +1,44 @@
+{{- if .Values.nodeLogger.enabled }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cp-node-logger
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-node-logger: "true"
+    cloud-pipeline/core-component: "DaemonSet"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-node-logger: "true"
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-node-logger: "true"
+        cloud-pipeline/core-component: "DaemonSet"
+    spec:
+      containers:
+        - name: cp-node-logger
+          image: "{{ .Values.nodeLogger.image.repository }}:{{ .Values.nodeLogger.image.tag }}"
+          imagePullPolicy: {{ .Values.nodeLogger.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          volumeMounts:
+            - name: kubelet-log
+              mountPath: /var/log/kubelet
+              readOnly: true
+      volumes:
+        - name: kubelet-log
+          hostPath:
+            path: /var/log/kubelet
+{{- end }}

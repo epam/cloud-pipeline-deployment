@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-jwt-generation
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+data:
+  jwt-generation.sh: |
+{{ .Files.Get "files/hooks/jwt-generation.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: jwt-token-generator
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: generate-jwt
+          image: "{{ .Values.image.apiServer.repository }}:{{ .Values.image.apiServer.tag }}"
+          imagePullPolicy: {{ .Values.image.apiServer.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: NAMESPACE
+              value: {{ include "lib.application.namespace" . | quote }}
+            - name: CP_API_TOKEN_SECRET_NAME
+              value: {{ include "lib.cpApiTokenSecretName" . | quote }}
+          command: ["/bin/bash", "/scripts/jwt-generation.sh"]
+          volumeMounts:
+            - mountPath: /opt/api/pki
+              name: cp-api-secret
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: cp-api-secret
+          secret:
+            secretName: cp-jwt-pki-secret
+        - name: scripts
+          configMap:
+            name: cp-hook-script-jwt-generation
+            defaultMode: 0755

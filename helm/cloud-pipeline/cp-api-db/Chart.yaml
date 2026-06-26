@@ -1,0 +1,11 @@
+apiVersion: v2
+name: cp-api-db
+description: Cloud-Pipeline in-cluster PostgreSQL (optional; internal DB only)
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: lib
+    version: "1.0.0"
+    repository: "file://../lib"

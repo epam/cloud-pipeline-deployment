@@ -1,0 +1,150 @@
+# Optional post-install Job: patch kube-dns cp-dnsmasq-hosts (see lib.patchDNSJob).
+{{ include "lib.patchDNSJob" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-docker-registry
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-docker-registry: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 443
+      targetPort: 443
+      name: cp-docker-registry-port-https
+  selector:
+    cloud-pipeline/cp-docker-registry: "true"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-docker-registry
+  namespace: {{ include "lib.application.namespace" . }}
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-docker-registry: "true"
+  replicas: 1
+  template:
+    metadata:
+      namespace: {{ include "lib.application.namespace" . }}
+      labels:
+        cloud-pipeline/cp-docker-registry: "true"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-docker-registry: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-docker-registry
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 443
+          envFrom:
+          - configMapRef:
+              name: cp-config-global
+          env:
+          - name: CP_API_SRV_INTERNAL_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: cp-config-global
+                key: CP_API_SRV_INTERNAL_HOST
+          - name: CP_API_SRV_INTERNAL_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: cp-config-global
+                key: CP_API_SRV_INTERNAL_PORT
+          - name: CP_API_JWT_ADMIN
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "lib.cpApiTokenSecretName" . }}
+                key: CP_API_JWT_ADMIN
+          - name: REGISTRY_HTTP_ADDR
+            value: "0.0.0.0:80"
+          {{- if .Values.useEc2InstanceRoleForS3 }}
+          - name: CP_CLOUD_CREDENTIALS_LOCATION
+            value: "/dev/null"
+          {{- else }}
+          - name: CP_CLOUD_CREDENTIALS_LOCATION
+            value: "/root/.cloud/credentials"
+          {{- end }}
+          volumeMounts:
+            - mountPath: /opt/docker-registry/pki
+              name: cp-docker-registry-pki
+            - mountPath: /opt/common/pki
+              name: cp-common-pki
+              readOnly: true
+            - mountPath: /var/lib/registry
+              subPath: docker-registry/images
+              name: cp-system
+            - mountPath: /usr/local/share/ca-certificates/cp-api
+              name: cp-api-pki
+              readOnly: true
+            {{- if not .Values.useEc2InstanceRoleForS3 }}
+            - name: cp-cloud-credentials
+              mountPath: /root/.cloud
+              readOnly: true
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 4
+      volumes:
+        - name: cp-docker-registry-pki
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: ssl-public-cert.pem
+                path: docker-public-cert.pem
+              - key: ssl-private-key.pem
+                path: docker-private-key.pem
+        - name: cp-common-pki
+          secret:
+            secretName: cp-pki-secret
+        - name: cp-api-pki
+          projected:
+            defaultMode: 420
+            sources:
+              - secret:
+                  name: cp-pki-secret
+                  items:
+                    - key: ssl-public-cert.pem
+                      path: ssl-public-cert.pem
+              - secret:
+                  name: cp-jwt-pki-secret
+                  items:
+                    - key: jwt.key.x509
+                      path: jwt.key.x509
+        {{- if not .Values.useEc2InstanceRoleForS3 }}
+        - name: cp-cloud-credentials
+          secret:
+            secretName: cp-cloud-credentials
+            optional: true
+        {{- end }}
+        - name: cp-system
+          hostPath:
+            path: {{ .Values.hostPath.basePath }}
+            type: DirectoryOrCreate
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret

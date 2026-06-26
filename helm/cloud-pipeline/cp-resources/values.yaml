@@ -1,0 +1,34 @@
+# PKI/JWT secrets (cp-pki-secret, cp-jwt-pki-secret): create before Helm deploy — see helm/prerequisites/README.md
+
+# Seed keys for cp-config-global; other charts add keys.
+# CP_DEPLOYMENT_ID is injected into cp-config-global by the chart (defaults to Helm release name) unless
+# you set resources.config.CP_DEPLOYMENT_ID in deploy values.
+config:
+  CP_CLOUD_REGION_ID: ""  # Primary AWS region ID, e.g. us-east-1
+  CP_CLOUD_CREDENTIALS_LOCATION: /root/.cloud
+  CP_CLOUD_PLATFORM: aws  # aws | azure | gcp
+  # CP_CLOUD_INTERNAL_HOST | CP_CLOUD_EXTERNAL_HOST | literal hostname env var key
+  CP_KUBE_EXTERNAL_HOST_TYPE: CP_CLOUD_INTERNAL_HOST
+  CP_KUBE_NAMESPACE: default
+  CP_KUBE_EXTERNAL_HOST: ""  # Public hostname or IP of the Kubernetes API server
+  CP_KUBE_EXTERNAL_PORT: "6443"
+  CP_KUBE_FLANNEL_CIDR: 10.244.0.0/16  # Pod network CIDR — must match kubeadm --pod-network-cidr
+  CP_KUBE_INTERNAL_HOST: kubernetes.default.svc.cluster.local
+  CP_KUBE_INTERNAL_PORT: "443"
+  CP_KUBE_KUBELET_PORT: "10250"
+  CP_KUBE_MASTER_DOCKER_MIN_DISK_MB: "102400"  # Minimum free disk in MB for Docker on master
+  CP_KUBE_MASTER_ETCD_MIN_DISK_MB: "20480"     # Minimum free disk in MB for etcd
+  CP_COMMON_CERT_DIR: /opt/common/pki
+  CP_COMMON_PKI_DURATION: "7300"  # TLS certificate validity in days (~20 years)
+  CP_COMMON_ROOT_FS_MIN_DISK_MB: "20480"  # Minimum free root filesystem in MB
+  CP_COMMON_SSL_SELF_SIGNED: "false"  # "true" | "false" — set "true" when using auto-generated self-signed certs
+  CP_DEFAULT_ADMIN_NAME: pipe_admin
+  CP_DEFAULT_ADMIN_PASS: ""
+  CP_DEFAULT_ADMIN_EMAIL: ""
+
+# Static DNS entries added to cp-dnsmasq-hosts (kube-dns). Use for external hosts
+# that are not Kubernetes services (e.g. RDS endpoints, NFS servers, external APIs).
+customDNS:
+  entries: []
+  # - ip: "203.0.113.5"
+  #   host: "external-rds.corp.internal"

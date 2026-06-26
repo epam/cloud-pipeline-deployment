@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-register-system-storage
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "30"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  cloud-pipeline-utils.sh: |
+{{ .Files.Get "files/hooks/utils/cloud-pipeline-utils.sh" | indent 4 }}
+  register-system-storage.sh: |
+{{ .Files.Get "files/hooks/register-system-storage.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cp-register-system-storage
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "31"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: register-system-storage
+          image: {{ include "lib.hook.deploymentImage" . | quote }}
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+            - secretRef:
+                name: cp-api-token
+          command: ["/bin/bash", "/scripts/register-system-storage.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-register-system-storage
+            defaultMode: 0755

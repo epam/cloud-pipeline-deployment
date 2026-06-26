@@ -1,0 +1,71 @@
+# Helmfile `installed:`; set false to skip this release.
+enabled: false
+
+service:
+  name: cp-search
+
+# Matches install.sh node labels: cloud-pipeline/cp-search-elk / cloud-pipeline/cp-search-srv
+nodeSelector:
+  elk:
+    cloud-pipeline/cp-search-elk: "true"
+  srv:
+    cloud-pipeline/cp-search-srv: "true"
+
+imagePullSecrets:
+  - name: cp-distr-docker-registry-secret
+
+# In-cluster Elasticsearch (install.sh when CP_SEARCH_ELK_TYPE == elasticsearch).
+elk:
+  elasticsearch:
+    enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: search-elk-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+  heapSize: 4g  # JVM heap for Elasticsearch, e.g. 4g, 8g (use M/G suffix)
+  # Extra JVM flags (install-config used CMS; container image may override).
+  javaOptsExtra: "-XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
+  dataHostPath: /opt/search-elk/data      # Node local path for Elasticsearch index data
+  backupHostPath: /opt/search-elk/backup  # Node local path for Elasticsearch snapshots
+
+curator:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: search-elk-curator-0.17
+    pullPolicy: Always  # IfNotPresent | Always | Never
+  logHostPath: /opt/search-elk/log/curator
+
+# cp-search-srv Deployment (install.sh default vs cp-search-srv-nfs-events / nfs-only k8s specs).
+srv:
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: search-0.17
+    pullPolicy: Always  # IfNotPresent | Always | Never
+  # default | nfsEvents | nfsOnly — controls indexer env flags and log hostPath (see EPM-CMBI k8s/cp-search/*-dpl*.yaml).
+  mode: default
+  logsHostPath: "/opt/search/logs"  # Node local path for search-srv log files; empty = no hostPath mount
+  # Optional extra env (list of {name:, value:}).
+  extraEnv: []
+
+# Mount cp-cloud-credentials into elk/curator (install.sh specs). Disable if secret is absent.
+cloudCredentials:
+  enabled: false
+  secretName: cp-cloud-credentials
+  # When true, workloads still start if the Secret does not exist (useful on fresh installs / IAM-role-only setups).
+  optional: true
+
+# Keys merged into cp-config-global via pre-upgrade hook (aligned with EPM-CMBI deploy/contents/install/install-config).
+config:
+  CP_SEARCH_ELK_TYPE: elasticsearch  # elasticsearch (only supported value)
+  CP_SEARCH_ELK_BACKUP_SERVICE_ROLE_ARN: ""  # IAM role ARN for Elasticsearch snapshot S3 access
+  CP_SEARCH_ELK_INTERNAL_SCHEME: http  # http | https
+  CP_SEARCH_ELK_INTERNAL_HOST: ""  # Elasticsearch host; empty = auto-resolved from service name
+  CP_SEARCH_ELK_ELASTIC_INTERNAL_PORT: "30091"
+  CP_SEARCH_ELK_TRANSPORT_INTERNAL_PORT: "30092"
+  CP_SEARCH_ELK_ULIMIT: "65536"  # nofile ulimit for Elasticsearch container
+  CP_SEARCH_ELK_HEAP_SIZE: 4g    # JVM heap passed as ES_JAVA_OPTS (should match elk.heapSize)
+  CP_SEARCH_ELK_CURATOR_CONTINUE_ON_FAILED_ACTION: "False"
+  CP_SEARCH_INTERNAL_HOST: ""
+  CP_SEARCH_INTERNAL_PORT: "30093"
+

@@ -1,0 +1,14 @@
+{
+    "git.repository.indexing.enabled": {
+        "value": "false",
+        "visible": false
+    },
+    "git.gitlab.api.version": {
+        "value": "v4",
+        "visible": false
+    },
+    "git.fsbrowser.workdir": {
+        "value": "/git-workdir",
+        "visible": true
+    }
+}

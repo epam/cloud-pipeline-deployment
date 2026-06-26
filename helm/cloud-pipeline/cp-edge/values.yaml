@@ -1,0 +1,28 @@
+service:
+  name: cp-edge
+  host:
+    external: ""
+    internal: cp-edge.default.svc.cluster.local
+  port:
+    external: "443"
+    internal: "443"
+
+patchDNS:
+  enabled: true
+
+region: ""      # AWS region of this edge node, e.g. us-east-1
+externalIP: ""  # Public IP of edge node (used in DNS and run endpoints)
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: edge-0.17
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+config:
+  CP_KUBE_SERVICES_TYPE: ingress  # ingress | nodePort
+  CP_EDGE_CONNECT_EXTERNAL_PORT: "31092"
+  CP_EDGE_CONNECT_INTERNAL_PORT: "31092"
+  CP_EDGE_WEB_EXTERNAL_PORT: "31091"
+  CP_EDGE_WEB_INTERNAL_PORT: "31091"
+  CP_EDGE_WEB_CLIENT_MAX_SIZE: 500M  # nginx client_max_body_size notation (e.g. 500M, 2G)
+  CP_EDGE_CERT_DIR: /opt/edge/pki
+  CP_EDGE_MAX_SSH_CONNECTIONS: "25"  # Concurrent SSH tunnel limit per edge pod
+  CP_EDGE_INVALIDATE_AUTH_PATH: /invalidate

@@ -1,0 +1,45 @@
+# false = ConfigMap only (external IdP). true = in-cluster IdP Deployment and Service.
+enabled: false
+
+# cp-idp-secret: create before Helm deploy — see ../../prerequisites/README.md
+
+service:
+  name: cp-idp
+  host:
+    external: ""
+    internal: ""
+  port:
+    external: "443"
+    internal: "443"
+
+patchDNS:
+  enabled: true
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: idp-0.17
+  pullPolicy: Always  # IfNotPresent | Always | Never
+labels: {}
+deploymentLabels: {}
+
+config:
+  CP_IDP_CERT_DIR: /opt/idp/pki
+  CP_IDP_PROFILE_DB: /opt/idp/saml-idp-profiles.json
+  CP_API_SRV_SAML_USER_ATTRIBUTES: "Email=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress,FirstName=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname,LastName=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname%22"
+
+apiSrv:
+  service:
+    host:
+      external: ""
+    port:
+      external: "443"
+
+git:
+  enabled: false  # true = configure GitLab SAML SSO against this IdP
+  service:
+    host:
+      external: ""
+    port:
+      external: "443"
+  ssoEndpointId: ""
+

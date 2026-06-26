@@ -1,0 +1,47 @@
+{
+    "regions": [
+        {
+            "name": "${CP_CLOUD_REGION_ID}",
+            "default": true,
+            "networks": {},
+            "proxies": [
+                {
+                    "name": "dns_proxy_post",
+                    "path": "${CP_PREF_CLUSTER_PROXIES_DNS_POST}"
+                }
+            ],
+            "amis": [
+                {
+                    "platform": "linux",
+                    "instance_mask": "g*",
+                    "ami": "${CP_PREF_CLUSTER_INSTANCE_IMAGE_GPU}",
+                    "init_script": "/opt/api/scripts/init_multicloud_v1.15.4.sh"
+                },
+                {
+                    "platform": "linux",
+                    "instance_mask": "*",
+                    "ami": "${CP_PREF_CLUSTER_INSTANCE_IMAGE}",
+                    "init_script": "/opt/api/scripts/init_multicloud_v1.15.4.sh"
+                },
+                {
+                    "platform": "windows",
+                    "instance_mask": "*",
+                    "ami": "${CP_PREF_CLUSTER_INSTANCE_IMAGE_WIN}",
+                    "init_script": "/opt/api/scripts/init_multicloud.ps1"
+                }
+            ],
+            "swap": [
+                {
+                    "name": "swap_ratio",
+                    "path": "0.01"
+                }
+            ],
+            "security_group_ids": [
+                ${CP_PREF_CLUSTER_INSTANCE_SECURITY_GROUPS}
+            ]
+        }
+    ],
+    "tags": {
+        "monitored": "true"
+    }
+}

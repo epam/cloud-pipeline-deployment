@@ -1,0 +1,10 @@
+{
+    "storage.allow.signed.urls": {
+        "value": "true",
+        "visible": true
+    },
+    "storage.version.storage.ignored.files": {
+        "value": ".gitkeep",
+        "visible": true
+    }
+}

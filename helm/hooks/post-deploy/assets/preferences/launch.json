@@ -1,0 +1,760 @@
+{
+    "launch.task.status.update.rate": {
+        "value": 20000,
+        "visible": false
+    },
+    "launch.cmd.template": {
+        "value": "sleep infinity",
+        "visible": true
+    },
+    "launch.run.visibility": {
+        "value": "INHERIT",
+        "visible": true
+    },
+    "launch.kube.pod.search.path": {
+        "value": "pods.default.svc.cluster.local",
+        "visible": true
+    },
+    "launch.kube.pod.domains.enabled": {
+        "value": "true",
+        "visible": true
+    },
+    "launch.dind.mounts": {
+        "value": [
+            {
+                "name": "docker-sock",
+                "hostPath": "/var/run/docker.sock",
+                "mountPath": "/var/run/docker.sock"
+            },
+            {
+                "name": "docker-bin",
+                "hostPath": "/bin/docker",
+                "mountPath": "/usr/bin/docker"
+            }
+        ],
+        "visible": true
+    },
+    "launch.env.properties": {
+        "value": {
+            "variables": {
+                "CP_CLUSTER_NAME": "CLOUD_PIPELINE",
+                "CP_RESTRICTED_PACKAGES": "nvidia-",
+                "CP_RESTRICTING_PACKAGE_MANAGERS": "apt,apt-get,aptitude,yum,pip,pip2,pip3",
+                "CP_ALLOWED_MOUNT_TRANSFER_SIZE": "50",
+                "CP_REPO_ENABLED": "true",
+                "CP_NM_PROXY_HOST": "${CP_EDGE_EXTERNAL_HOST}",
+                "CP_NM_PROXY_PORT": "${CP_EDGE_EXTERNAL_PORT}",
+                "CP_CAP_DCV_PROXY_HOST": "${CP_EDGE_EXTERNAL_HOST}",
+                "CP_CAP_DCV_PROXY_PORT": "${CP_EDGE_EXTERNAL_PORT}",
+                "CP_NOLOCK": "true",
+                "CP_NOCLEAN": "true"
+            },
+            "sensitive": {
+                "http_proxy": "http://cp-sensitive-proxy.default.svc.cluster.local:3128",
+                "https_proxy": "http://cp-sensitive-proxy.default.svc.cluster.local:3128",
+                "ftp_proxy": "http://cp-sensitive-proxy.default.svc.cluster.local:3128",
+                "no_proxy": "localhost,127.0.0.1,.cluster.local,cluster.local,10.96.0.1,${CP_API_SRV_INTERNAL_HOST},${CP_DOCKER_INTERNAL_HOST}"
+            }
+        },
+        "visible": true
+    },
+    "launch.system.parameters": {
+        "value": [
+            {
+                "name": "CP_DISABLE_WORKER_ENDPOINTS",
+                "type": "boolean",
+                "description": "Disable Endpoint URLs for worker nodes, if a cluster run is scheduled. Only master node will expose Endpoint URL",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_DISABLE_RUN_ENDPOINTS",
+                "type": "boolean",
+                "description": "Disable Endpoint URL for a current run. If a cluster run is scheduled - worker nodes will still expose expose Endpoint URL",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_SGE",
+                "type": "boolean",
+                "description": "Enables Grid Engine for a current run",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_SGE_QUEUE_NAME",
+                "type": "string",
+                "description": "Overrides the default name of the Grid Engine queue",
+                "defaultValue": "main.q",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SGE_HOSTLIST_NAME",
+                "type": "string",
+                "description": "Overrides the default name of the Grid Engine hostlist",
+                "defaultValue": "@allhosts",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SGE_DISABLE_DEFAULT_QUEUE",
+                "type": "string",
+                "description": "Disables default Grid Engine queue and hostlist creation",
+                "defaultValue": "true",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SGE_PE_NAME",
+                "type": "string",
+                "description": "Overrides the default name of the Grid Engine PE",
+                "defaultValue": "local",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_MODULES",
+                "type": "boolean",
+                "description": "Enables Environment Modules for a current run",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_MODULES_TYPE",
+                "type": "string",
+                "description": "Declares specific environment module system to use (tcl/lmod)",
+                "defaultValue": "tcl"
+            },
+            {
+                "name": "CP_CAP_SPARK",
+                "type": "boolean",
+                "description": "Enables Spark for a current run",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_SPARK_VERSION",
+                "type": "string",
+                "description": "Allows to override a Spark version (2.3.3 or 2.4.3)",
+                "defaultValue": "2.4.3"
+            },
+            {
+                "name": "CP_CAP_KUBE",
+                "type": "boolean",
+                "description": "Enables Kubernetes for a current run (1.15.4), supported for Centos only",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_KUBE_VERSION",
+                "type": "string",
+                "description": "Sets Kubernetes version to be installed: 1.15.4 and 1.28.2 are available",
+                "defaultValue": "1.15.4",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_S3_FUSE_TYPE",
+                "type": "string",
+                "description": "Allows to select which FUSE implementation to use for S3 buckets mounting. Allowed values are: goofys, s3fs and pipefuse",
+                "defaultValue": "goofys",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_S3_FUSE_STAT_CACHE",
+                "type": "string",
+                "description": "Applied to goofys FUSE. How long to cache StatObject results and inode attributes. Set this to 0 if you are experiencing issues with files consistency",
+                "defaultValue": "1m0s",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_S3_FUSE_ENSURE_DISKFREE",
+                "type": "int",
+                "description": "Applied to s3fs FUSE. Sets MB to ensure disk free space. This option means the threshold of free space size on disk which is used for the cache file by s3fs. s3fs makes file for downloading, uploading and caching files. If the disk free space is smaller than this value, s3fs do not use disk space as possible in exchange for the performance.",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_S3_FUSE_TYPE_CACHE",
+                "type": "string",
+                "description": "Applied to goofys FUSE. How long to cache name -> file/dir mappings in directory. Set this to 0 if you are experiencing issues with files consistency",
+                "defaultValue": "1m0s",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_GCS_FUSE_TYPE",
+                "type": "string",
+                "description": "Allows to select which FUSE implementation to use for GCS buckets mounting. Allowed values are: gcsfuse and pipefuse",
+                "defaultValue": "gcsfuse",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_PIPE_FUSE_PERSIST_LOGS",
+                "type": "boolean",
+                "description": "Enables pipefuse logging persistence for a current run",
+                "defaultValue": true
+            },
+            {
+                "name": "CP_PIPE_FUSE_DEBUG_LIBFUSE",
+                "type": "boolean",
+                "description": "Enables pipefuse low level logging for a current run",
+                "defaultValue": false
+            },
+            {
+                "name": "CP_PIPE_FUSE_LOGGING_LEVEL",
+                "type": "string",
+                "description": "Declares pipefuse logging level (CRITICAL, ERROR, WARN, INFO or DEBUG)",
+                "defaultValue": "ERROR"
+            },
+            {
+                "name": "CP_PIPE_FUSE_MOUNT_OPTIONS",
+                "type": "string",
+                "description": "Declares pipefuse additional mount options",
+                "defaultValue": ""
+            },
+            {
+                "name": "CP_CAP_SGE_MASTER_CORES",
+                "type": "string",
+                "description": "Allow to limit Grid Engine master cores usage (0 - do not use)",
+                "defaultValue": ""
+            },
+            {
+                "name": "CP_CAP_SGE_WORKER_FREE_CORES",
+                "type": "string",
+                "description": "Allow to keep the specified number of CPUs unused by the GE worker",
+                "defaultValue": "1",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SLURM_MAX_ARRAY_SIZE",
+                "type": "string",
+                "description": "Allow to control the MaxArraySize - a maximum job array size.",
+                "defaultValue": "1001",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_NFS",
+                "type": "boolean",
+                "description": "Enables shared filesystem (NFS) for a current run. If a cluster run is scheduled - worker nodes will mount NFS share",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_NFS_THREADS",
+                "type": "string",
+                "description": "Number of NFS threads to use. If empty - cores * 4, but not more that 32",
+                "defaultValue": ""
+            },
+            {
+                "name": "CP_CAP_NFS_SYNC_MODE",
+                "type": "string",
+                "description": "NFS server will use sync/async mode. Allows to manage performance",
+                "defaultValue": "sync"
+            },
+            {
+                "name": "RUN_DIR",
+                "type": "string",
+                "description": "Defines a folder within a compute node, that holds all run-specific folders (ANALYSIS_DIR, INPUT_DIR, CONFIG_DIR, SCRIPTS_DIR)",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "COMMON_DIR",
+                "type": "string",
+                "description": "Defines a folder within a compute node, that is typically used within custer runs and is mounted as a NFS across cluster nodes",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "ANALYSIS_DIR",
+                "type": "string",
+                "description": "Defines a folder within a compute node, which is typically used as a Current Working Directory. When a batch run is finished - files from this directory are uploaded to the Output locations",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "INPUT_DIR",
+                "type": "string",
+                "description": "Defines a folder within a compute node, which is typically used for storing data, that is downloaded from the datastorage automatically",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "SCRIPTS_DIR",
+                "type": "string",
+                "description": "Defines a folder within a compute node, which is typically used for cloning pipeline code",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "CONFIG_DIR",
+                "type": "string",
+                "description": "Defines a folder within a compute node, which is typically used for storing configuration files",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "SHARED_FOLDER",
+                "type": "string",
+                "description": "Defines a folder within a compute node, which is typically used for storing any data that can be shared across nodes within a cluster, that shall be separated from the COMMON_DIR",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_TRANSFER_BUCKET",
+                "type": "string",
+                "description": "Defines a bucket name that will be used to transfer file from on-premise DTS to the Cloud and vice-versa",
+                "defaultValue": "project.DataStorage"
+            },
+            {
+                "name": "CP_CAP_AUTOSCALE",
+                "type": "boolean",
+                "description": "Enables cluster autoscaling",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_AUTOSCALE_WORKERS",
+                "type": "int",
+                "description": "Maximum number of additional cluster autoscaled workers",
+                "defaultValue": "3"
+            },
+            {
+                "name": "CP_CAP_AUTOSCALE_VERBOSE",
+                "type": "boolean",
+                "description": "Enables cluster autoscaling verbose logging",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_AUTOSCALE_PRICE_TYPE",
+                "type": "boolean",
+                "description": "Instance price type that will be used for cluster additional workers",
+                "defaultValue": ""
+            },
+            {
+                "name": "CP_CAP_AUTOSCALE_HYBRID",
+                "type": "boolean",
+                "description": "Enables hybrid cluster autoscaling",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_AUTOSCALE_HYBRID_FAMILY",
+                "type": "string",
+                "description": "Instance type family that will be used for hybrid autoscaling cluster workers",
+                "defaultValue": ""
+            },
+            {
+                "name": "CP_CAP_AUTOSCALE_HYBRID_MAX_CORE_PER_NODE",
+                "type": "int",
+                "description": "Maximum number of cores that hybrid autoscaling cluster worker instances can have",
+                "defaultValue": "2"
+            },
+            {
+                "name": "CP_CAP_DIND_CONTAINER",
+                "type": "boolean",
+                "description": "Enable docker engine for a current run using a containerized approach",
+                "defaultValue": "true"
+            },
+            {
+                "name": "CP_CAP_DIND_VERSION",
+                "type": "string",
+                "description": "Allows to select docker version, used for DIND setup",
+                "defaultValue": "18.09.6",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SYSTEMD_CONTAINER",
+                "type": "boolean",
+                "description": "Enable systemd for a current run (supported for Centos only)",
+                "defaultValue": "true",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_KEEP_FAILED_RUN",
+                "type": "string",
+                "description": "Any job, that is failed due to the <command> or output upload errors, will be kept for this amount of time before terminated. <sleep> format is accepted",
+                "defaultValue": "36000s"
+            },
+            {
+                "name": "CP_CAP_SINGULARITY",
+                "type": "boolean",
+                "description": "Enable singularity for a current run",
+                "defaultValue": "true",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_TZ",
+                "type": "string",
+                "description": "Overwrites standard UTC timezone on pipeline run node",
+                "defaultValue": "/usr/share/zoneinfo/UTC",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SHARE_FS_TYPE",
+                "type": "string",
+                "description": "Defines which file system shall be used as shared for cluster runs",
+                "defaultValue": "lfs",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SHARE_FS_SIZE",
+                "type": "int",
+                "description": "Allows to specify shared file system size (supported for Lustre FS only)",
+                "defaultValue": "1200",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_SHARE_FS_DEPLOYMENT_TYPE",
+                "type": "string",
+                "description": "Allows to specify shared file deployment type: [SCRATCH_1, SCRATCH_2, PERSISTENT_1, PERSISTENT_2] (supported for Lustre FS only)",
+                "defaultValue": "SCRATCH_2",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_SHARE_FS_THROUGHPUT",
+                "type": "int",
+                "description": "Allows to specify shared file system throughput (supported for persistent Lustre FS only)",
+                "defaultValue": "500",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_SHARE_FS_IOPS",
+                "type": "int",
+                "description": "Allows to specify shared file system IOPS (supported for persistent Lustre FS only). Possible values are: [1500, 3000, 6000, 12000, 24000, 36000, 48000, 60000, 72000, 84000, 96000, 108000, 120000, 132000, 144000, 156000, 168000, 180000, 192000]",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_HW_ADDR",
+                "type": "string",
+                "description": "Allows to override the MAC address of the instance, running a job. Format: XX:XX:XX:XX:XX:XX",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_HW_NAME",
+                "type": "string",
+                "description": "Controls the network interface name, to apply the CP_CAP_HW_ADDR. Default: eth0",
+                "defaultValue": "eth0",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_EXEC_TIMEOUT",
+                "type": "int",
+                "description": "If defined - will terminate job when specified duration in minutes is elapsed",
+                "defaultValue": "",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_LIMIT_MOUNTS",
+                "type": "string",
+                "description": "If defined - will limit mounts for the run",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_MOUNT_OPTIONS_",
+                "type": "string",
+                "description": "Allows to set mount options for a storage",
+                "passToWorkers": true,
+                "prefix": true
+            },
+            {
+                "name": "CP_CAP_MOUNT_PATH_",
+                "type": "string",
+                "description": "Allows to set mount path for a storage",
+                "passToWorkers": true,
+                "prefix": true
+            },
+            {
+                "name": "CP_CAP_FORCE_MOUNTS",
+                "type": "string",
+                "description": "If defined - will force specified mounts for the run, even if the limits are set",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_PIPE_FUSE_MOUNT_TIMEOUT",
+                "type": "int",
+                "description": "Allows to specify the pipe fuse timeout",
+                "defaultValue": "10000",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_FS_MOUNT_ATTEMPT",
+                "type": "int",
+                "description": "Allows to specify the number of times the NFS client attempts to retries an NFS mount operation after the first attempt fails",
+                "defaultValue": "0",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_FS_MOUNT_TIMEOUT",
+                "type": "int",
+                "description": "Allows to specify the time in deciseconds the NFS client waits for a response before it retries an NFS request",
+                "defaultValue": "7",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_POD_PULL_POLICY",
+                "type": "string",
+                "description": "Allows to specify pod image pull policy. Valid values are 'Always', 'Never', 'IfNotPresent'",
+                "defaultValue": "Always",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_DISABLE_HYPER_THREADING",
+                "type": "boolean",
+                "description": "Disables hyper-threading for a run and its workers",
+                "defaultValue": "false",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_FSBROWSER_ENABLED",
+                "type": "string",
+                "description": "Disables BROWSE button for the job",
+                "defaultValue": "false",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SHARE_USERS",
+                "type": "boolean",
+                "description": "Enables cluster users sharing.",
+                "defaultValue": "true",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SYNC_USERS",
+                "type": "boolean",
+                "description": "Enables users synchronization.",
+                "defaultValue": "true",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_SSH_MODE",
+                "type": "string",
+                "description": "SSH connection mode. Allowed values are: user, owner, owner-sshpass and root.",
+                "defaultValue": "root",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_DCV",
+                "type": "boolean",
+                "description": "Enables NICE DCV Desktop environment.",
+                "defaultValue": "true",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_LOCALIZE_FROM_FILES",
+                "type": "string",
+                "description": "Lists job parameter names, which are used to extend the InputData task",
+                "defaultValue": "",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_LOCALIZE_FROM_FILES_EXT",
+                "type": "string",
+                "description": "If CP_LOCALIZE_FROM_FILES defines a directory, allows to filter files by mask",
+                "defaultValue": "*",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_LOCALIZE_FROM_FILES_ENV_VARS_SUFFIX",
+                "type": "string",
+                "description": "How to name an isolated data localization process to CP_LOCALIZE_FROM_FILES",
+                "defaultValue": "_PARAM_TYPE_FROM_FILE",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_LOCALIZE_FROM_FILES_RE_PATTERN",
+                "type": "string",
+                "description": "How to match the remote URLs in the files, defined by CP_LOCALIZE_FROM_FILES",
+                "defaultValue": "((s3|gs|az):\/\/.*(,|;|$))",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_PARALLEL_TRANSFER",
+                "type": "boolean",
+                "description": "Enables multi-threaded InputData/OutputData task execution",
+                "defaultValue": "false",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_PARALLEL_TRANSFER_MODE",
+                "type": "string",
+                "description": "Can run CP_PARALLEL_TRANSFER in 'threaded' or a 'multiprocessing' (default) mode",
+                "defaultValue": "false",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_TRANSFER_THREADS",
+                "type": "int",
+                "description": "A number of CPUs to use for the InputData/OutputData task",
+                "defaultValue": "1",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_TRANSFER_PROC_RATIO",
+                "type": "int",
+                "description": "A divider for the CPUs count to determine a number of threads for the InputData/OutputData task",
+                "defaultValue": "4",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_TRANSFER_PIPE_INPUT_ARGS",
+                "type": "int",
+                "description": "Specifies additional args to the pipe for the InputData task (effective for 'local' and 'threaded' modes)",
+                "defaultValue": "1",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_TRANSFER_PIPE_OUTPUT_ARGS",
+                "type": "int",
+                "description": "Specifies additional args to the pipe for the OutputData task (effective for 'local' and 'threaded' modes)",
+                "defaultValue": "1",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_LOCALIZE_FROM_FILES_KEEP_JOB_ON_FAILURE",
+                "type": "boolean",
+                "description": "Whether fail or keep a job running if a config file based localization fails",
+                "defaultValue": "true",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_TARGET_AVAILABILITY_ZONE",
+                "type": "string",
+                "description": "Specifies the target availability zone for a run",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_TARGET_NETWORK_INTERFACE",
+                "type": "string",
+                "description": "Specifies the target ENI to be attached to the node for run",
+                "defaultValue": "",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_DEDICATED_INSTANCE",
+                "type": "boolean",
+                "description": "Specifies if the instance should be dedicated (has a dedicated hardware)",
+                "defaultValue": "false",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_TARGET_SECURITY_GROUPS",
+                "type": "string",
+                "description": "Specifies which security groups shall be attached to the instance",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_TARGET_SUBNET_ID",
+                "type": "string",
+                "description": "Specifies which subnet shall be used for an instance",
+                "defaultValue": "",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_NODE_SSH_PORT",
+                "type": "int",
+                "description": "Sets SSH port, which is used by a host node of the job",
+                "defaultValue": "22",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_EFA_ENABLED",
+                "type": "boolean",
+                "description": "Specifies if EFA should be enabled for this instance",
+                "defaultValue": "false",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_USE_HOST_NETWORK",
+                "type": "boolean",
+                "description": "Specifies if run pod should be run with host network capability",
+                "defaultValue": "false",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_RECOVERY",
+                "type": "boolean",
+                "description": "Enables recovery support for a current run",
+                "defaultValue": "true",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_SGE_GPU_EXCLUSIVE_MODE",
+                "type": "boolean",
+                "description": "Enables GPU exclusive mode",
+                "defaultValue": "true",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_SGE_GPU_RSMAP_DEVICES",
+                "type": "boolean",
+                "description": "Enables RSMAP-like GPU devices assignment",
+                "defaultValue": "true",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_RESCHEDULE_RUN",
+                "type": "boolean",
+                "description": "Enables rescheduling run to other regions",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_CAP_GRID_ENGINE_NOTIFICATIONS",
+                "type": "boolean",
+                "defaultValue": "true",
+                "description": "Enables notifications for Slurm and SGE engines.",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_MAIL",
+                "type": "boolean",
+                "defaultValue": "true",
+                "description": "Changes default mail client if favor to pipe_mail script.",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_NETWORK_POLICY_TYPE",
+                "type": "string",
+                "description": "Specifies run network policy type. Allowed values are: common and internal.",
+                "defaultValue": "common",
+                "passToWorkers": true
+            },
+            {
+                "name": "NODE_UNAVAILABLE_GRACE_PERIOD_MINUTES",
+                "type": "int",
+                "description": "Configures a grace period in minutes after which unavailable nodes are terminated.",
+                "defaultValue": "30",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_SSH_EXTRA_ARGS",
+                "type": "string",
+                "description": "Configures ssh extra args.",
+                "defaultValue": "-o ConnectTimeout=10 -o ConnectionAttempts=30 -v",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_DATA_STORAGE_MOUNT_KEEP_JOB_ON_FAILURE",
+                "type": "boolean",
+                "description": "Keeps job running even if storages mounting has failed.",
+                "defaultValue": "true",
+                "passToWorkers": true
+            },
+            {
+                "name": "CP_CAP_EBS_VOLUMES_MOUNT_DISABLED",
+                "type": "boolean",
+                "description": "Disable mount of /ebs/runs and /ebs/reference folders to the run file system.",
+                "defaultValue": "false",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_RUN_ENGINE_TYPE",
+                "type": "string",
+                "description": "Instance execution workflow language: nextflow, mlflow",
+                "defaultValue": "",
+                "passToWorkers": false
+            },
+            {
+                "name": "CP_REMOVE_RUN_ENV_VARS",
+                "type": "string",
+                "description": "Comma delimited list of environment variables that should be excluded from run container",
+                "defaultValue": "",
+                "passToWorkers": true
+            }
+        ],
+        "visible": true
+    },
+    "launch.docker.image": {
+        "value": "${CP_DOCKER_INTERNAL_HOST}:${CP_DOCKER_INTERNAL_PORT}/library/rockylinux:latest",
+        "visible": true
+    }
+}

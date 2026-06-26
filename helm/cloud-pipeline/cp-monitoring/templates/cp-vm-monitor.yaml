@@ -1,0 +1,129 @@
+{{- if .Values.vmMonitor.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-vm-monitor
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-vm-monitor: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-vm-monitor: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-vm-monitor: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-vm-monitor: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-vm-monitor
+          image: "{{ .Values.vmMonitor.image.repository }}:{{ .Values.vmMonitor.image.tag }}"
+          imagePullPolicy: {{ .Values.vmMonitor.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/init"]
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          volumeMounts:
+            - name: vm-monitor-logs
+              mountPath: /opt/vm-monitor/logs
+            - name: api-pki
+              mountPath: /opt/api/pki
+              readOnly: true
+            - name: api-sso
+              mountPath: /opt/api/sso
+              readOnly: true
+            - name: git-pki
+              mountPath: /opt/gitlab/pki
+              readOnly: true
+            - name: git-sso
+              mountPath: /opt/gitlab/sso
+              readOnly: true
+            - name: docker-pki
+              mountPath: /opt/docker-registry/pki
+              readOnly: true
+            - name: edge-pki
+              mountPath: /opt/edge/pki
+              readOnly: true
+            - name: share-pki
+              mountPath: /opt/share-srv/pki
+              readOnly: true
+            - name: share-sso
+              mountPath: /opt/share-srv/sso
+              readOnly: true
+            - name: common-pki
+              mountPath: /opt/common/pki
+              readOnly: true
+            - name: cp-core-fs
+              mountPath: /fs/core-fs
+              readOnly: true
+            - name: kube-config
+              mountPath: /root/.kube
+              readOnly: true
+            - name: kube-pki
+              mountPath: /etc/kubernetes/pki
+              readOnly: true
+      volumes:
+        - name: vm-monitor-logs
+          hostPath:
+            path: {{ .Values.vmMonitor.logsHostPath }}
+            type: DirectoryOrCreate
+        - name: api-pki
+          hostPath:
+            path: /opt/api/pki
+        - name: api-sso
+          hostPath:
+            path: /opt/api/sso
+        - name: git-pki
+          hostPath:
+            path: /opt/gitlab/pki
+        - name: git-sso
+          hostPath:
+            path: /opt/gitlab/sso
+        - name: docker-pki
+          hostPath:
+            path: /opt/docker-registry/pki
+        - name: edge-pki
+          hostPath:
+            path: /opt/edge/pki
+        - name: share-pki
+          hostPath:
+            path: /opt/share-srv/pki
+        - name: share-sso
+          hostPath:
+            path: /opt/share-srv/sso
+        - name: common-pki
+          hostPath:
+            path: /opt/common/pki
+        - name: cp-core-fs
+          hostPath:
+            path: /opt
+        - name: kube-config
+          hostPath:
+            path: /root/.kube
+        - name: kube-pki
+          hostPath:
+            path: /etc/kubernetes/pki
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret
+{{- end }}

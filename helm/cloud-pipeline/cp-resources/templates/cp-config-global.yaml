@@ -1,0 +1,13 @@
+# Base keys for cp-config-global. Other charts merge their keys via pre-install/pre-upgrade hook Jobs
+# (see lib.cpConfigGlobal.patchHookTemplate) so service hooks can patch selected keys.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-config-global
+  namespace: {{ include "lib.application.namespace" . }}
+data:
+{{- $cfg := .Values.config | default dict }}
+{{- $cfgMerged := mergeOverwrite (dict "CP_DEPLOYMENT_ID" .Release.Name) $cfg }}
+{{- range $key, $value := $cfgMerged }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}

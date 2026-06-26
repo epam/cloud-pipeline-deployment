@@ -1,0 +1,63 @@
+{{- if eq .Values.db.type "internal" }}
+{{- $ns := include "lib.application.namespace" . -}}
+{{- $dbHost := .Values.db.host | default (printf "cp-api-db.%s.svc.cluster.local" $ns) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-init-internal-db
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-51"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  init-internal-db.sh: |
+{{ .Files.Get "files/hooks/init-internal-db.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cp-api-db-init
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-50"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        cloud-pipeline/cp-api-db: "true"
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      containers:
+        - name: init
+          image: postgres:{{ .Values.db.version }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PSG_HOST
+              value: {{ $dbHost | quote }}
+            - name: PSG_PORT
+              value: {{ .Values.db.port | quote }}
+            - name: PSG_DB
+              value: {{ .Values.db.db | quote }}
+            - name: PSG_USER
+              value: {{ .Values.db.user | quote }}
+            - name: PSG_PASS
+              value: {{ .Values.db.pass | quote }}
+          command: ["/bin/bash", "/scripts/init-internal-db.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-init-internal-db
+            defaultMode: 0755
+{{- end }}

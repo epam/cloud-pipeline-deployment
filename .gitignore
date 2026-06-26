@@ -1,0 +1,68 @@
+# ──────────────────────────────────────────────
+# Terraform
+# ──────────────────────────────────────────────
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+*.tfvars
+!*.tfvars.example
+*.tfvars.json
+!*.tfvars.json.example
+*.tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+crash.*.log
+
+# ──────────────────────────────────────────────
+# Packer
+# ──────────────────────────────────────────────
+packer-manifest.json
+packer_cache/
+
+# ──────────────────────────────────────────────
+# Helm / Helmfile
+# ──────────────────────────────────────────────
+helm/values.*.yaml
+!helm/values.yaml
+helm/cloud-pipeline/**/charts/*.tgz
+helm/cloud-pipeline/**/Chart.lock
+
+# ──────────────────────────────────────────────
+# PKI / certificates
+# ──────────────────────────────────────────────
+helm/prerequisites/certificates/
+*.pem
+*.p12
+*.pfx
+*.key
+*.csr
+*.der
+*.jks
+
+# ──────────────────────────────────────────────
+# Secrets and environment files
+# ──────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.secret
+secrets/
+**/bootstrap.env.local
+
+# ──────────────────────────────────────────────
+# OS / editor artefacts
+# ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+.claude/

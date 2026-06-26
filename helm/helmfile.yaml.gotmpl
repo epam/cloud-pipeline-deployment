@@ -1,0 +1,272 @@
+helmDefaults:
+  timeout: 1200
+
+{{- $ValuesFilePath := env "HELMFILE_VALUES" | default "values.yaml" }}
+{{- $deployValues := readFile $ValuesFilePath | fromYaml }}
+{{- $generalValues := index $deployValues "general" | default dict }}
+{{- $resourcesValues := index $deployValues "resources" | default dict }}
+{{- $idpValues := index $deployValues "idp" | default dict }}
+{{- $apiSrvValues := index $deployValues "apiSrv" | default dict }}
+{{- $dockerRegistryValues := index $deployValues "dockerRegistry" | default dict }}
+{{- $edgeValues := index $deployValues "edge" | default dict }}
+{{- $gitValues := index $deployValues "git" | default dict }}
+{{- $searchValues := index $deployValues "search" | default dict }}
+{{- $billingValues := index $deployValues "billing" | default dict }}
+{{- $notifierValues := index $deployValues "notifier" | default dict }}
+{{- $monitoringValues := index $deployValues "monitoring" | default dict }}
+{{- $postDeployValues := index $deployValues "postDeploy" | default dict }}
+
+releases:
+  - name: cp-resources
+    chart: ./cloud-pipeline/cp-resources
+    values:
+      - cloud-pipeline/cp-resources/values.yaml
+      -
+{{- $generalValues | toYaml | nindent 8 }}
+      -
+{{- $resourcesValues | toYaml | nindent 8 }}
+      -
+{{- dict "idp" (dict "enabled" ($idpValues.enabled | default false) ) | toYaml | nindent 8 }}
+    wait: true
+
+  - name: cp-idp
+    installed: {{ index $idpValues "enabled" | default false }}
+    chart: ./cloud-pipeline/cp-idp
+    values:
+      - cloud-pipeline/cp-idp/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $idpValues | nindent 8 }}
+      -
+{{- dict "apiSrv" (dict "service" (index $apiSrvValues "service" | default dict)) | toYaml | nindent 8 }}
+      -
+{{- dict "git" (dict "enabled" (index $gitValues "enabled" | default false) "service" (index $gitValues "service" | default dict) "ssoEndpointId" (index (index $gitValues "config" | default dict) "CP_GITLAB_SSO_ENDPOINT_ID" | default "")) | toYaml | nindent 8 }}
+    needs:
+      - cp-resources
+    wait: true
+
+  - name: cp-api-db
+    installed: {{ eq (index ($apiSrvValues.db | default dict) "type" | default "external") "internal" }}
+    chart: ./cloud-pipeline/cp-api-db
+    values:
+      - cloud-pipeline/cp-api-db/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- dict "db" (index $apiSrvValues "db" | default dict) | toYaml | nindent 8 }}
+    needs:
+      - cp-resources
+    wait: true
+
+  - name: cp-api-srv
+    chart: ./cloud-pipeline/cp-api-srv
+    values:
+      - cloud-pipeline/cp-api-srv/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $apiSrvValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-idp
+      - cp-api-db
+    wait: true
+
+  - name: cp-monitoring
+    installed: {{ index ($deployValues.monitoring | default dict) "enabled" | default true }}
+    chart: ./cloud-pipeline/cp-monitoring
+    values:
+      - cloud-pipeline/cp-monitoring/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml ($deployValues.monitoring | default dict) | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
+  - name: cp-docker-registry
+    installed:  {{ index $dockerRegistryValues "enabled" | default true }}
+    chart: ./cloud-pipeline/cp-docker-registry
+    values:
+      - cloud-pipeline/cp-docker-registry/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml ($deployValues.dockerRegistry | default dict) | nindent 8 }}
+    needs:
+      - cp-api-srv
+    wait: true
+
+  - name: cp-search
+    installed: {{ index $searchValues "enabled" | default false }}
+    chart: ./cloud-pipeline/cp-search
+    values:
+      - cloud-pipeline/cp-search/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $searchValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
+  - name: cp-billing-srv
+    installed: {{ index $billingValues "enabled" | default true }}
+    chart: ./cloud-pipeline/cp-billing-srv
+    values:
+      - cloud-pipeline/cp-billing-srv/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $billingValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+      - cp-search
+    wait: true
+
+  - name: cp-git
+    installed: {{ $gitValues.enabled | default false }}
+    chart: ./cloud-pipeline/cp-git
+    values:
+      - cloud-pipeline/cp-git/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $gitValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-idp
+      - cp-api-srv
+    wait: true
+
+  - name: cp-notifier
+    installed: {{ index ($deployValues.notifier | default dict) "enabled" | default false }}
+    chart: ./cloud-pipeline/cp-notifier
+    values:
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml ($deployValues.notifier | default dict) | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
+  - name: cp-edge
+    chart: ./cloud-pipeline/cp-edge
+    values:
+      - cloud-pipeline/cp-edge/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $edgeValues | nindent 8 }}
+      -
+{{- dict "git" $gitValues | toYaml | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-idp
+      - cp-api-srv
+      - cp-docker-registry
+      - cp-git
+    wait: true
+
+hooks:
+  - events: ["prepare"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        SCRIPT="./hooks/validation/validate-values.sh"
+        VALUES_FILE="{{ $ValuesFilePath }}"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$VALUES_FILE"
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        SCRIPT="./hooks/post-deploy/wait-for-api.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        MANIFEST_DIR="./hooks/post-deploy/assets/dockers-manifest"
+        TOOLS_JSON='{{ index $postDeployValues "dockers" | default list | toJson }}'
+        SCRIPT="./hooks/post-deploy/register-docker-tools.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE" "$MANIFEST_DIR" "$TOOLS_JSON"
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        export CP_SYSTEM_PREFERENCE_CONFIG="{{ env "CP_SYSTEM_PREFERENCE_CONFIG" | default (index $postDeployValues "systemPreferenceConfig" | default "") }}"
+        SCRIPT="./hooks/post-deploy/apply-preferences.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        {{- $clusterNetworkConfigValue := index $postDeployValues "clusterNetworksConfig" -}}
+        {{- if kindIs "string" $clusterNetworkConfigValue }}
+        export CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64='{{ readFile $clusterNetworkConfigValue | b64enc }}'
+        {{- else }}
+        export CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64='{{ $clusterNetworkConfigValue | default dict | toJson | b64enc }}'
+        {{- end }}
+        SCRIPT="./hooks/post-deploy/apply-cluster-networks-config.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        export CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64='{{ index $postDeployValues "additionalCloudRegions" | default list | toJson | b64enc }}'
+        SCRIPT="./hooks/post-deploy/register-additional-cloud-regions.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- if index $gitValues "enabled" | default false }}
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        SCRIPT="./hooks/post-deploy/register-demo-pipelines.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- end }}
+{{- $emailNotifValues := index $postDeployValues "emailNotifications" | default dict }}
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        export CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64='{{ $emailNotifValues | toJson | b64enc }}'
+        SCRIPT="./hooks/post-deploy/register-email-templates.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"

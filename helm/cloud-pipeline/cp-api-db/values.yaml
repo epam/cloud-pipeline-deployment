@@ -1,0 +1,18 @@
+# `db` merged from Helmfile apiSrv.db; this release installs only when db.type is internal.
+db:
+  # internal (bundled Postgres pod) | external (RDS or managed Postgres)
+  type: internal
+  port: "5432"
+  version: "16.4"  # Postgres major.minor version (used for container image tag)
+  sharedBuffers: 128MB  # PostgreSQL shared_buffers; use M/MB/G/GB suffix
+  maxConnections: 100
+
+backup:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: cp-bkp-worker-0.17
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+  schedule: "0 8 * * *"  # Cron schedule in server local time
+  retention: "10"         # Number of backup archives to keep
+  storageList: ""         # Comma-separated S3 paths for backup upload; empty = local only

@@ -1,0 +1,90 @@
+{{- if .Values.enabled }}
+{{ include "lib.patchDNSJob" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-idp
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-idp: "true"
+    {{- with .Values.labels }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port.internal }}
+      targetPort: 8080
+      name: cp-idp-port-https
+  selector:
+    cloud-pipeline/cp-idp: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-idp
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-idp: "true"
+    {{- with .Values.labels }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.deploymentLabels }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-idp: "true"
+  template:
+    metadata:
+      namespace: {{ include "lib.application.namespace" . }}
+      labels:
+        cloud-pipeline/cp-idp: "true"
+        {{- with .Values.labels }}
+        {{ toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.deploymentLabels }}
+        {{ toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-idp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/init"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - mountPath: /opt/idp/pki
+              name: cp-idp-secret
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /metadata
+              port: 8080
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: cp-idp-secret
+          projected:
+            defaultMode: 420
+            sources:
+              - secret:
+                  name: cp-idp-secret
+              - secret:
+                  name: cp-pki-secret
+{{- end }}

@@ -1,0 +1,69 @@
+{{- if .Values.gitSync.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-git-sync
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-git-sync: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-git-sync: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-git-sync: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      {{- with .Values.gitSync.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-git-sync
+          image: "{{ .Values.gitSync.image.repository }}:{{ .Values.gitSync.image.tag }}"
+          imagePullPolicy: {{ .Values.gitSync.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              API_HOST="${CP_API_SRV_INTERNAL_HOST:-${CP_API_SRV_EXTERNAL_HOST:-cp-api-srv.default.svc.cluster.local}}"
+              API_PORT="${CP_API_SRV_INTERNAL_PORT:-${CP_API_SRV_EXTERNAL_PORT:-31080}}"
+              exec /init-git-sync "https://${API_HOST}:${API_PORT}/pipeline/restapi/" "${JWT}"
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: JWT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          volumeMounts:
+            - mountPath: /opt/git-sync/logs
+              name: git-sync-logs
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness-git-sync.sh
+            initialDelaySeconds: 600
+            periodSeconds: 300
+            failureThreshold: 4
+      volumes:
+        - name: git-sync-logs
+          emptyDir: {}
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret
+{{- end }}

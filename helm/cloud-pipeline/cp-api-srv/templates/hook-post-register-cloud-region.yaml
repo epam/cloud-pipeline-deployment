@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-register-cloud-region
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  cloud-pipeline-utils.sh: |
+{{ .Files.Get "files/hooks/utils/cloud-pipeline-utils.sh" | indent 4 }}
+  register-cloud-region.sh: |
+{{ .Files.Get "files/hooks/register-cloud-region.sh" | indent 4 }}
+  storage.cors.policy.json: |
+{{ .Files.Get "files/hooks/storage.cors.policy.json" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-config-register-cloud-region
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  cloud-region.json: {{ .Values.cloudRegion | default dict | toJson | quote }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cp-register-cloud-region
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "11"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: register-cloud-region
+          image: {{ include "lib.hook.deploymentImage" . | quote }}
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+            - secretRef:
+                name: cp-api-token
+          env:
+            - name: CP_CLOUD_REGION_JSON
+              valueFrom:
+                configMapKeyRef:
+                  name: cp-hook-config-register-cloud-region
+                  key: cloud-region.json
+          command: ["/bin/bash", "/scripts/register-cloud-region.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: scripts
+              mountPath: /assets/storage.cors.policy.json
+              subPath: storage.cors.policy.json
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-register-cloud-region
+            defaultMode: 0755

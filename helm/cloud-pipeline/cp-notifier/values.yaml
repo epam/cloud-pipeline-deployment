@@ -1,0 +1,35 @@
+# Helmfile sets `installed:` from this flag; deploy values live under the `notifier:` key in values.yaml.
+enabled: false
+
+service:
+  name: cp-notifier
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: notifier-0.17
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+
+# Structured settings → CP_NOTIFIER_* keys in cp-config-global (via hook ConfigMap + patch Job).
+smtp:
+  enabled: false
+  server:
+    host: ""
+    port: ""  # e.g. 587 (STARTTLS) or 465 (SSL)
+  sslOnConnect: false  # true = SSL/TLS from first connect; false = plain or STARTTLS
+  startTls: true       # true = STARTTLS upgrade (used when sslOnConnect is false)
+  from: ""   # Sender address, e.g. noreply@example.com
+  user: ""
+  pass: ""
+
+ui:
+  enabled: true  # true = enable in-app UI notification channel
+
+azure:
+  enabled: false
+  tenantId: ""
+  clientId: ""
+  clientSecret: ""
+  scopes: "https://graph.microsoft.com/.default"
+  sender: ""    # Azure AD user or shared mailbox address to send from
+  dryRun: false  # true = log emails without sending (test mode)
+

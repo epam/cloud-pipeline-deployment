@@ -1,0 +1,56 @@
+{{- if and .Values.enabled .Values.git.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-register-gitlab-in-idp
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "14"
+    "helm.sh/hook-delete-policy": hook-succeeded
+data:
+  register-gitlab-in-idp.sh: |
+{{ .Files.Get "files/hooks/register-gitlab-in-idp.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hook-register-gitlab-in-idp
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "15"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: hook-register-gitlab-in-idp
+          image: {{ include "lib.hook.deploymentImage" . | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              value: {{ include "lib.application.namespace" . | quote }}
+            - name: ISSUER
+              value: {{ if .Values.git.ssoEndpointId }}{{ .Values.git.ssoEndpointId | quote }}{{ else }}{{ printf "https://%s:%s" .Values.git.service.host.external (.Values.git.service.port.external | toString) | quote }}{{ end }}
+          command: ["/bin/bash", "/scripts/register-gitlab-in-idp.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-register-gitlab-in-idp
+            defaultMode: 0755
+{{- end }}

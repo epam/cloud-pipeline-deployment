@@ -1,0 +1,73 @@
+{{- if .Values.heapster.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.heapster.elk.service.name }}
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-heapster-elk: "true"
+    cloud-pipeline/core-component: "Service"
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.heapster.elk.service.port.internal }}
+      targetPort: 9200
+      name: elasticsearch
+  selector:
+    cloud-pipeline/cp-heapster-elk: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-heapster-elk
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-heapster-elk: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-heapster-elk: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-heapster-elk: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-heapster-elk: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-heapster-elk
+          command:
+            - /init
+          image: "{{ .Values.heapster.elk.image.repository }}:{{ .Values.heapster.elk.image.tag }}"
+          imagePullPolicy: {{ .Values.heapster.elk.image.pullPolicy }}
+          ports:
+            - containerPort: 9200
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - name: elk-data
+              mountPath: /home/elasticsearch/elasticsearch/data
+      volumes:
+        - name: elk-data
+          hostPath:
+            path: {{ .Values.heapster.elk.dataHostPath }}
+            type: DirectoryOrCreate
+{{- end }}

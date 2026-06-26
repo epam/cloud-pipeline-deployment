@@ -1,0 +1,7 @@
+{{- include "lib.backupWorker.deployment" (dict "context" . "serviceName" "cp-api-srv" "serviceWd" "/opt/api/logs/bkp" "kubectlArgs" "-c cp-api-srv") }}
+
+{{- if eq .Values.db.type "internal" }}
+---
+{{- include "lib.backupWorker.deployment" (dict "context" . "serviceName" "cp-api-db" "serviceWd" "/opt/postgresql/data/bkp") }}
+{{- end }}
+

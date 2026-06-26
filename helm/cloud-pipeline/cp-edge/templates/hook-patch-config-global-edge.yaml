@@ -1,0 +1,32 @@
+{{- $service := .Values.service | default dict -}}
+{{- $serviceHost := index $service "host" | default dict -}}
+{{- $servicePort := index $service "port" | default dict -}}
+{{- $config := index .Values "config" | default dict -}}
+{{- $externalHost := index $serviceHost "external" | default "" | toString -}}
+{{- $externalPort := index $servicePort "external" | default "443" | toString -}}
+{{- $defaultInternalHost := printf "cp-edge.%s.svc.cluster.local" (include "lib.application.namespace" .) -}}
+{{- $data := dict -}}
+{{- $_ := set $data "CP_EDGE_EXTERNAL_HOST" $externalHost -}}
+{{- $_ := set $data "CP_EDGE_EXTERNAL_PORT" $externalPort -}}
+{{- $_ := set $data "CP_EDGE_INTERNAL_HOST" (index $serviceHost "internal" | default $defaultInternalHost | toString) -}}
+{{- $_ := set $data "CP_EDGE_INTERNAL_PORT" (index $servicePort "internal" | default "443" | toString) -}}
+{{- $_ := set $data "EDGE_EXTERNAL" (printf "%s:%s" $externalHost $externalPort) -}}
+{{- range $key, $value := $config -}}
+{{- $_ := set $data $key ($value | toString) -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-edge
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+{{- $cpEdgePatchServiceEnabled := include "cp-edge.patchServiceEnabled" . -}}
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-8" "prePatchAdditionalScript" $cpEdgePatchServiceEnabled) }}

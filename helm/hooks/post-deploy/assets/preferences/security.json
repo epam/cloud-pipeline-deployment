@@ -1,0 +1,42 @@
+{
+  "security.tools.jwt.token.expiration": {
+    "value": 3600,
+    "visible": false
+  },
+  "security.tools.policy.max.medium.vulnerabilities": {
+    "value": 300,
+    "visible": true
+  },
+  "security.tools.policy.max.high.vulnerabilities": {
+    "value": 100,
+    "visible": true
+  },
+  "security.tools.policy.max.critical.vulnerabilities": {
+    "value": 50,
+    "visible": true
+  },
+  "security.tools.scan.clair.root.url": {
+    "value": "http://${CP_CLAIR_INTERNAL_HOST}:${CP_CLAIR_INTERNAL_PORT}",
+    "visible": false
+  },
+  "security.tools.docker.comp.scan.root.url": {
+    "value": "http://${CP_DOCKER_COMP_INTERNAL_HOST}:${CP_DOCKER_COMP_INTERNAL_PORT}/dockercompscan/",
+    "visible": false
+  },
+  "security.tools.grace.hours": {
+    "value": 48,
+    "visible": true
+  },
+  "security.tools.scan.all.registries": {
+    "value": true,
+    "visible": true
+  },
+  "security.tools.scan.enabled": {
+    "value": true,
+    "visible": true
+  },
+  "security.tools.scan.clair.version": {
+    "value": "${CP_CLAIR_VERSION}",
+    "visible": true
+  }
+}

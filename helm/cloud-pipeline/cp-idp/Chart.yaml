@@ -1,0 +1,11 @@
+apiVersion: v2
+name: cp-idp
+description: Cloud-Pipeline self hosted IdP service
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: lib
+    version: "1.0.0"
+    repository: "file://../lib"

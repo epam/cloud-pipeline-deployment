@@ -1,0 +1,73 @@
+{{- $namespace := include "lib.application.namespace" . -}}
+
+{{- $service := .Values.service | default dict -}}
+{{- $serviceHost := index $service "host" | default dict -}}
+{{- $servicePort := index $service "port" | default dict -}}
+{{- $internalHost := index $serviceHost "internal" | default "" | toString | trim -}}
+{{- $externalHost := index $serviceHost "external" | default "" | toString | trim -}}
+{{- $internalPort := index $servicePort "internal" | default "31080" | toString | trim -}}
+{{- $externalPort := index $servicePort "external" | default "443" | toString | trim -}}
+
+{{- if and (ne $externalHost "") (or (eq $internalHost "") (contains ".svc.cluster.local" $internalHost)) -}}
+{{- $internalHost = $externalHost -}}
+{{- $internalPort = $externalPort -}}
+{{- end -}}
+
+{{- if eq $internalHost "" -}}
+{{- $internalHost = printf "cp-api-srv.%s.svc.cluster.local" $namespace -}}
+{{- end -}}
+{{- $apiExternalUrl := printf "https://%s:%s/pipeline/restapi/" $internalHost $internalPort -}}
+{{- if ne $externalHost "" -}}
+{{- $apiExternalUrl = printf "https://%s:%s/pipeline/restapi/" $externalHost $externalPort -}}
+{{- end -}}
+
+{{- $config := .Values.config | default dict -}}
+{{- $database := .Values.db | default dict -}}
+{{- $databaseHost := index $database "host" | default (printf "cp-api-db.%s.svc.cluster.local" $namespace) -}}
+{{- $redisHa := .Values.highAvailability | default dict -}}
+{{- $redisPort := (.Values.highAvailability.service.port | default 30097) | toString -}}
+{{- $redisInternalHost := printf "cp-redis.%s.svc.cluster.local" $namespace -}}
+
+{{- $data := dict -}}
+{{- $_ := set $data "PSG_HOST" ($databaseHost | toString) -}}
+{{- $_ := set $data "PSG_PORT" (index $database "port" | default "5432" | toString) -}}
+{{- $_ := set $data "PSG_VERSION" (index $database "version" | default "" | toString) -}}
+{{- $_ := set $data "PSG_DB" (index $database "db" | default "pipeline" | toString) -}}
+{{- $_ := set $data "PSG_USER" (index $database "user" | default "pipeline" | toString) -}}
+{{- $_ := set $data "PSG_PASS" (index $database "pass" | default "" | toString) -}}
+{{- $_ := set $data "PSG_SHARED_BUFFERS" (index $database "sharedBuffers" | default "128MB" | toString) -}}
+{{- $_ := set $data "PSG_MAX_CONNECTIONS" (index $database "maxConnections" | default "100" | toString) -}}
+{{- $_ := set $data "API_EXTERNAL" ($apiExternalUrl | toString) -}}
+{{- $_ := set $data "CP_API_SRV_EXTERNAL_HOST" ($externalHost | toString) -}}
+{{- $_ := set $data "CP_API_SRV_EXTERNAL_PORT" ($externalPort | toString) -}}
+{{- $_ := set $data "CP_API_SRV_INTERNAL_HOST" ($internalHost | toString) -}}
+{{- $_ := set $data "CP_API_SRV_INTERNAL_PORT" ($internalPort | toString) -}}
+{{- if $redisHa.enabled -}}
+{{- $_ := set $data "CP_API_ACL_CACHE_REFRESH" "true" -}}
+{{- $_ := set $data "CP_API_ACL_CACHE_TYPE" "MEMORY" -}}
+{{- $_ := set $data "CP_API_CACHE_TYPE" "REDIS" -}}
+{{- $_ := set $data "CP_REDIS_INTERNAL_HOST" $redisInternalHost -}}
+{{- $_ := set $data "CP_REDIS_INTERNAL_PORT" $redisPort -}}
+{{- $_ := set $data "CP_EVENT_SOURCING_REDIS_INTERNAL_HOST" $redisInternalHost -}}
+{{- $_ := set $data "CP_EVENT_SOURCING_REDIS_INTERNAL_PORT" $redisPort -}}
+{{- end -}}
+
+{{- range $key, $value := $config -}}
+{{- $_ := set $data $key ($value | toString) -}}
+{{- end -}}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-api-srv
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "-11"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-10") }}

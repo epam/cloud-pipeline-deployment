@@ -1,0 +1,138 @@
+{{ include "lib.patchDNSJob" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-git
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-git: "true"
+    cloud-pipeline/core-component: "Service"
+spec:
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port.internal }}
+      targetPort: {{ .Values.service.port.internal }}
+      name: cp-git-port-http
+    - protocol: TCP
+      port: {{ .Values.service.sshPort }}
+      targetPort: {{ .Values.service.sshPort }}
+      name: cp-git-port-ssh
+  selector:
+    cloud-pipeline/cp-git: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-git
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-git: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-git: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-git: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-git: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      {{- if .Values.gitlabDb.enabled }}
+      initContainers:
+        - name: gitlab-db-bootstrap
+          image: "{{ .Values.gitlabDb.image }}:{{ include "cp-git.gitlabDbImageTag" . }}"
+          imagePullPolicy: {{ .Values.gitlabDb.imagePullPolicy }}
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+{{- include "cp-git.gitlabDbInitScript" . | nindent 14 }}
+          env:
+            - name: PGHOST
+              value: cp-gitlab-db
+            - name: PGPORT
+              value: {{ include "cp-git.gitlabDbServicePort" . | quote }}
+            - name: PGUSER
+              value: "postgres"
+            - name: PGPASSWORD
+              value: "postgres"
+            - name: GITLAB_DB_USER
+              value: {{ include "cp-git.gitlabAppDbUser" . | quote }}
+            - name: GITLAB_DB_NAME
+              value: {{ include "cp-git.gitlabAppDbName" . | quote }}
+            - name: GITLAB_APP_PASSWORD
+              value: {{ include "cp-git.gitlabAppDbPassword" . | quote }}
+            - name: GITLAB_DB_ADVISORY_LOCK_KEY
+              value: "8734221"
+      {{- end }}
+      containers:
+        - name: cp-git
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port.internal }}
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - mountPath: /var/log/gitlab
+              name: git-logs
+            - mountPath: /var/opt/gitlab
+              name: git-data
+            - mountPath: /opt/gitlab/pki
+              name: git-pki
+              readOnly: true
+            - mountPath: /opt/idp/pki
+              name: idp-pki
+              readOnly: true
+            - mountPath: /opt/common/pki
+              name: common-pki
+              readOnly: true
+            - mountPath: /etc/gitlab
+              name: git-config
+      volumes:
+        - name: git-logs
+          hostPath:
+            path: /opt/gitlab/logs
+            type: DirectoryOrCreate
+        - name: git-data
+          hostPath:
+            path: /opt/gitlab/data
+            type: DirectoryOrCreate
+        - name: git-config
+          hostPath:
+            path: /opt/gitlab/config
+            type: DirectoryOrCreate
+        - name: git-pki
+          projected:
+            defaultMode: 420
+            sources:
+              - secret:
+                  name: cp-pki-secret
+              - secret:
+                  name: cp-jwt-pki-secret
+        - name: idp-pki
+          projected:
+            defaultMode: 420
+            sources:
+              - secret:
+                  name: cp-idp-secret
+              - secret:
+                  name: cp-pki-secret
+        - name: common-pki
+          secret:
+            secretName: cp-pki-secret
+      imagePullSecrets:
+        - name: cp-distr-docker-registry-secret

@@ -1,0 +1,31 @@
+{{- if .Values.enabled }}
+{{- $namespace := include "lib.application.namespace" . -}}
+{{- $config := .Values.config | default dict -}}
+{{- $data := dict -}}
+{{- range $key, $value := $config }}
+{{- $_ := set $data $key ($value | toString) -}}
+{{- end }}
+{{- $searchInternalHost := index $data "CP_SEARCH_INTERNAL_HOST" | default "" | trim -}}
+{{- if eq $searchInternalHost "" }}
+{{- $_ := set $data "CP_SEARCH_INTERNAL_HOST" (printf "cp-search-srv.%s.svc.cluster.local" $namespace) -}}
+{{- end }}
+{{- $elkInternalHost := index $data "CP_SEARCH_ELK_INTERNAL_HOST" | default "" | trim -}}
+{{- if and .Values.elk.elasticsearch.enabled (eq $elkInternalHost "") }}
+{{- $_ := set $data "CP_SEARCH_ELK_INTERNAL_HOST" (printf "cp-search-elk.%s.svc.cluster.local" $namespace) -}}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-search
+  namespace: {{ $namespace }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-4") }}
+{{- end }}
