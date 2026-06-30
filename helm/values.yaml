@@ -3,9 +3,9 @@
 resources:
   config:
     CP_CLOUD_PLATFORM: aws  # aws | azure | gcp
-    CP_CLOUD_REGION_ID: ""  # Primary AWS region ID, e.g. us-east-1
-    CP_DEFAULT_ADMIN_NAME: ""
-    CP_DEFAULT_ADMIN_EMAIL: ""
+    CP_CLOUD_REGION_ID: "<us-east-1>"  # Primary AWS region ID
+    CP_DEFAULT_ADMIN_NAME: "<admin>"
+    CP_DEFAULT_ADMIN_EMAIL: "<admin@example.com>"
   customDNS:
     entries: []
     # - ip: "203.0.113.5"
@@ -22,7 +22,7 @@ idp:
 apiSrv:
   service:
     host:
-      external: ""
+      external: "<api.example.com>"
 
   highAvailability:
     enabled: false
@@ -33,12 +33,12 @@ apiSrv:
     type: internal
     db: pipeline
     user: pipeline
-    pass: ""
+    pass: "<db-password>"
 
   cloudRegion:
-    kmsKeyArn: ""             # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
-    kmsKeyId: ""              # Key ID (UUID portion of the ARN)
-    sshKeyName: ""            # AWS EC2 key pair name (not a file path)
+    kmsKeyArn: "arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000"  # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
+    kmsKeyId: "<key-id>"      # Key ID (UUID portion of the ARN)
+    sshKeyName: "<ec2-key-pair-name>"  # AWS EC2 key pair name (not a file path)
     tempCredentialsRole: ""   # IAM role ARN for temporary S3 credentials
     backupDuration: 20        # S3 object backup retention in days
     omicsServiceRole: ""      # IAM role ARN for AWS HealthOmics
@@ -51,7 +51,7 @@ apiSrv:
 
   config:
     CP_PREF_UI_PIPELINE_DEPLOYMENT_NAME: ""
-    CP_KUBE_EXTERNAL_HOST: ""
+    CP_KUBE_EXTERNAL_HOST: "0.0.0.0"
     CP_API_SRV_SSO_ENDPOINT_ID: ""
     CP_PREF_STORAGE_SYSTEM_STORAGE_NAME: ""
 
@@ -59,16 +59,16 @@ dockerRegistry:
   enabled: true
   service:
     host:
-      external: ""
+      external: "<docker.example.com>"
   config:
-    CP_DOCKER_STORAGE_CONTAINER: ""
+    CP_DOCKER_STORAGE_CONTAINER: "<docker-s3-bucket>"
 
 edge:
-  region: ""      # AWS region of this edge node, e.g. us-east-1
-  externalIP: ""  # Public IP of edge node (used in DNS and run endpoints)
+  region: "<us-east-1>"      # AWS region of this edge node
+  externalIP: "<edge-node-public-ip>"  # Public IP of edge node (used in DNS and run endpoints)
   service:
     host:
-      external: ""
+      external: "<edge.example.com>"
 
 # GitLab (cp-git). Set enabled: false to skip the release (and cp-edge will not wait on cp-git).
 git:
@@ -77,7 +77,7 @@ git:
     enabled: true
   service:
     host:
-      external: ""
+      external: "<git.example.com>"
   gitlab:
     internalHttpPort: 443
   image:
@@ -88,7 +88,7 @@ git:
     CP_GITLAB_SSO_ENDPOINT_ID: ""
     CP_GITLAB_SSO_TARGET_URL: ""
     CP_GITLAB_SSO_TARGET_URL_TRAIL: ""
-    GITLAB_ROOT_PASSWORD: ""
+    GITLAB_ROOT_PASSWORD: "<gitlab-root-password>"
 
 # Search (cp-search-srv, cp-search-elk, cp-search-elk-curator). Matches EPM-CMBI deploy k8s/cp-search/*.yaml + install.sh cp-search block; label nodes cloud-pipeline/cp-search-srv / cp-search-elk.
 search:
@@ -172,6 +172,7 @@ monitoring:
     logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files
 
 postDeploy:
+  enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
   # Additional (non-default) AWS cloud regions to register after deployment.
   # Each entry uses the same field names as apiSrv.cloudRegion; regionId and kmsKeyArn are required.
   additionalCloudRegions: []
