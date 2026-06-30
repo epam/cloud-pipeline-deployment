@@ -1,0 +1,32 @@
+name: Helmfile template
+
+on:
+  pull_request:
+    paths:
+      - 'helm/**'
+
+jobs:
+  template:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: helm
+    env:
+      HELM_DIFF_IGNORE_UNKNOWN_FLAGS: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.3.4
+
+      - name: Install helmfile
+        run: |
+          curl -fsSL https://github.com/helmfile/helmfile/releases/download/v1.4.1/helmfile_1.4.1_linux_amd64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin helmfile
+
+      - name: Install helm-diff plugin
+        run: helm plugin install https://github.com/databus23/helm-diff --version v3.4.2
+
+      - name: Render all releases
+        run: helmfile template

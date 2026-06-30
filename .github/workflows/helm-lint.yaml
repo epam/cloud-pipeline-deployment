@@ -1,0 +1,25 @@
+name: Helm lint
+
+on:
+  pull_request:
+    paths:
+      - 'helm/cloud-pipeline/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.3.4
+
+      - name: Lint all charts
+        run: |
+          for chart in helm/cloud-pipeline/*/; do
+            [ -f "${chart}Chart.yaml" ] || continue
+            echo "--- $chart ---"
+            helm dependency update "${chart}"
+            helm lint "${chart}"
+          done
