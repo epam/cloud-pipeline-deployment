@@ -1,3 +1,5 @@
+# buildVersion: ""  # overrides general.buildVersion for this release
+
 service:
   name: cp-api-srv
   host:
@@ -19,11 +21,13 @@ patchDNS:
 image:
   leaderElector:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: leader-elector-0.17
+    tag: leader-elector
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   apiServer:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: api-srv-0.17
+    tag: api-srv
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 db:
@@ -110,7 +114,8 @@ backup:
   enabled: true
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: cp-bkp-worker-0.17
+    tag: cp-bkp-worker
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   schedule: "0 8 * * *"  # Cron schedule in server local time
   retention: "10"         # Number of backup archives to keep

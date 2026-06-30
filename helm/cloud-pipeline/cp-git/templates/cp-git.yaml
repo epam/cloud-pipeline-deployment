@@ -79,7 +79,8 @@ spec:
       {{- end }}
       containers:
         - name: cp-git
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.service.port.internal }}

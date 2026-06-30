@@ -1,5 +1,8 @@
 # Prepare node for Kubernetes: images, kubeadm/kubelet. Cluster is initialized on first boot via k8s-first-boot.service.
 set -e
+
+_CP_BUILD_VERSION=$(tr -d '[:space:]' < /var/lib/cloud-pipeline/deploy/helm/CP_BUILD_VERSION.txt)
+
 systemctl start docker || { journalctl -xeu docker.service --no-pager >&2; journalctl -xeu containerd.service --no-pager >&2; exit 1; }
 mkdir -p /var/lib/cloud-pipeline/deploy/docker-system-images && \
 wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-node-v3.14.1.tar" -O /var/lib/cloud-pipeline/deploy/docker-system-images/calico-node-v3.14.1.tar && \
@@ -51,7 +54,6 @@ envsubst '${CP_KUBE_FLANNEL_CIDR} ${CP_KUBE_KUBELET_PORT} ${CP_KUBE_NODE_CIDR_MA
 envsubst '${CP_KUBE_FLANNEL_CIDR}' < /var/lib/cloud-pipeline/deploy/k8s-bootstrap/canal.yaml.raw > /var/lib/cloud-pipeline/deploy/k8s-bootstrap/canal.yaml
 
 chmod +x /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh
-sed -i "s|__CP_DNS_HOSTS_SYNC_IMAGE__|${CP_DNS_HOSTS_SYNC_IMAGE}|" /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh
 
 # Configure the node via EC2 user data by appending to bootstrap.env:
 #
@@ -335,7 +337,7 @@ _KUBE_DNS_NODE_SELECTOR_KEY="${_KUBE_DNS_NODE_SELECTOR_LABEL%%=*}"
 _KUBE_DNS_NODE_SELECTOR_VALUE="${_KUBE_DNS_NODE_SELECTOR_LABEL#*=}"
 kubectl label nodes --all "${_KUBE_DNS_NODE_SELECTOR_KEY}=${_KUBE_DNS_NODE_SELECTOR_VALUE}" --overwrite
 
-/var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}"
+/var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}" --dns-hosts-sync-image-version="__CP_DNS_HOSTS_SYNC_IMAGE_VERSION__"
 
 echo "Wait for kube-dns Service ClusterIP to be available"
 for _i in $(seq 1 60); do
@@ -433,6 +435,7 @@ K8SBOOT
 
 echo "CP_CLOUD_PIPELINE_NODE_REGION: $CP_CLOUD_PIPELINE_NODE_REGION"
 sed -i "s/__CP_NODE_REGION__/${CP_CLOUD_PIPELINE_NODE_REGION}/" /usr/local/bin/k8s-first-boot.sh
+sed -i "s/__CP_DNS_HOSTS_SYNC_IMAGE_VERSION__/${_CP_BUILD_VERSION}/" /usr/local/bin/k8s-first-boot.sh
 chmod +x /usr/local/bin/k8s-first-boot.sh
 
 # Systemd unit: run once after network is up

@@ -1,3 +1,5 @@
+# buildVersion: ""  # overrides general.buildVersion for this release
+
 service:
   name: cp-docker-registry
   host:
@@ -12,17 +14,21 @@ patchDNS:
 
 image:
   repository: quay.io/lifescience/cloud-pipeline
-  tag: registry-0.17-default
+  tag: registry
+  tagSuffix: "-default"
+  # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 dockerComp:
   image:
-    tag: docker-comp-0.17
+    tag: docker-comp
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 clair:
   image:
-    tag: clair-v4-0.17
+    tag: clair-v4
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   healthEndpoint: /healthz
   # cp-clair-db-init Job: official Postgres image (bundled psql/pg_isready). Align tag with cp-api-db db.version via Helmfile when using internal DB.

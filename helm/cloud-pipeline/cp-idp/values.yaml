@@ -1,5 +1,6 @@
 # false = ConfigMap only (external IdP). true = in-cluster IdP Deployment and Service.
 enabled: false
+# buildVersion: ""  # overrides general.buildVersion for this release
 
 # cp-idp-secret: create before Helm deploy — see ../../prerequisites/README.md
 
@@ -17,7 +18,8 @@ patchDNS:
 
 image:
   repository: quay.io/lifescience/cloud-pipeline
-  tag: idp-0.17
+  tag: idp
+  # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: Always  # IfNotPresent | Always | Never
 labels: {}
 deploymentLabels: {}

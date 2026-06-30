@@ -1,3 +1,5 @@
+# buildVersion: ""  # overrides general.buildVersion for this release
+
 service:
   name: cp-edge
   host:
@@ -14,7 +16,8 @@ region: ""      # AWS region of this edge node, e.g. us-east-1
 externalIP: ""  # Public IP of edge node (used in DNS and run endpoints)
 image:
   repository: quay.io/lifescience/cloud-pipeline
-  tag: edge-0.17
+  tag: edge
+  # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 config:
   CP_KUBE_SERVICES_TYPE: ingress  # ingress | nodePort

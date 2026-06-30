@@ -42,8 +42,8 @@ variable "ssh_interface" {
   description = "Defines which protocol to use for the instance communication: SSH or SSM. Use session_manager for SSM and keep empty for SSH."
 }
 
-variable "dns_hosts_sync_image" {
+variable "cloud_pipeline_build_version" {
   type        = string
-  default     = "quay.io/lifescience/cloud-pipeline:dns-hosts-sync-0.17"
-  description = "Full image reference for the dns-hosts-sync sidecar injected into the kube-dns deployment."
+  default     = "0.17"
+  description = "Cloud Pipeline build version used for docker image tags (e.g. api-srv-<version>, dns-hosts-sync-<version>, etc.)."
 }

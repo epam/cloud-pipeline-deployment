@@ -1,5 +1,6 @@
 # Helmfile sets `installed:` from this flag; deploy values live under the `billing:` key in values.yaml.
 enabled: true
+# buildVersion: ""  # overrides general.buildVersion for this release
 
 service:
   name: cp-billing-srv
@@ -7,7 +8,8 @@ service:
 
 image:
   repository: quay.io/lifescience/cloud-pipeline
-  tag: billing-srv-0.17
+  tag: billing-srv
+  # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: Always
 
 # With subPath billing/logs on the cp-system volume → <basePath>/billing/logs on the node (default /opt/billing/logs).

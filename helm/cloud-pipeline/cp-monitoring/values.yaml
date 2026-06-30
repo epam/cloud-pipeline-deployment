@@ -4,6 +4,7 @@ service:
 
 # Top-level toggle for helmfile installed:
 enabled: true
+# buildVersion: ""  # overrides general.buildVersion for this release
 
 heapster:
   enabled: true
@@ -23,7 +24,8 @@ heapster:
   elk:
     image:
       repository: quay.io/lifescience/cloud-pipeline
-      tag: heapster-elk-0.17
+      tag: heapster-elk
+      # buildVersion: ""  # overrides general.buildVersion for this image
       pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
     service:
@@ -39,7 +41,8 @@ nodeLogger:
 
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: node-logger-0.17
+    tag: node-logger
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 nodeReporter:
@@ -47,7 +50,8 @@ nodeReporter:
 
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: node-reporter-0.17
+    tag: node-reporter
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
   hostPath:
@@ -59,7 +63,8 @@ vmMonitor:
 
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: vm-monitor-0.17
+    tag: vm-monitor
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: Always  # IfNotPresent | Always | Never
 
   logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files

@@ -1,5 +1,6 @@
 # Helmfile uses this for `installed:`; set false to skip the cp-git release.
 enabled: false
+# buildVersion: ""  # overrides general.buildVersion for this release
 
 patchDNS:
   enabled: true
@@ -16,14 +17,16 @@ service:
 
 image:
   repository: quay.io/lifescience/cloud-pipeline
-  tag: git-15-0.17
+  tag: git-15
+  # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 gitSync:
   enabled: true
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: api-srv-0.17
+    tag: api-srv
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 config:
@@ -51,7 +54,8 @@ backup:
   enabled: true
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: cp-bkp-worker-0.17
+    tag: cp-bkp-worker
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   schedule: "0 8 * * *"  # Cron schedule in server local time
   retention: "10"         # Number of backup archives to keep

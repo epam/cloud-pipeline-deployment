@@ -60,7 +60,8 @@ spec:
         {{- end }}
       containers:
         - name: cp-bkp-worker
-          image: {{ printf "%s:%s" $ctx.Values.backup.image.repository $ctx.Values.backup.image.tag }}
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce $ctx.Values.backup.image.buildVersion $ctx.Values.buildVersion "") }}
+          image: {{ $ctx.Values.backup.image.repository }}:{{ $ctx.Values.backup.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}
           imagePullPolicy: {{ $ctx.Values.backup.image.pullPolicy }}
           env:
             - name: CP_BKP_SERVICE_NAME

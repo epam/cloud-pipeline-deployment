@@ -30,7 +30,8 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-vm-monitor
-          image: "{{ .Values.vmMonitor.image.repository }}:{{ .Values.vmMonitor.image.tag }}"
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.vmMonitor.image.buildVersion .Values.buildVersion "") }}
+          image: "{{ .Values.vmMonitor.image.repository }}:{{ .Values.vmMonitor.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
           imagePullPolicy: {{ .Values.vmMonitor.image.pullPolicy }}
           securityContext:
             privileged: true

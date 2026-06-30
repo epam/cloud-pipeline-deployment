@@ -67,7 +67,8 @@ build {
       "sudo cp -f /cp_temp/patch-kube-dns.sh /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh",
       "sudo chmod 755 /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh",
       "sudo mv /cp_temp/helm /var/lib/cloud-pipeline/deploy/helm",
-      "sudo chmod -R 777 /var/lib/cloud-pipeline/deploy",  
+      "echo '${var.cloud_pipeline_build_version}' | sudo tee /var/lib/cloud-pipeline/deploy/helm/CP_BUILD_VERSION.txt",
+      "sudo chmod -R 777 /var/lib/cloud-pipeline/deploy",
       "sudo rm -rf /cp_temp"
     ]
   }
@@ -75,7 +76,6 @@ build {
   provisioner "shell" {
     environment_vars = [
       "CP_CLOUD_PIPELINE_NODE_REGION=${var.region}",
-      "CP_DNS_HOSTS_SYNC_IMAGE=${var.dns_hosts_sync_image}",
     ]
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
     script          = "${path.root}/../common/scripts/install_kubernetes.sh"
