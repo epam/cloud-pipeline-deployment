@@ -1,3 +1,4 @@
+#!/bin/bash
 # Prepare node for Kubernetes: images, kubeadm/kubelet. Cluster is initialized on first boot via k8s-first-boot.service.
 set -e
 systemctl start docker || { journalctl -xeu docker.service --no-pager >&2; journalctl -xeu containerd.service --no-pager >&2; exit 1; }

@@ -8,13 +8,13 @@ packer {
 }
 
 source "amazon-ebs" "this" {
-  vpc_id              = var.vpc_id
-  subnet_id           = var.subnet_id
-  ami_name            = "${var.ami_name_prefix}-${formatdate("YYYY-MM-DD-hhmmss", timestamp())}"
-  instance_type       = var.instance_type
-  region              = var.region
-  source_ami          = data.amazon-ami.al2023.id
-  security_group_id   = var.security_group_id
+  vpc_id               = var.vpc_id
+  subnet_id            = var.subnet_id
+  ami_name             = "${var.ami_name_prefix}-${formatdate("YYYY-MM-DD-hhmmss", timestamp())}"
+  instance_type        = var.instance_type
+  region               = var.region
+  source_ami           = data.amazon-ami.al2023.id
+  security_group_id    = var.security_group_id
   iam_instance_profile = var.iam_instance_profile
 
   # Provisioning connection parameters
@@ -67,7 +67,7 @@ build {
       "sudo cp -f /cp_temp/patch-kube-dns.sh /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh",
       "sudo chmod 755 /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh",
       "sudo mv /cp_temp/helm /var/lib/cloud-pipeline/deploy/helm",
-      "sudo chmod -R 777 /var/lib/cloud-pipeline/deploy",  
+      "sudo chmod -R 777 /var/lib/cloud-pipeline/deploy",
       "sudo rm -rf /cp_temp"
     ]
   }

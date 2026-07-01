@@ -186,6 +186,7 @@ hooks:
         VALUES_FILE="{{ $ValuesFilePath }}"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$VALUES_FILE"
+{{- if index $postDeployValues "enabled" | default false }}
   - events: ["cleanup"]
     showlogs: true
     command: bash
@@ -270,3 +271,4 @@ hooks:
         SCRIPT="./hooks/post-deploy/register-email-templates.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- end }}
