@@ -30,8 +30,8 @@ Replace hostnames and namespace with your values.
 cd cloud-pipeline-deployment/helm/prerequisites
 chmod +x *.sh lib/*.sh
 
-API_DOMAIN="pipeline.example.com"
-IDP_HOST="idp.pipeline.example.com"
+API_DOMAIN="<your-cloud-pipeline-domain-name>"
+IDP_HOST="idp.<your-cloud-pipeline-domain-name>"
 NAMESPACE="cloud-pipeline"
 DEPLOYMENT_ID="$NAMESPACE"
 
@@ -72,32 +72,34 @@ certbot certonly \
   --preferred-challenges dns \
   --server https://acme-v02.api.letsencrypt.org/directory \
   --register-unsafely-without-email \
-  -d "example.com" \
-  -d "*.example.com"
+  -d "<your-cloud-pipeline-domain-name>" \
+  -d "*.<your-cloud-pipeline-domain-name>"
 ```
 
 When prompted, agree to the Terms of Service by typing `yes`.
 
-Certbot will request **two** DNS TXT records under `_acme-challenge.example.com`. Add both values to your DNS provider before pressing Enter. If your DNS provider supports multiple values per record, you can add both at once:
+Certbot will request **two** DNS TXT records under `_acme-challenge.<your-cloud-pipeline-domain-name>`. Add both values to your DNS provider before pressing Enter.
 
 ```
-"<token-1>"
-"<token-2>"
+"<value-1>"
+"<value-2>"
 ```
+
+> **Note:** If your DNS provider supports multiple values per record, you can add both at once.
 
 Verify propagation before pressing Enter:
 
 ```bash
-dig TXT _acme-challenge.example.com
+dig TXT _acme-challenge.<your-cloud-pipeline-domain-name>
 ```
 
 or the Google Admin Toolbox:
 ```
-https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.example.com
+https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.<your-cloud-pipeline-domain-name>
 ```
 Look for both token values in the `;ANSWER` section.
 
-After success, certificates are saved at `/etc/letsencrypt/live/example.com/`:
+After success, certificates are saved at `/etc/letsencrypt/live/<your-cloud-pipeline-domain-name>/`:
 - `fullchain.pem` — server cert + intermediate chain
 - `privkey.pem` — private key (EC P-256)
 
@@ -111,8 +113,8 @@ Set `TLS_CERT` and `TLS_KEY` before calling `generate-cp-pki-certs.sh` to enable
 cd cloud-pipeline-deployment/helm/prerequisites
 chmod +x *.sh lib/*.sh
 
-API_DOMAIN="example.com"
-IDP_HOST="idp.example.com"
+API_DOMAIN="<your-cloud-pipeline-domain-name>"
+IDP_HOST="idp.<your-cloud-pipeline-domain-name>"
 NAMESPACE="cloud-pipeline"
 export TLS_CERT=/etc/letsencrypt/live/$API_DOMAIN/fullchain.pem
 export TLS_KEY=/etc/letsencrypt/live/$API_DOMAIN/privkey.pem
