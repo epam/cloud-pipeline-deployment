@@ -44,7 +44,7 @@ cert_common_build_san_names() {
 cert_common_prepare_output_dir() {
   local output_dir="$1"
   mkdir -p "$output_dir"
-  cd "$output_dir"
+  cd "$output_dir" || return 42
 }
 
 cert_common_default_idp_internal_host() {

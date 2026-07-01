@@ -10,9 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASES_DIR="$SCRIPT_DIR/releases"
 echo "Validating $VALUES_FILE ..."
 
-for cmd in jq; do
-  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
-done
+command -v "jq" >/dev/null || { echo "ERROR: jq required but not installed"; exit 1; }
 
 # ---------------------------------------------------------------------------
 # YAML → JSON

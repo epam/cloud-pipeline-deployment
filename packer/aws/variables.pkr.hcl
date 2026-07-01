@@ -31,14 +31,14 @@ variable "security_group_id" {
 }
 
 variable "iam_instance_profile" {
-  type =  string
-  default = ""
+  type        = string
+  default     = ""
   description = "IAM profile to be assigned to the temporary instance (shall allow SSM communication if ssh_interface is set to session_manager)"
 }
 
 variable "ssh_interface" {
-  type =  string
-  default = ""
+  type        = string
+  default     = ""
   description = "Defines which protocol to use for the instance communication: SSH or SSM. Use session_manager for SSM and keep empty for SSH."
 }
 
