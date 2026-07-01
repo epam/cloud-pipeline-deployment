@@ -111,14 +111,14 @@ Set `TLS_CERT` and `TLS_KEY` before calling `generate-cp-pki-certs.sh` to enable
 cd cloud-pipeline-deployment/helm/prerequisites
 chmod +x *.sh lib/*.sh
 
-DOMAIN="example.com"
+API_DOMAIN="example.com"
 IDP_HOST="idp.example.com"
 NAMESPACE="cloud-pipeline"
-TLS_CERT=/etc/letsencrypt/live/$DOMAIN/fullchain.pem
-TLS_KEY=/etc/letsencrypt/live/$DOMAIN/privkey.pem
+export TLS_CERT=/etc/letsencrypt/live/$API_DOMAIN/fullchain.pem
+export TLS_KEY=/etc/letsencrypt/live/$API_DOMAIN/privkey.pem
 
 # 1) Import Let's Encrypt cert
-./generate-cp-pki-certs.sh "$DOMAIN"
+./generate-cp-pki-certs.sh "$API_DOMAIN"
 
 # 2) JWT signing keys — skip on renewal (JWT keys don't expire with TLS cert)
 ./generate-cp-jwt-pki-certs.sh
@@ -136,9 +136,9 @@ On renewal, only steps 1, 3, and 4 are needed. Skip JWT regeneration.
 
 ```bash
 # 1) Re-import renewed cert
-TLS_CERT=/etc/letsencrypt/live/$DOMAIN/fullchain.pem \
-TLS_KEY=/etc/letsencrypt/live/$DOMAIN/privkey.pem \
-./generate-cp-pki-certs.sh "$DOMAIN"
+TLS_CERT=/etc/letsencrypt/live/$API_DOMAIN/fullchain.pem \
+TLS_KEY=/etc/letsencrypt/live/$API_DOMAIN/privkey.pem \
+./generate-cp-pki-certs.sh "$API_DOMAIN"
 
 # 2) Regenerate IdP cert (cp-idp-secret must be updated when renewing)
 ./generate-idp-certs.sh "$IDP_HOST" "" "$NAMESPACE"
@@ -150,7 +150,7 @@ TLS_KEY=/etc/letsencrypt/live/$DOMAIN/privkey.pem \
 kubectl rollout restart deployment/cp-idp -n "$NAMESPACE"
 # Re-register SP connection (run after cp-idp is ready):
 kubectl exec deployment/cp-idp -- bash -c \
-  "saml-idp add-connection https://$DOMAIN:443/pipeline/ -c /opt/idp/pki/sso-public-cert.pem --profileDatabase /opt/idp/saml-idp-profiles.json"
+  "saml-idp add-connection https://$API_DOMAIN:443/pipeline/ -c /opt/idp/pki/sso-public-cert.pem --profileDatabase /opt/idp/saml-idp-profiles.json"
 # Fetch fresh IdP metadata and update secret:
 curl -fsSk "https://cp-idp.default.svc.cluster.local:443/metadata" \
   -H "Host: $IDP_HOST:443" \
