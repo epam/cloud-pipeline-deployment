@@ -101,7 +101,7 @@ sysctl -p /etc/sysctl.d/k8s.conf
 setenforce 0 || true
 sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
 
-cd /tmp
+cd /tmp || exit 42
 curl -O https://get.helm.sh/helm-v3.3.4-linux-amd64.tar.gz
 tar -xzf helm-v3.3.4-linux-amd64.tar.gz --strip-components=1 linux-amd64/helm
 mv helm /usr/local/bin

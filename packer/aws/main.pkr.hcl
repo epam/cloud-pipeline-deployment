@@ -8,13 +8,13 @@ packer {
 }
 
 source "amazon-ebs" "this" {
-  vpc_id              = var.vpc_id
-  subnet_id           = var.subnet_id
-  ami_name            = "${var.ami_name_prefix}-${formatdate("YYYY-MM-DD-hhmmss", timestamp())}"
-  instance_type       = var.instance_type
-  region              = var.region
-  source_ami          = data.amazon-ami.al2023.id
-  security_group_id   = var.security_group_id
+  vpc_id               = var.vpc_id
+  subnet_id            = var.subnet_id
+  ami_name             = "${var.ami_name_prefix}-${formatdate("YYYY-MM-DD-hhmmss", timestamp())}"
+  instance_type        = var.instance_type
+  region               = var.region
+  source_ami           = data.amazon-ami.al2023.id
+  security_group_id    = var.security_group_id
   iam_instance_profile = var.iam_instance_profile
 
   # Provisioning connection parameters
@@ -39,7 +39,7 @@ build {
   }
 
   provisioner "shell" {
-    environment_vars  = [
+    environment_vars = [
       "CLOUD_PIPELINE_DISTRO_DIR=${var.cloud_pipeline_deploy_dir_path}",
     ]
     execute_command   = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"

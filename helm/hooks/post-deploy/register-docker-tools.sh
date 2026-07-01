@@ -255,7 +255,6 @@ fi
 docker login -u "$CP_DEFAULT_ADMIN_NAME" -p "$CP_API_JWT_ADMIN" "$REGISTRY_PATH" || { echo "docker login failed"; exit 1; }
 
 push_result=0
-LAST_REGISTERED_IMAGE=""
 while IFS=, read -r docker_name docker_pretty_name; do
   docker_pretty_name=$(echo "$docker_pretty_name" | tr -d ' ')
   if ! array_contains_or_empty "$docker_pretty_name" "${CP_DOCKERS_TO_INIT[@]}"; then
@@ -278,9 +277,7 @@ while IFS=, read -r docker_name docker_pretty_name; do
   if docker pull "$docker_name" && docker tag "$docker_name" "$docker_full_pretty_name" && docker push "$docker_full_pretty_name"; then
     echo "Waiting 15s for registry to index before API registration..."
     sleep 15
-    if docker_register_image "$docker_pretty_name" "$docker_tool_manifest_path" "$REGISTRY_ID" "$REGISTRY_IDENTIFIER"; then
-      LAST_REGISTERED_IMAGE="$docker_pretty_name"
-    else
+    if ! docker_register_image "$docker_pretty_name" "$docker_tool_manifest_path" "$REGISTRY_ID" "$REGISTRY_IDENTIFIER"; then
       push_result=1
     fi
   else

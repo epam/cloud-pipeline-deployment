@@ -414,7 +414,7 @@ api_upload_demo_pipelines() {
 }
 
 api_register_data_transfer_pipeline() {
-  local role_grant="${1:-ROLE_USER}"
+  local role_grant="ROLE_USER"
   local role_permissions="26"
   local pipeline_version
   pipeline_version=$(echo "${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_VERSION:-v1}" | tr -d '"')
@@ -451,7 +451,7 @@ api_register_data_transfer_pipeline() {
 }
 
 api_register_system_jobs_pipeline() {
-  local role_grant="${1:-ROLE_ADMIN}"
+  local role_grant="ROLE_ADMIN"
   local role_permissions="21"
   local pipeline_version
   pipeline_version=$(echo "${CP_API_SRV_SYSTEM_JOBS_PIPELINE_VERSION:-v1}" | tr -d '"')
