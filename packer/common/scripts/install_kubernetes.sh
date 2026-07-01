@@ -1,21 +1,27 @@
 #!/bin/bash
 # Prepare node for Kubernetes: images, kubeadm/kubelet. Cluster is initialized on first boot via k8s-first-boot.service.
 set -e
-systemctl start docker || { journalctl -xeu docker.service --no-pager >&2; journalctl -xeu containerd.service --no-pager >&2; exit 1; }
-mkdir -p /var/lib/cloud-pipeline/deploy/docker-system-images && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-node-v3.14.1.tar" -O /var/lib/cloud-pipeline/deploy/docker-system-images/calico-node-v3.14.1.tar && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-pod2daemon-flexvol-v3.14.1.tar" -O /var/lib/cloud-pipeline/deploy/docker-system-images/calico-pod2daemon-flexvol-v3.14.1.tar && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-cni-v3.14.1.tar" -O /var/lib/cloud-pipeline/deploy/docker-system-images/calico-cni-v3.14.1.tar && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/k8s.gcr.io-kube-proxy-v1.15.4.tar" -O /var/lib/cloud-pipeline/deploy/docker-system-images/k8s.gcr.io-kube-proxy-v1.15.4.tar && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/ghcr.io-flannel-io-flannel-v0.26.4.tar" -O /var/lib/cloud-pipeline/deploy/docker-system-images/ghcr.io-flannel-io-flannel-v0.26.4.tar && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/k8s.gcr.io-pause-3.1.tar" -O /var/lib/cloud-pipeline/deploy/docker-system-images/k8s.gcr.io-pause-3.1.tar
 
-docker load -i /var/lib/cloud-pipeline/deploy/docker-system-images/calico-node-v3.14.1.tar && \
-docker load -i /var/lib/cloud-pipeline/deploy/docker-system-images/calico-pod2daemon-flexvol-v3.14.1.tar && \
-docker load -i /var/lib/cloud-pipeline/deploy/docker-system-images/calico-cni-v3.14.1.tar && \
-docker load -i /var/lib/cloud-pipeline/deploy/docker-system-images/k8s.gcr.io-kube-proxy-v1.15.4.tar && \
-docker load -i /var/lib/cloud-pipeline/deploy/docker-system-images/ghcr.io-flannel-io-flannel-v0.26.4.tar && \
-docker load -i /var/lib/cloud-pipeline/deploy/docker-system-images/k8s.gcr.io-pause-3.1.tar
+if [ -z "${CLOUD_PIPELINE_DISTRO_DIR:-}" ]; then
+  echo "WARNING: CLOUD_PIPELINE_DISTRO_DIR is not set, falling back to /var/lib/cloud-pipeline/deploy" >&2
+  CLOUD_PIPELINE_DISTRO_DIR="/var/lib/cloud-pipeline/deploy"
+fi
+
+systemctl start docker || { journalctl -xeu docker.service --no-pager >&2; journalctl -xeu containerd.service --no-pager >&2; exit 1; }
+mkdir -p "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images" && \
+wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-node-v3.14.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-node-v3.14.1.tar" && \
+wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-pod2daemon-flexvol-v3.14.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-pod2daemon-flexvol-v3.14.1.tar" && \
+wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-cni-v3.14.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-cni-v3.14.1.tar" && \
+wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/k8s.gcr.io-kube-proxy-v1.15.4.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-kube-proxy-v1.15.4.tar" && \
+wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/ghcr.io-flannel-io-flannel-v0.26.4.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/ghcr.io-flannel-io-flannel-v0.26.4.tar" && \
+wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/k8s.gcr.io-pause-3.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-pause-3.1.tar"
+
+docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-node-v3.14.1.tar" && \
+docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-pod2daemon-flexvol-v3.14.1.tar" && \
+docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-cni-v3.14.1.tar" && \
+docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-kube-proxy-v1.15.4.tar" && \
+docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/ghcr.io-flannel-io-flannel-v0.26.4.tar" && \
+docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-pause-3.1.tar"
 
 systemctl stop docker
 
@@ -40,29 +46,29 @@ systemctl start docker
 systemctl start kubelet
 
 for _bootstrap in kubeadm-init-config.yaml.raw canal.yaml.raw; do
-  if [ ! -f "/var/lib/cloud-pipeline/deploy/k8s-bootstrap/${_bootstrap}" ]; then
-    echo "ERROR: missing /var/lib/cloud-pipeline/deploy/k8s-bootstrap/${_bootstrap} (Packer file provisioner failed?)" >&2
+  if [ ! -f "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/${_bootstrap}" ]; then
+    echo "ERROR: missing ${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/${_bootstrap} (Packer file provisioner failed?)" >&2
     exit 1
   fi
 done
 export CP_KUBE_FLANNEL_CIDR="${CP_KUBE_FLANNEL_CIDR:-10.244.0.0/16}"
 export CP_KUBE_NODE_CIDR_MASK="${CP_KUBE_NODE_CIDR_MASK:-26}"
 export CP_KUBE_KUBELET_PORT="${CP_KUBE_KUBELET_PORT:-10250}"
-envsubst '${CP_KUBE_FLANNEL_CIDR} ${CP_KUBE_KUBELET_PORT} ${CP_KUBE_NODE_CIDR_MASK}' < /var/lib/cloud-pipeline/deploy/k8s-bootstrap/kubeadm-init-config.yaml.raw > /var/lib/cloud-pipeline/deploy/k8s-bootstrap/kubeadm-init-config.yaml
-envsubst '${CP_KUBE_FLANNEL_CIDR}' < /var/lib/cloud-pipeline/deploy/k8s-bootstrap/canal.yaml.raw > /var/lib/cloud-pipeline/deploy/k8s-bootstrap/canal.yaml
+envsubst '${CP_KUBE_FLANNEL_CIDR} ${CP_KUBE_KUBELET_PORT} ${CP_KUBE_NODE_CIDR_MASK}' < "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/kubeadm-init-config.yaml.raw" > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/kubeadm-init-config.yaml"
+envsubst '${CP_KUBE_FLANNEL_CIDR}' < "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml.raw" > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml"
 
-chmod +x /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh
-sed -i "s|__CP_DNS_HOSTS_SYNC_IMAGE__|${CP_DNS_HOSTS_SYNC_IMAGE}|" /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh
+chmod +x "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh"
+sed -i "s|__CP_DNS_HOSTS_SYNC_IMAGE__|${CP_DNS_HOSTS_SYNC_IMAGE}|" "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh"
 
 # Configure the node via EC2 user data by appending to bootstrap.env:
 #
 #   #!/bin/bash
-#   cat >> /var/lib/cloud-pipeline/deploy/k8s-bootstrap/bootstrap.env <<'EOF'
+#   cat >> "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/bootstrap.env" <<'EOF'
 #   ROLE=application-node          # omit or set "master-node" for the control plane node
 #   CP_STORAGE_ID=fs-xxxxxxxxxxxxxxxxx
 #   EOF
 #
-cat << 'BOOTSTRAPENV' > /var/lib/cloud-pipeline/deploy/k8s-bootstrap/bootstrap.env
+cat << 'BOOTSTRAPENV' > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/bootstrap.env"
 # Node role: "master-node" (default when unset) or "application-node".
 # ROLE=application-node
 #
@@ -100,7 +106,13 @@ cat << 'K8SBOOT' > /usr/local/bin/k8s-first-boot.sh
 #!/bin/bash
 set -e
 
-_BOOTSTRAP_ENV=/var/lib/cloud-pipeline/deploy/k8s-bootstrap/bootstrap.env
+source /etc/environment 2>/dev/null || true
+if [ -z "${CLOUD_PIPELINE_DISTRO_DIR:-}" ]; then
+  echo "WARNING: CLOUD_PIPELINE_DISTRO_DIR not found in /etc/environment, falling back to /var/lib/cloud-pipeline/deploy" >&2
+  CLOUD_PIPELINE_DISTRO_DIR="/var/lib/cloud-pipeline/deploy"
+fi
+
+_BOOTSTRAP_ENV=${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/bootstrap.env
 if [ -f "$_BOOTSTRAP_ENV" ]; then
   source "$_BOOTSTRAP_ENV"
 fi
@@ -239,7 +251,7 @@ if [ -f /etc/kubernetes/pki/ca.crt ]; then
   echo "Kubernetes already initialized, skipping first-boot init"
   exit 0
 fi
-kubeadm init --config /var/lib/cloud-pipeline/deploy/k8s-bootstrap/kubeadm-init-config.yaml --ignore-preflight-errors=all
+kubeadm init --config "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/kubeadm-init-config.yaml" --ignore-preflight-errors=all
 
 mkdir -p /root/.kube
 \cp /etc/kubernetes/admin.conf /root/.kube/config
@@ -329,14 +341,14 @@ else
   echo "Shared filesystem is not mounted, see mount errors above; skipping join credential generation"
 fi
 
-kubectl apply -f /var/lib/cloud-pipeline/deploy/k8s-bootstrap/canal.yaml
+kubectl apply -f "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml"
 
 _KUBE_DNS_NODE_SELECTOR_LABEL="${KUBE_DNS_NODE_SELECTOR_LABEL:-node-role.kubernetes.io/master=}"
 _KUBE_DNS_NODE_SELECTOR_KEY="${_KUBE_DNS_NODE_SELECTOR_LABEL%%=*}"
 _KUBE_DNS_NODE_SELECTOR_VALUE="${_KUBE_DNS_NODE_SELECTOR_LABEL#*=}"
 kubectl label nodes --all "${_KUBE_DNS_NODE_SELECTOR_KEY}=${_KUBE_DNS_NODE_SELECTOR_VALUE}" --overwrite
 
-/var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}"
+"${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh" --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}"
 
 echo "Wait for kube-dns Service ClusterIP to be available"
 for _i in $(seq 1 60); do
