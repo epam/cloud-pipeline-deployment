@@ -8,13 +8,13 @@ packer {
 }
 
 source "amazon-ebs" "this" {
-  vpc_id              = var.vpc_id
-  subnet_id           = var.subnet_id
-  ami_name            = "${var.ami_name_prefix}-${formatdate("YYYY-MM-DD-hhmmss", timestamp())}"
-  instance_type       = var.instance_type
-  region              = var.region
-  source_ami          = data.amazon-ami.al2023.id
-  security_group_id   = var.security_group_id
+  vpc_id               = var.vpc_id
+  subnet_id            = var.subnet_id
+  ami_name             = "${var.ami_name_prefix}-${formatdate("YYYY-MM-DD-hhmmss", timestamp())}"
+  instance_type        = var.instance_type
+  region               = var.region
+  source_ami           = data.amazon-ami.al2023.id
+  security_group_id    = var.security_group_id
   iam_instance_profile = var.iam_instance_profile
 
   # Provisioning connection parameters
@@ -35,6 +35,13 @@ build {
   }
 
   provisioner "shell" {
+    inline = ["echo 'CLOUD_PIPELINE_DISTRO_DIR=${var.cloud_pipeline_deploy_dir_path}' | sudo tee -a /etc/environment"]
+  }
+
+  provisioner "shell" {
+    environment_vars = [
+      "CLOUD_PIPELINE_DISTRO_DIR=${var.cloud_pipeline_deploy_dir_path}",
+    ]
     execute_command   = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
     script            = "${path.root}/../common/scripts/install_prerequsites.sh"
     expect_disconnect = true
@@ -62,13 +69,13 @@ build {
 
   provisioner "shell" {
     inline = [
-      "sudo mkdir -p /var/lib/cloud-pipeline/deploy/k8s-bootstrap",
-      "sudo cp -f /cp_temp/kubeadm-init-config.yaml.raw /cp_temp/canal.yaml.raw /var/lib/cloud-pipeline/deploy/k8s-bootstrap/",
-      "sudo cp -f /cp_temp/patch-kube-dns.sh /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh",
-      "sudo chmod 755 /var/lib/cloud-pipeline/deploy/k8s-bootstrap/patch-kube-dns.sh",
-      "sudo mv /cp_temp/helm /var/lib/cloud-pipeline/deploy/helm",
-      "echo '${var.cloud_pipeline_build_version}' | sudo tee /var/lib/cloud-pipeline/deploy/helm/CP_BUILD_VERSION.txt",
-      "sudo chmod -R 777 /var/lib/cloud-pipeline/deploy",
+      "sudo mkdir -p ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap",
+      "sudo cp -f /cp_temp/kubeadm-init-config.yaml.raw /cp_temp/canal.yaml.raw ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/",
+      "sudo cp -f /cp_temp/patch-kube-dns.sh ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/patch-kube-dns.sh",
+      "sudo chmod 755 ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/patch-kube-dns.sh",
+      "sudo mv /cp_temp/helm ${var.cloud_pipeline_deploy_dir_path}/helm",
+      "echo '${var.cloud_pipeline_build_version}' | sudo tee ${var.cloud_pipeline_deploy_dir_path}/helm/CP_BUILD_VERSION.txt",
+      "sudo chmod -R 777 ${var.cloud_pipeline_deploy_dir_path}",
       "sudo rm -rf /cp_temp"
     ]
   }
@@ -76,6 +83,8 @@ build {
   provisioner "shell" {
     environment_vars = [
       "CP_CLOUD_PIPELINE_NODE_REGION=${var.region}",
+      "CP_DNS_HOSTS_SYNC_IMAGE=${var.dns_hosts_sync_image}",
+      "CLOUD_PIPELINE_DISTRO_DIR=${var.cloud_pipeline_deploy_dir_path}",
     ]
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
     script          = "${path.root}/../common/scripts/install_kubernetes.sh"

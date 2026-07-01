@@ -133,7 +133,8 @@ echo "Registering docker registry in API (${REGISTRY_PATH})..."
 
 function check_api_response_status {
   local response_json="$1"
-  local response_status=$(echo "$response_json" | jq -r ".status")
+  local response_status
+  response_status=$(echo "$response_json" | jq -r ".status")
   local result=0
   if [ "$response_status" == "ERROR" ] || [[ "$response_status" == "40"* ]]; then
       result=1
@@ -191,7 +192,7 @@ function call_api {
 }
 
 function api_register_docker_registry {
-  local docker_role_grant="${1:-ROLE_USER}"
+  local docker_role_grant="ROLE_USER"
 
   local docker_path=$CP_DOCKER_INTERNAL_HOST:$CP_DOCKER_INTERNAL_PORT
   local docker_externalUrl=$CP_DOCKER_EXTERNAL_HOST:$CP_DOCKER_EXTERNAL_PORT
@@ -203,9 +204,11 @@ function api_register_docker_registry {
   local docker_pipelineAuth="true"
   local docker_userName="$CP_DEFAULT_ADMIN_NAME"
   # api + docker registry certificates are added as trusted (api is required to pipeline auth)
-  local public_certificate=$(cat $docker_caCert $api_caCert | awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}')
+  local public_certificate
+  public_certificate=$(cat $docker_caCert $api_caCert | awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}')
 
-  local docker_id=$(api_get_docker_registry_id "$docker_path")
+  local docker_id
+  docker_id=$(api_get_docker_registry_id "$docker_path")
   if [ "$docker_id" ]; then
       echo "Docker registry \"$docker_path\" with id \"$docker_id\" already exists, it will NOT be deleted and a new registry will NOT be registered"
       export CP_DOCKER_REGISTRY_ID=$docker_id

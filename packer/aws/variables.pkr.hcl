@@ -31,14 +31,14 @@ variable "security_group_id" {
 }
 
 variable "iam_instance_profile" {
-  type =  string
-  default = ""
+  type        = string
+  default     = ""
   description = "IAM profile to be assigned to the temporary instance (shall allow SSM communication if ssh_interface is set to session_manager)"
 }
 
 variable "ssh_interface" {
-  type =  string
-  default = ""
+  type        = string
+  default     = ""
   description = "Defines which protocol to use for the instance communication: SSH or SSM. Use session_manager for SSM and keep empty for SSH."
 }
 
@@ -46,4 +46,10 @@ variable "cloud_pipeline_build_version" {
   type        = string
   default     = "0.17"
   description = "Cloud Pipeline build version used for docker image tags (e.g. api-srv-<version>, dns-hosts-sync-<version>, etc.)."
+}
+
+variable "cloud_pipeline_deploy_dir_path" {
+  type        = string
+  default     = "/var/lib/cloud-pipeline/deploy"
+  description = "Filesystem path on the AMI where Cloud Pipeline deployment artifacts are stored. Exposed on the instance as CLOUD_PIPELINE_DISTRO_DIR in /etc/environment."
 }

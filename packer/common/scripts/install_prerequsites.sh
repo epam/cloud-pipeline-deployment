@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ -z "${CLOUD_PIPELINE_DISTRO_DIR:-}" ]; then
+  echo "WARNING: CLOUD_PIPELINE_DISTRO_DIR is not set, falling back to /var/lib/cloud-pipeline/deploy" >&2
+  CLOUD_PIPELINE_DISTRO_DIR="/var/lib/cloud-pipeline/deploy"
+fi
+
 yum install -y \
             wget \
             git \
@@ -96,7 +101,7 @@ sysctl -p /etc/sysctl.d/k8s.conf
 setenforce 0 || true
 sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
 
-cd /tmp
+cd /tmp || exit 42
 curl -O https://get.helm.sh/helm-v3.3.4-linux-amd64.tar.gz
 tar -xzf helm-v3.3.4-linux-amd64.tar.gz --strip-components=1 linux-amd64/helm
 mv helm /usr/local/bin
@@ -107,8 +112,8 @@ chmod 777 helmfile
 mv helmfile /usr/local/bin
 
 mkdir -p /root/.local/share/helm/plugins
-mkdir -p /var/lib/cloud-pipeline/deploy
-mkdir -p /var/lib/cloud-pipeline/deploy/k8s-bootstrap
+mkdir -p "${CLOUD_PIPELINE_DISTRO_DIR}"
+mkdir -p "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap"
 
 curl -L https://github.com/databus23/helm-diff/releases/download/v3.4.2/helm-diff-linux-amd64.tgz | tar -C /root/.local/share/helm/plugins -xzv
 

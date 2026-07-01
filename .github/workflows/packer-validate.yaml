@@ -1,0 +1,23 @@
+name: Packer validate
+
+on:
+  pull_request:
+    paths:
+      - 'packer/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packer/aws
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-packer@v3
+
+      - name: Check formatting
+        run: packer fmt --check .
+
+      - name: Validate syntax
+        run: packer validate -syntax-only .
