@@ -83,7 +83,6 @@ build {
   provisioner "shell" {
     environment_vars = [
       "CP_CLOUD_PIPELINE_NODE_REGION=${var.region}",
-      "CP_DNS_HOSTS_SYNC_IMAGE=${var.dns_hosts_sync_image}",
       "CLOUD_PIPELINE_DISTRO_DIR=${var.cloud_pipeline_deploy_dir_path}",
     ]
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
