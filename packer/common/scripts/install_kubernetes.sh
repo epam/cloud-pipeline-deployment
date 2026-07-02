@@ -7,6 +7,8 @@ if [ -z "${CLOUD_PIPELINE_DISTRO_DIR:-}" ]; then
   CLOUD_PIPELINE_DISTRO_DIR="/var/lib/cloud-pipeline/deploy"
 fi
 
+_CP_BUILD_VERSION=$(tr -d '[:space:]' < "${CLOUD_PIPELINE_DISTRO_DIR}/helm/CP_BUILD_VERSION.txt")
+
 systemctl start docker || { journalctl -xeu docker.service --no-pager >&2; journalctl -xeu containerd.service --no-pager >&2; exit 1; }
 mkdir -p "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images" && \
 wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-node-v3.14.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-node-v3.14.1.tar" && \
@@ -57,8 +59,8 @@ export CP_KUBE_KUBELET_PORT="${CP_KUBE_KUBELET_PORT:-10250}"
 envsubst '${CP_KUBE_FLANNEL_CIDR} ${CP_KUBE_KUBELET_PORT} ${CP_KUBE_NODE_CIDR_MASK}' < "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/kubeadm-init-config.yaml.raw" > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/kubeadm-init-config.yaml"
 envsubst '${CP_KUBE_FLANNEL_CIDR}' < "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml.raw" > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml"
 
-chmod +x "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh"
 sed -i "s|__CP_DNS_HOSTS_SYNC_IMAGE__|${CP_DNS_HOSTS_SYNC_IMAGE}|" "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh"
+chmod +x "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh"
 
 # Configure the node via EC2 user data by appending to bootstrap.env:
 #
@@ -348,7 +350,7 @@ _KUBE_DNS_NODE_SELECTOR_KEY="${_KUBE_DNS_NODE_SELECTOR_LABEL%%=*}"
 _KUBE_DNS_NODE_SELECTOR_VALUE="${_KUBE_DNS_NODE_SELECTOR_LABEL#*=}"
 kubectl label nodes --all "${_KUBE_DNS_NODE_SELECTOR_KEY}=${_KUBE_DNS_NODE_SELECTOR_VALUE}" --overwrite
 
-"${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh" --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}"
+"${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh" --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}" --dns-hosts-sync-image-version="__CP_DNS_HOSTS_SYNC_IMAGE_VERSION__"
 
 echo "Wait for kube-dns Service ClusterIP to be available"
 for _i in $(seq 1 60); do
@@ -446,6 +448,7 @@ K8SBOOT
 
 echo "CP_CLOUD_PIPELINE_NODE_REGION: $CP_CLOUD_PIPELINE_NODE_REGION"
 sed -i "s/__CP_NODE_REGION__/${CP_CLOUD_PIPELINE_NODE_REGION}/" /usr/local/bin/k8s-first-boot.sh
+sed -i "s/__CP_DNS_HOSTS_SYNC_IMAGE_VERSION__/${_CP_BUILD_VERSION}/" /usr/local/bin/k8s-first-boot.sh
 chmod +x /usr/local/bin/k8s-first-boot.sh
 
 # Systemd unit: run once after network is up

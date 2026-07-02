@@ -16,6 +16,10 @@ helmDefaults:
 {{- $monitoringValues := index $deployValues "monitoring" | default dict }}
 {{- $postDeployValues := index $deployValues "postDeploy" | default dict }}
 
+{{/* Put buildVersion value from CP_BUILD_VERSION.txt only if not set by values.yaml */}}
+{{- $fileVersion := exec "sh" (list "-c" "cat ./CP_BUILD_VERSION.txt 2>/dev/null | tr -d '[:space:]'") }}
+{{- if and $fileVersion (not (index $generalValues "buildVersion")) }}{{- $_ := set $generalValues "buildVersion" $fileVersion }}{{- end }}
+
 releases:
   - name: cp-resources
     chart: ./cloud-pipeline/cp-resources

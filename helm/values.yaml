@@ -1,4 +1,6 @@
-# deploymentNamespace: cloud-pipeline
+general:
+  # buildVersion: ""  # top-level build version applied to all cloud-pipeline images
+  namespace: default
 
 resources:
   config:
@@ -82,7 +84,7 @@ git:
     internalHttpPort: 443
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: git-15-0.17
+    tag: git-15
     pullPolicy: IfNotPresent
   config:
     CP_GITLAB_SSO_ENDPOINT_ID: ""
@@ -98,23 +100,23 @@ search:
       enabled: true
     image:
       repository: quay.io/lifescience/cloud-pipeline
-      tag: search-elk-0.17
+      tag: search-elk
   curator:
     image:
       repository: quay.io/lifescience/cloud-pipeline
-      tag: search-elk-curator-0.17
+      tag: search-elk-curator
   srv:
     mode: default  # default | nfsEvents | nfsOnly
     image:
       repository: quay.io/lifescience/cloud-pipeline
-      tag: search-0.17
+      tag: search
 
 # Billing report agent (cp-billing-srv). Syncs billing data to Elasticsearch; requires cloud-pipeline/cp-billing-srv=true on a node (see install.sh).
 billing:
   enabled: true
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: billing-srv-0.17
+    tag: billing-srv
     pullPolicy: Always
 
 # Email notifier (cp-notifier). Patches cp-config-global with CP_NOTIFIER_* from structured smtp/azure/ui settings; requires cloud-pipeline/cp-notifier=true on a node (see install.sh).
@@ -142,7 +144,7 @@ notifier:
     dryRun: false  # true = log emails without sending (test mode)
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: notifier-0.17
+    tag: notifier
     pullPolicy: Always  # IfNotPresent | Always | Never
 
 monitoring:
@@ -152,23 +154,23 @@ monitoring:
     elk:
       image:
         repository: quay.io/lifescience/cloud-pipeline
-        tag: heapster-elk-0.17
+        tag: heapster-elk
       dataHostPath: /opt/heapster-elk/data  # Node local path for Elasticsearch data
   nodeLogger:
     enabled: true
     image:
       repository: quay.io/lifescience/cloud-pipeline
-      tag: node-logger-0.17
+      tag: node-logger
   nodeReporter:
     enabled: true
     image:
       repository: quay.io/lifescience/cloud-pipeline
-      tag: node-reporter-0.17
+      tag: node-reporter
   vmMonitor:
     enabled: true
     image:
       repository: quay.io/lifescience/cloud-pipeline
-      tag: vm-monitor-0.17
+      tag: vm-monitor
     logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files
 
 postDeploy:

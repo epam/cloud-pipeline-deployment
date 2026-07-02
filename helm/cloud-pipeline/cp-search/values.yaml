@@ -1,5 +1,6 @@
 # Helmfile `installed:`; set false to skip this release.
 enabled: false
+# buildVersion: ""  # overrides general.buildVersion for this release
 
 service:
   name: cp-search
@@ -20,7 +21,8 @@ elk:
     enabled: true
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: search-elk-0.17
+    tag: search-elk
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   heapSize: 4g  # JVM heap for Elasticsearch, e.g. 4g, 8g (use M/G suffix)
   # Extra JVM flags (install-config used CMS; container image may override).
@@ -32,7 +34,8 @@ curator:
   enabled: true
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: search-elk-curator-0.17
+    tag: search-elk-curator
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: Always  # IfNotPresent | Always | Never
   logHostPath: /opt/search-elk/log/curator
 
@@ -40,7 +43,8 @@ curator:
 srv:
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: search-0.17
+    tag: search
+    # buildVersion: ""  # overrides general.buildVersion for this image
     pullPolicy: Always  # IfNotPresent | Always | Never
   # default | nfsEvents | nfsOnly — controls indexer env flags and log hostPath (see EPM-CMBI k8s/cp-search/*-dpl*.yaml).
   mode: default

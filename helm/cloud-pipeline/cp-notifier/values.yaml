@@ -1,12 +1,14 @@
 # Helmfile sets `installed:` from this flag; deploy values live under the `notifier:` key in values.yaml.
 enabled: false
+# buildVersion: ""  # overrides general.buildVersion for this release
 
 service:
   name: cp-notifier
 
 image:
   repository: quay.io/lifescience/cloud-pipeline
-  tag: notifier-0.17
+  tag: notifier
+  # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 # Structured settings → CP_NOTIFIER_* keys in cp-config-global (via hook ConfigMap + patch Job).

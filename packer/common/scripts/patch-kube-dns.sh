@@ -6,6 +6,8 @@
 # Options:
 #   --node-selector-label <key>=<value>   Node selector label for kube-dns pod scheduling.
 #                                         Default: node-role.kubernetes.io/master=
+#   --dns-hosts-sync-image-version <ver>  Cloud Pipeline build version for the dns-hosts-sync image.
+#                                         Default: 0.17
 #
 # Examples:
 #   patch-kube-dns.sh
@@ -13,19 +15,24 @@
 #   patch-kube-dns.sh --node-selector-label node-role.kubernetes.io/master=true
 #   patch-kube-dns.sh --node-selector-label=kubernetes.io/hostname=my-node
 #   patch-kube-dns.sh --node-selector-label kubernetes.io/hostname=my-node
+#   patch-kube-dns.sh --dns-hosts-sync-image-version 0.17
 
 _parse_args() {
   _KUBE_DNS_NODE_SELECTOR_LABEL="node-role.kubernetes.io/master="
+  _DNS_HOSTS_SYNC_IMAGE_VERSION="0.17"
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --node-selector-label=*) _KUBE_DNS_NODE_SELECTOR_LABEL="${1#*=}" ;;
-      --node-selector-label)   _KUBE_DNS_NODE_SELECTOR_LABEL="$2"; shift ;;
+      --node-selector-label=*)          _KUBE_DNS_NODE_SELECTOR_LABEL="${1#*=}" ;;
+      --node-selector-label)            _KUBE_DNS_NODE_SELECTOR_LABEL="$2"; shift ;;
+      --dns-hosts-sync-image-version=*) _DNS_HOSTS_SYNC_IMAGE_VERSION="${1#*=}" ;;
+      --dns-hosts-sync-image-version)   _DNS_HOSTS_SYNC_IMAGE_VERSION="$2"; shift ;;
       *) echo "WARNING: unknown argument '$1', ignoring" >&2 ;;
     esac
     shift
   done
   _KUBE_DNS_NODE_SELECTOR_KEY="${_KUBE_DNS_NODE_SELECTOR_LABEL%%=*}"
   _KUBE_DNS_NODE_SELECTOR_VALUE="${_KUBE_DNS_NODE_SELECTOR_LABEL#*=}"
+  _DNS_HOSTS_SYNC_IMAGE="quay.io/lifescience/cloud-pipeline:dns-hosts-sync-${_DNS_HOSTS_SYNC_IMAGE_VERSION}"
 }
 
 _parse_args "$@"
@@ -128,7 +135,7 @@ kubectl patch deployment kube-dns \
                                 \"python\",
                                 \"/sync-hosts.py\"
                             ],
-                            \"image\": \"__CP_DNS_HOSTS_SYNC_IMAGE__\",
+                            \"image\": \"${_DNS_HOSTS_SYNC_IMAGE}\",
                             \"imagePullPolicy\": \"IfNotPresent\",
                             \"name\": \"pods\",
                             \"volumeMounts\": [

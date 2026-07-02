@@ -30,7 +30,8 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-node-reporter
-          image: "{{ .Values.nodeReporter.image.repository }}:{{ .Values.nodeReporter.image.tag }}"
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.nodeReporter.image.buildVersion .Values.buildVersion "") }}
+          image: "{{ .Values.nodeReporter.image.repository }}:{{ .Values.nodeReporter.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
           imagePullPolicy: {{ .Values.nodeReporter.image.pullPolicy }}
           resources:
             limits:

@@ -36,7 +36,8 @@ spec:
       restartPolicy: Never
       containers:
         - name: generate-jwt
-          image: "{{ .Values.image.apiServer.repository }}:{{ .Values.image.apiServer.tag }}"
+          {{- $apiImageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.apiServer.buildVersion .Values.buildVersion "") }}
+          image: "{{ .Values.image.apiServer.repository }}:{{ .Values.image.apiServer.tag }}-{{ $apiImageVersion }}"
           imagePullPolicy: {{ .Values.image.apiServer.pullPolicy }}
           envFrom:
             - configMapRef:
