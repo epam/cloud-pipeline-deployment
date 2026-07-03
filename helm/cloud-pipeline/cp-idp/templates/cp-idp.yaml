@@ -72,6 +72,8 @@ spec:
             - mountPath: /opt/idp/pki
               name: cp-idp-secret
               readOnly: true
+            - mountPath: /opt/idp/pdb
+              name: idp-profile-db
           readinessProbe:
             httpGet:
               path: /metadata
@@ -88,4 +90,8 @@ spec:
                   name: cp-idp-secret
               - secret:
                   name: cp-pki-secret
+        - name: idp-profile-db
+          hostPath:
+            path: {{ .Values.profileDb.hostPath }}
+            type: DirectoryOrCreate
 {{- end }}
