@@ -24,9 +24,12 @@ image:
 labels: {}
 deploymentLabels: {}
 
+profileDb:
+  hostPath: /opt/idp/pdb
+
 config:
   CP_IDP_CERT_DIR: /opt/idp/pki
-  CP_IDP_PROFILE_DB: /opt/idp/saml-idp-profiles.json
+  CP_IDP_PROFILE_DB: /opt/idp/pdb/saml-idp-profiles.json
   CP_API_SRV_SAML_USER_ATTRIBUTES: "Email=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress,FirstName=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname,LastName=http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname%22"
 
 apiSrv:
