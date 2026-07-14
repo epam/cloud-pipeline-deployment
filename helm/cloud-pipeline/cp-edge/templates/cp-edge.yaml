@@ -134,6 +134,17 @@ spec:
             - mountPath: /etc/docker-registry/pki
               name: cp-docker-registry-pki
               readOnly: true
+            - mountPath: /var/log
+              name: edge-logs
+            - mountPath: /etc/nginx/ext/external-apps
+              name: edge-external-apps
+              readOnly: true
+            - mountPath: /etc/nginx/ext/external-locs
+              name: edge-external-locs
+              readOnly: true
+            - mountPath: /opt/share-srv/pki
+              name: cp-api-secret
+              readOnly: true
       dnsConfig:
         options:
           - name: ndots
@@ -154,3 +165,12 @@ spec:
                 path: docker-public-cert.pem
               - key: ssl-private-key.pem
                 path: docker-private-key.pem
+        - name: edge-logs
+          hostPath:
+            path: /opt/edge/logs/{{ .Values.region }}
+        - name: edge-external-apps
+          hostPath:
+            path: /opt/edge/external-apps
+        - name: edge-external-locs
+          hostPath:
+            path: /opt/edge/external-locs
