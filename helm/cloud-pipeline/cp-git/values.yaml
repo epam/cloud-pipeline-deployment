@@ -48,6 +48,7 @@ config:
   GITLAB_DATABASE_VERSION: "12.4"  # Postgres major.minor for cp-gitlab-db image tag
   GITLAB_DATABASE_SHARED_BUFFERS: 256MB  # PostgreSQL shared_buffers; use M/MB/G/GB suffix
   GITLAB_DATABASE_MAX_CONNECTIONS: "200"
+  SYNC_GIT_PERIOD: "60"
 
 # Embedded Postgres (cp-gitlab-db) when enabled. App DB name/user/password and Postgres tuning come from config.GITLAB_DATABASE_* above.
 backup:

@@ -9,6 +9,10 @@
 {{- $_ := set $data "CP_HEAPSTER_ELK_INTERNAL_PORT" $elkInternalPort -}}
 {{- $_ := set $data "CP_HEAPSTER_INTERNAL_HOST" $heapsterInternalHost -}}
 {{- $_ := set $data "CP_HEAPSTER_INTERNAL_PORT" $heapsterInternalPort -}}
+{{- $config := .Values.config | default dict -}}
+{{- range $key, $value := $config -}}
+{{- $_ := set $data $key ($value | toString) -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
