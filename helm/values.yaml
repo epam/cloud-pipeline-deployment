@@ -173,6 +173,24 @@ monitoring:
       tag: vm-monitor
     logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files
 
+# Storage lifecycle service (cp-storage-lifecycle-service). Archives/restores S3 objects between storage classes.
+# Requires node label cloud-pipeline/cp-storage-lifecycle-service=true.
+storageLifecycle:
+  enabled: true
+  archive:
+    startAt: "23:00"  # Time of day to run the archive job (HH:MM)
+  restore:
+    startEach: "20"   # Interval in minutes between restore checks
+
+# WebDAV service (cp-dav). Provides WebDAV access to Cloud Pipeline storage.
+# Requires node label cloud-pipeline/cp-dav=true.
+dav:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: dav
+    pullPolicy: Always
+
 postDeploy:
   enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
   # Additional (non-default) AWS cloud regions to register after deployment.

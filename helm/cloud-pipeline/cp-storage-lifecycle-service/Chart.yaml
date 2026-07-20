@@ -1,0 +1,11 @@
+apiVersion: v2
+name: cp-storage-lifecycle-service
+description: Cloud-Pipeline storage lifecycle service (archive/restore between S3 storage classes)
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: lib
+    version: "1.0.0"
+    repository: "file://../lib"

@@ -429,6 +429,7 @@ else
   kubectl label nodes --all cloud-pipeline/cp-git=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-gitlab-db=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-git-sync=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-gitlab-reader=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-notifier=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-clair=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-docker-comp=true --overwrite
@@ -438,8 +439,11 @@ else
   kubectl label nodes --all cloud-pipeline/cp-heapster-elk=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-heapster=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-vm-monitor=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-monitoring-srv=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-billing-srv=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-redis=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-storage-lifecycle-service=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-dav=true --overwrite
   kubectl label nodes --all cloud-pipeline/application-node=true --overwrite
 fi
 

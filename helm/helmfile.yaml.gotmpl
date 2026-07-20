@@ -14,6 +14,8 @@ helmDefaults:
 {{- $billingValues := index $deployValues "billing" | default dict }}
 {{- $notifierValues := index $deployValues "notifier" | default dict }}
 {{- $monitoringValues := index $deployValues "monitoring" | default dict }}
+{{- $storageLifecycleValues := index $deployValues "storageLifecycle" | default dict }}
+{{- $davValues := index $deployValues "dav" | default dict }}
 {{- $postDeployValues := index $deployValues "postDeploy" | default dict }}
 
 {{/* Put buildVersion value from CP_BUILD_VERSION.txt only if not set by values.yaml */}}
@@ -161,6 +163,34 @@ releases:
       - cp-api-srv
     wait: true
 
+  - name: cp-storage-lifecycle-service
+    installed: {{ index $storageLifecycleValues "enabled" | default true }}
+    chart: ./cloud-pipeline/cp-storage-lifecycle-service
+    values:
+      - cloud-pipeline/cp-storage-lifecycle-service/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $storageLifecycleValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
+  - name: cp-dav
+    installed: {{ index $davValues "enabled" | default true }}
+    chart: ./cloud-pipeline/cp-dav
+    values:
+      - cloud-pipeline/cp-dav/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $davValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
   - name: cp-edge
     chart: ./cloud-pipeline/cp-edge
     values:
@@ -251,6 +281,18 @@ hooks:
         SCRIPT="./hooks/post-deploy/register-additional-cloud-regions.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- if index $storageLifecycleValues "enabled" | default true }}
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        SCRIPT="./hooks/post-deploy/configure-storage-lifecycle-regions.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- end }}
 {{- if index $gitValues "enabled" | default false }}
   - events: ["cleanup"]
     showlogs: true

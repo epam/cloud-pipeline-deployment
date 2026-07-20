@@ -69,3 +69,20 @@ gitlabDb:
   # Container listen port (Postgres default 5432). Service port = config GITLAB_DATABASE_PORT (e.g. 6543).
   port: 5432
   dataHostPath: /opt/gitlab-postgresql/data
+
+gitlabReader:
+  enabled: true
+
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: gitlab-reader
+    # buildVersion: ""  # overrides general.buildVersion for this image
+    pullPolicy: Always  # IfNotPresent | Always | Never
+
+  service:
+    name: cp-gitlab-reader
+    port:
+      internal: "35800"  # Maps to container port 8080
+
+  gitDataHostPath: /opt/gitlab/data  # Must match the cp-git git data hostPath
+  logsHostPath: /opt/git-reader/logs  # Node local path for gitlab-reader log files

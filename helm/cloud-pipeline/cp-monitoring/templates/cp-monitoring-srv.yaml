@@ -1,0 +1,54 @@
+{{- if .Values.monitoringSrv.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-monitoring-srv
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-monitoring-srv: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-monitoring-srv: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-monitoring-srv: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-monitoring-srv: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-monitoring-srv
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.monitoringSrv.image.buildVersion .Values.buildVersion "") }}
+          image: "{{ .Values.monitoringSrv.image.repository }}:{{ .Values.monitoringSrv.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          imagePullPolicy: {{ .Values.monitoringSrv.image.pullPolicy }}
+          command: ["/init"]
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          env:
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          volumeMounts:
+            - name: monitoring-srv-logs
+              mountPath: /opt/monitoring/logs
+      volumes:
+        - name: monitoring-srv-logs
+          hostPath:
+            path: {{ .Values.monitoringSrv.logsHostPath }}
+            type: DirectoryOrCreate
+{{- end }}

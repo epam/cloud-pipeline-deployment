@@ -1,0 +1,89 @@
+{{- if .Values.gitlabReader.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cp-gitlab-reader
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-gitlab-reader: "true"
+    cloud-pipeline/core-component: "Service"
+spec:
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: {{ .Values.gitlabReader.service.port.internal }}
+      targetPort: 8080
+      name: cp-gitlab-reader-port-http
+  selector:
+    cloud-pipeline/cp-gitlab-reader: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-gitlab-reader
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-gitlab-reader: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-gitlab-reader: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-gitlab-reader: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-gitlab-reader: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-gitlab-reader
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.gitlabReader.image.buildVersion .Values.buildVersion "") }}
+          image: "{{ .Values.gitlabReader.image.repository }}:{{ .Values.gitlabReader.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          imagePullPolicy: {{ .Values.gitlabReader.image.pullPolicy }}
+          command: ["/init.sh"]
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /var/opt/gitlab
+              name: git-data
+            - mountPath: /opt/git-reader/logs
+              name: git-reader-logs
+            - mountPath: /opt/api/pki
+              name: api-pki
+              readOnly: true
+      volumes:
+        - name: git-data
+          hostPath:
+            path: {{ .Values.gitlabReader.gitDataHostPath }}
+            type: DirectoryOrCreate
+        - name: git-reader-logs
+          hostPath:
+            path: {{ .Values.gitlabReader.logsHostPath }}
+            type: DirectoryOrCreate
+        - name: api-pki
+          projected:
+            sources:
+              - secret:
+                  name: cp-pki-secret
+              - secret:
+                  name: cp-jwt-pki-secret
+{{- end }}
