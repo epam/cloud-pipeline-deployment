@@ -289,6 +289,13 @@ hooks:
       - -c
       - |
         KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        {{- $slsRegionsValue := index $storageLifecycleValues "regions" | default list -}}
+        {{- if kindIs "string" $slsRegionsValue }}
+        export CP_POST_DEPLOY_SLS_REGIONS_B64='{{ readFile $slsRegionsValue | b64enc }}'
+        {{- else }}
+        export CP_POST_DEPLOY_SLS_REGIONS_B64='{{ $slsRegionsValue | toJson | b64enc }}'
+        {{- end }}
+        export CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX='{{ index $storageLifecycleValues "reportBucketPrefix" | default "storage-lifecycle-service/tagging-job-reports" }}'
         SCRIPT="./hooks/post-deploy/configure-storage-lifecycle-regions.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"

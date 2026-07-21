@@ -18,6 +18,5 @@ restore:
 
 logsHostPath: /opt/cp-sls/logs  # Node local path for log files
 
-config:
-  # S3 key prefix inside CP_PREF_STORAGE_SYSTEM_STORAGE_NAME where S3 Batch Operations job reports are stored.
-  CP_PREF_STORAGE_LIFECYCLE_SERVICE_REPORT_BUCKET_PREFIX: "storage-lifecycle-service/tagging-job-reports"
+# config:
+#   KEY: value  # additional keys written to cp-config-global for this service

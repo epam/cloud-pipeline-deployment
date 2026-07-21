@@ -1,11 +1,12 @@
+{{- $service := .Values.service | default dict -}}
+{{- $servicePort := index $service "port" | default dict -}}
 {{- $config := .Values.config | default dict -}}
 {{- $defaultInternalHost := printf "cp-dav.%s.svc.cluster.local" (include "lib.application.namespace" .) -}}
 {{- $data := dict -}}
-{{- $_ := set $data "CP_DAV_INTERNAL_HOST" (index $config "CP_DAV_INTERNAL_HOST" | default $defaultInternalHost | toString) -}}
+{{- $_ := set $data "CP_DAV_INTERNAL_HOST" $defaultInternalHost -}}
+{{- $_ := set $data "CP_DAV_INTERNAL_PORT" (index $servicePort "internal" | default "31085" | toString) -}}
 {{- range $key, $value := $config -}}
-{{- if ne $key "CP_DAV_INTERNAL_HOST" -}}
 {{- $_ := set $data $key ($value | toString) -}}
-{{- end -}}
 {{- end -}}
 apiVersion: v1
 kind: ConfigMap

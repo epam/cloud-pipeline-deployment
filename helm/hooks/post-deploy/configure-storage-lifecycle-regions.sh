@@ -50,66 +50,82 @@ if ! check_api_response_status "$ALL_REGIONS_RESPONSE"; then
   exit 1
 fi
 
-AWS_REGION_IDS=$(echo "$ALL_REGIONS_RESPONSE" | jq -r '.payload[] | select(.provider == "AWS") | .id')
-if [ -z "$AWS_REGION_IDS" ]; then
+AWS_REGIONS=$(echo "$ALL_REGIONS_RESPONSE" | jq -c '[.payload[] | select(.provider == "AWS") | {id: .id, regionId: .regionId}]')
+if [ "$(echo "$AWS_REGIONS" | jq 'length')" -eq 0 ]; then
   echo "No AWS cloud regions found; skipping."
   exit 0
 fi
 
 errors=0
-while IFS= read -r region_id; do
+while IFS= read -r region_entry; do
+  region_id=$(echo "$region_entry" | jq -r '.id')
+  aws_region_id=$(echo "$region_entry" | jq -r '.regionId')
   [ -z "$region_id" ] && continue
-  echo "Configuring storageLifecycleServiceProperties for region id=$region_id..."
+  echo "Configuring storageLifecycleServiceProperties for region $aws_region_id (id=$region_id)..."
 
-  GET_RESPONSE=$(call_api "/cloud/region/$region_id" "$CP_API_JWT_ADMIN" "")
-  if ! check_api_response_status "$GET_RESPONSE"; then
+  cloud_region_current_settings=$(call_api "/cloud/region/$region_id" "$CP_API_JWT_ADMIN" "")
+  if ! check_api_response_status "$cloud_region_current_settings"; then
     echo "WARNING: GET /cloud/region/$region_id failed; skipping."
-    echo "$GET_RESPONSE"
+    echo "$cloud_region_current_settings"
     errors=$((errors + 1))
     continue
   fi
 
-  TEMP_CREDENTIALS_ROLE=$(echo "$GET_RESPONSE" | jq -r '.payload.tempCredentialsRole // ""')
-  if [ -z "$TEMP_CREDENTIALS_ROLE" ]; then
-    echo "WARNING: region id=$region_id has no tempCredentialsRole set; skipping."
-    continue
+  sls_region_override=$(echo "$CP_POST_DEPLOY_SLS_REGIONS_B64" | base64 -d \
+    | jq -c --arg rid "$aws_region_id" '.[] | select(.awsRegionId == $rid)' 2>/dev/null || true)
+
+  # If a full slsProperties object is provided for this region, use it as-is.
+  sls_properties=$(echo "$sls_region_override" | jq -c '.slsProperties // empty' 2>/dev/null || true)
+
+  if [ -z "$sls_properties" ]; then
+    # Build sls_properties from role ARN (per-region override or tempCredentialsRole fallback).
+    sls_role_arn=$(echo "$sls_region_override" | jq -r '.slsRoleArn // ""' 2>/dev/null || true)
+    if [ -z "$sls_role_arn" ]; then
+      sls_role_arn=$(echo "$cloud_region_current_settings" | jq -r '.payload.tempCredentialsRole // ""')
+    fi
+    if [ -z "$sls_role_arn" ]; then
+      echo "WARNING: region id=$region_id has no slsProperties, slsRoleArn, or tempCredentialsRole; skipping."
+      continue
+    fi
+
+    sls_aws_account_id=$(echo "$sls_role_arn" | grep -oP '(?<=::)\d{12}(?=:role/)')
+    if [ -z "$sls_aws_account_id" ]; then
+      echo "WARNING: Cannot extract AWS account ID from role ARN '$sls_role_arn' for region id=$region_id; skipping."
+      errors=$((errors + 1))
+      continue
+    fi
+
+    sls_report_bucket_prefix="${CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX:-${CP_PREF_STORAGE_LIFECYCLE_SERVICE_REPORT_BUCKET_PREFIX:-storage-lifecycle-service/tagging-job-reports}}"
+
+    sls_properties=$(jq -n \
+      --arg acct "$sls_aws_account_id" \
+      --arg role "$sls_role_arn" \
+      --arg bucket "$CP_PREF_STORAGE_SYSTEM_STORAGE_NAME" \
+      --arg prefix "$sls_report_bucket_prefix" \
+      '{
+        properties: {
+          batch_operation_job_aws_account_id: $acct,
+          batch_operation_job_role_arn: $role,
+          batch_operation_job_report_bucket: $bucket,
+          batch_operation_job_report_bucket_prefix: $prefix,
+          batch_operation_job_poll_status_retry_count: "30",
+          batch_operation_job_poll_status_sleep_sec: "5",
+          storage_skip_archiving_tag: "disable_storage_lifecycle"
+        }
+      }')
   fi
 
-  AWS_ACCOUNT_ID=$(echo "$TEMP_CREDENTIALS_ROLE" | grep -oP '(?<=::)\d{12}(?=:role/)')
-  if [ -z "$AWS_ACCOUNT_ID" ]; then
-    echo "WARNING: Cannot extract AWS account ID from tempCredentialsRole '$TEMP_CREDENTIALS_ROLE' for region id=$region_id; skipping."
-    errors=$((errors + 1))
-    continue
-  fi
+  cloud_region_updated_settings=$(echo "$cloud_region_current_settings" | jq --argjson sls "$sls_properties" '.payload.storageLifecycleServiceProperties = $sls | .payload')
 
-  SLS_PROPERTIES=$(jq -n \
-    --arg acct "$AWS_ACCOUNT_ID" \
-    --arg role "$TEMP_CREDENTIALS_ROLE" \
-    --arg bucket "$CP_PREF_STORAGE_SYSTEM_STORAGE_NAME" \
-    --arg prefix "${CP_PREF_STORAGE_LIFECYCLE_SERVICE_REPORT_BUCKET_PREFIX}" \
-    '{
-      properties: {
-        batch_operation_job_aws_account_id: $acct,
-        batch_operation_job_role_arn: $role,
-        batch_operation_job_report_bucket: $bucket,
-        batch_operation_job_report_bucket_prefix: $prefix,
-        batch_operation_job_poll_status_retry_count: "30",
-        batch_operation_job_poll_status_sleep_sec: "5",
-        storage_skip_archiving_tag: "disable_storage_lifecycle"
-      }
-    }')
-
-  REGION_PAYLOAD=$(echo "$GET_RESPONSE" | jq --argjson sls "$SLS_PROPERTIES" '.payload.storageLifecycleServiceProperties = $sls | .payload')
-
-  PUT_RESPONSE=$(call_api_put "/cloud/region/$region_id" "$CP_API_JWT_ADMIN" "$REGION_PAYLOAD")
-  if ! check_api_response_status "$PUT_RESPONSE"; then
+  cloud_region_update_check=$(call_api_put "/cloud/region/$region_id" "$CP_API_JWT_ADMIN" "$cloud_region_updated_settings")
+  if ! check_api_response_status "$cloud_region_update_check"; then
     echo "WARNING: PUT /cloud/region/$region_id failed."
-    echo "$PUT_RESPONSE"
+    echo "$cloud_region_update_check"
     errors=$((errors + 1))
     continue
   fi
   echo "Region id=$region_id storageLifecycleServiceProperties configured."
-done <<< "$AWS_REGION_IDS"
+done < <(echo "$AWS_REGIONS" | jq -c '.[]')
 
 if [ "$errors" -gt 0 ]; then
   echo "WARNING: $errors region(s) failed to configure. Check output above."

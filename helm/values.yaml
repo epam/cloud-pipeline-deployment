@@ -181,7 +181,24 @@ storageLifecycle:
     startAt: "23:00"  # Time of day to run the archive job (HH:MM)
   restore:
     startEach: "20"   # Interval in minutes between restore checks
-
+  reportBucketPrefix: "storage-lifecycle-service/tagging-job-reports"  # S3 key prefix for job reports; applied to all regions unless overridden per-region via slsProperties
+  # Per-region overrides. Inline list or path to a JSON file.
+  # Each entry: awsRegionId (required), slsRoleArn or full slsProperties object.
+  regions: []
+  # - awsRegionId: "us-east-1"          # use slsRoleArn to override the S3 Batch Operations role
+  #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+  # - awsRegionId: "eu-west-1"          # use slsProperties to set all properties explicitly
+  #   slsProperties:
+  #     properties:
+  #       batch_operation_job_aws_account_id: "<account-id>"
+  #       batch_operation_job_role_arn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+  #       batch_operation_job_report_bucket: "my-bucket"
+  #       batch_operation_job_report_bucket_prefix: "storage-lifecycle-service/tagging-job-reports"
+  #       batch_operation_job_poll_status_retry_count: "30"
+  #       batch_operation_job_poll_status_sleep_sec: "5"
+  #       storage_skip_archiving_tag: "disable_storage_lifecycle"
+  # or: regions: "./path/to/sls-regions.json"
+  
 # WebDAV service (cp-dav). Provides WebDAV access to Cloud Pipeline storage.
 # Requires node label cloud-pipeline/cp-dav=true.
 dav:

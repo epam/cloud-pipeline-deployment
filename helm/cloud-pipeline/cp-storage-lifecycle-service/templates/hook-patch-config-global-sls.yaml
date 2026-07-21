@@ -1,4 +1,5 @@
 {{- $config := .Values.config | default dict -}}
+{{- if $config -}}
 {{- $data := dict -}}
 {{- range $key, $value := $config -}}
 {{- $_ := set $data $key ($value | toString) -}}
@@ -18,3 +19,4 @@ data:
 {{- end }}
 ---
 {{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-10") }}
+{{- end }}
