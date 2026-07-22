@@ -15,6 +15,8 @@ helmDefaults:
 {{- $notifierValues := index $deployValues "notifier" | default dict }}
 {{- $monitoringValues := index $deployValues "monitoring" | default dict }}
 {{- $postDeployValues := index $deployValues "postDeploy" | default dict }}
+{{- $shareSrvValues := index $deployValues "shareSrv" | default dict }}
+{{- $runPolicyManagerValues := index $deployValues "runPolicyManager" | default dict }}
 
 {{/* Put buildVersion value from CP_BUILD_VERSION.txt only if not set by values.yaml */}}
 {{- $fileVersion := exec "sh" (list "-c" "cat ./CP_BUILD_VERSION.txt 2>/dev/null | tr -d '[:space:]'") }}
@@ -156,6 +158,37 @@ releases:
 {{- toYaml $generalValues | nindent 8 }}
       -
 {{- toYaml ($deployValues.notifier | default dict) | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
+  - name: cp-share-srv
+    installed: {{ index $shareSrvValues "enabled" | default false }}
+    chart: ./cloud-pipeline/cp-share-srv
+    values:
+      - cloud-pipeline/cp-share-srv/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $shareSrvValues | nindent 8 }}
+      -
+{{- dict "idp" (dict "enabled" ($idpValues.enabled | default false)) | toYaml | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-idp
+      - cp-api-srv
+    wait: true
+
+  - name: cp-run-policy-manager
+    installed: {{ index $runPolicyManagerValues "enabled" | default false }}
+    chart: ./cloud-pipeline/cp-run-policy-manager
+    values:
+      - cloud-pipeline/cp-run-policy-manager/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $runPolicyManagerValues | nindent 8 }}
     needs:
       - cp-resources
       - cp-api-srv

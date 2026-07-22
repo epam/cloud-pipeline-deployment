@@ -1,0 +1,116 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-share-srv: "true"
+    cloud-pipeline/core-component: "Service"
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port.internal | int }}
+      targetPort: 8080
+      name: cp-share-srv-port-https
+  selector:
+    cloud-pipeline/cp-share-srv: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-share-srv
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-share-srv: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-share-srv: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-share-srv: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-share-srv: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-share-srv
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/init"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - mountPath: /opt/share-srv/pki
+              name: share-pki
+            - mountPath: /opt/share-srv/sso
+              name: share-sso
+            - mountPath: /opt/share-srv/logs
+              name: share-logs
+            - mountPath: /opt/idp/pki
+              name: idp-pki
+            - mountPath: /opt/common/pki
+              name: common-pki
+              readOnly: true
+            - mountPath: /opt/api/pki
+              name: api-pki
+              readOnly: true
+            - mountPath: /opt/share-srv/prefs
+              name: share-prefs
+              readOnly: true
+            - mountPath: /opt/share-srv/static
+              name: share-static
+              readOnly: true
+      volumes:
+        - name: share-pki
+          secret:
+            secretName: cp-share-srv-pki-secret
+            defaultMode: 0400
+        - name: share-sso
+          secret:
+            secretName: cp-fed-metadata-secret
+        - name: share-logs
+          hostPath:
+            path: {{ .Values.logsHostPath }}
+            type: DirectoryOrCreate
+        - name: idp-pki
+          hostPath:
+            path: {{ .Values.idpPkiHostPath }}
+            type: DirectoryOrCreate
+        - name: common-pki
+          hostPath:
+            path: {{ .Values.commonPkiHostPath }}
+            type: DirectoryOrCreate
+        - name: api-pki
+          projected:
+            sources:
+              - secret:
+                  name: cp-pki-secret
+              - secret:
+                  name: cp-jwt-pki-secret
+        - name: share-prefs
+          hostPath:
+            path: {{ .Values.prefsHostPath }}
+            type: DirectoryOrCreate
+        - name: share-static
+          hostPath:
+            path: {{ .Values.staticHostPath }}
+            type: DirectoryOrCreate
+{{- end }}

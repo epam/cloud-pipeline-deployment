@@ -1,0 +1,32 @@
+{{- if .Values.enabled -}}
+{{- $service := .Values.service | default dict -}}
+{{- $serviceHost := index $service "host" | default dict -}}
+{{- $servicePort := index $service "port" | default dict -}}
+{{- $config := .Values.config | default dict -}}
+{{- $defaultInternalHost := printf "cp-share-srv.%s.svc.cluster.local" (include "lib.application.namespace" .) -}}
+{{- $internalHost := index $serviceHost "internal" | default $defaultInternalHost | toString -}}
+{{- $externalHost := index $serviceHost "external" | default $internalHost | toString -}}
+{{- $data := dict -}}
+{{- $_ := set $data "CP_SHARE_SRV_INTERNAL_HOST" $internalHost -}}
+{{- $_ := set $data "CP_SHARE_SRV_INTERNAL_PORT" (index $servicePort "internal" | default "31084" | toString) -}}
+{{- $_ := set $data "CP_SHARE_SRV_EXTERNAL_HOST" $externalHost -}}
+{{- $_ := set $data "CP_SHARE_SRV_EXTERNAL_PORT" (index $servicePort "external" | default "31084" | toString) -}}
+{{- range $key, $value := $config -}}
+{{- $_ := set $data $key ($value | toString) -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-share-srv
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-8") }}
+{{- end }}

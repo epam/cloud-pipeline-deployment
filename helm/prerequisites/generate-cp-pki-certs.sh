@@ -112,6 +112,7 @@ rm -f \
   ssl-private-key.pem ssl-public-cert.pem ssl-public-cert.csr \
   sso-private-key.pem sso-public-cert.pem \
   cp-api-srv-ssl.p12 cp-api-srv-sso.p12 \
+  cp-share-srv-ssl.p12 cp-share-srv-sso.p12 \
   san.cnf sso.cnf \
   2>/dev/null || true
 
@@ -156,7 +157,7 @@ EOF
 fi
 
 # ── Step 3: ssl.p12 ───────────────────────────────────────────────────────────
-echo "Step 3/5: build cp-api-srv-ssl.p12..."
+echo "Step 3/5: build cp-api-srv-ssl.p12 and cp-share-srv-ssl.p12..."
 openssl pkcs12 -export \
   -inkey ssl-private-key.pem \
   -in ssl-public-cert.pem \
@@ -164,6 +165,13 @@ openssl pkcs12 -export \
   -name ssl \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-api-srv-ssl.p12
+openssl pkcs12 -export \
+  -inkey ssl-private-key.pem \
+  -in ssl-public-cert.pem \
+  -out cp-share-srv-ssl.p12 \
+  -name ssl \
+  -passout "pass:${PKCS12_PASSWORD}"
+chmod 644 cp-share-srv-ssl.p12
 
 # ── Step 4: SSO certificate ───────────────────────────────────────────────────
 echo "Step 4/5: prepare SSO certificate (RSA required for SAML)..."
@@ -217,7 +225,7 @@ EOF
 fi
 
 # ── Step 5: sso.p12 ───────────────────────────────────────────────────────────
-echo "Step 5/5: build cp-api-srv-sso.p12..."
+echo "Step 5/5: build cp-api-srv-sso.p12 and cp-share-srv-sso.p12..."
 openssl pkcs12 -export \
   -inkey sso-private-key.pem \
   -in sso-public-cert.pem \
@@ -225,6 +233,13 @@ openssl pkcs12 -export \
   -name sso \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-api-srv-sso.p12
+openssl pkcs12 -export \
+  -inkey sso-private-key.pem \
+  -in sso-public-cert.pem \
+  -out cp-share-srv-sso.p12 \
+  -name sso \
+  -passout "pass:${PKCS12_PASSWORD}"
+chmod 644 cp-share-srv-sso.p12
 
 echo ""
 echo "Done. Files written to: ${OUTPUT_DIR}"
