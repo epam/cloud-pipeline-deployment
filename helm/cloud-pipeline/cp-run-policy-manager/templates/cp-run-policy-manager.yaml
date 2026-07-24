@@ -1,0 +1,58 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-run-policy-manager
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-run-policy-manager: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-run-policy-manager: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-run-policy-manager: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-run-policy-manager: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-run-policy-manager
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/policy-manager/init"]
+          env:
+            - name: CP_RUN_POLICY_MANAGER_POLL_PERIOD_SEC
+              value: {{ .Values.pollPeriodSec | quote }}
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          volumeMounts:
+            - mountPath: /root/.kube
+              name: kube-config
+              readOnly: true
+            - mountPath: /policy-manager/logs
+              name: run-policy-manager-logs
+      volumes:
+        - name: kube-config
+          hostPath:
+            path: {{ .Values.kubeConfigHostPath }}
+        - name: run-policy-manager-logs
+          hostPath:
+            path: {{ .Values.logsHostPath }}
+            type: DirectoryOrCreate
+{{- end }}

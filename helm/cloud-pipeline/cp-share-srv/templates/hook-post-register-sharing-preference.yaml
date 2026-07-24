@@ -1,0 +1,61 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-register-sharing-preference
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  cloud-pipeline-utils.sh: |
+{{ .Files.Get "files/hooks/utils/cloud-pipeline-utils.sh" | indent 4 }}
+  register-sharing-preference.sh: |
+{{ .Files.Get "files/hooks/register-sharing-preference.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cp-register-sharing-preference
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "11"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: register-sharing-preference
+          image: {{ include "lib.hook.deploymentImage" . | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CP_SHARE_SRV_SHARED_STORAGE_NAME
+              value: {{ .Values.sharedStorageName | quote }}
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+            - secretRef:
+                name: cp-api-token
+          command: ["/bin/bash", "/scripts/register-sharing-preference.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-register-sharing-preference
+            defaultMode: 0755
+{{- end }}

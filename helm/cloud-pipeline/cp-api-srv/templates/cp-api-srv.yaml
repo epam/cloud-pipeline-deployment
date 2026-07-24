@@ -37,8 +37,8 @@ spec:
       cloud-pipeline/cp-api-srv: "true"
   strategy:
     rollingUpdate:
-      maxSurge: 1        # a second pod will be brought up
-      maxUnavailable: 0  # never kill the old pod before a new one is Ready
+      maxSurge: 0        # terminate old pod first (required with hard anti-affinity on 2-node cluster)
+      maxUnavailable: 1
     type: RollingUpdate
   template:
     metadata:

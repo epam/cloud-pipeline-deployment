@@ -444,7 +444,10 @@ else
   kubectl label nodes --all cloud-pipeline/cp-redis=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-storage-lifecycle-service=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-dav=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-share-srv=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-run-policy-manager=true --overwrite
   kubectl label nodes --all cloud-pipeline/application-node=true --overwrite
+  
 fi
 
 sed -i '/- kube-apiserver/a \    \- --service-node-port-range=80-32767' /etc/kubernetes/manifests/kube-apiserver.yaml
