@@ -85,7 +85,7 @@ spec:
             defaultMode: 0400
         - name: share-sso
           secret:
-            secretName: cp-fed-metadata-secret
+            secretName: cp-share-srv-fed-metadata-secret
         - name: share-logs
           hostPath:
             path: {{ .Values.logsHostPath }}

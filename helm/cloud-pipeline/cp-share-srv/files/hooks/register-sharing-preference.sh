@@ -30,6 +30,13 @@ echo "Setting preference data.sharing.base.api=${PREF_VALUE}"
 api_set_preference "data.sharing.base.api" "$PREF_VALUE" "false"
 echo "data.sharing.base.api preference set successfully."
 
+ENDPOINT_ID="https://${CP_SHARE_SRV_EXTERNAL_HOST}:${CP_SHARE_SRV_EXTERNAL_PORT}/proxy"
+ENDPOINT_VALUE=$(jq -cn --arg id "$ENDPOINT_ID" \
+  '[{endpointId:$id,metadataPath:"/opt/api/sso/cp-share-srv-fed-meta.xml",external:true}]')
+echo "Setting preference system.external.services.endpoints=${ENDPOINT_VALUE}"
+api_set_preference "system.external.services.endpoints" "$ENDPOINT_VALUE" "false" || exit 1
+echo "system.external.services.endpoints preference set successfully."
+
 [ -z "${CP_SHARE_SRV_SHARED_STORAGE_NAME:-}" ] && { echo "ERROR: CP_SHARE_SRV_SHARED_STORAGE_NAME not set"; exit 1; }
 SHARED_STORAGE_NAME="$CP_SHARE_SRV_SHARED_STORAGE_NAME"
 echo "Creating/locating shared storage directory: ${SHARED_STORAGE_NAME}"

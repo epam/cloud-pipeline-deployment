@@ -308,4 +308,14 @@ hooks:
         SCRIPT="./hooks/post-deploy/register-email-templates.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+  - events: ["cleanup"]
+    showlogs: true
+    command: bash
+    args:
+      - -c
+      - |
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
+        SCRIPT="./hooks/post-deploy/restart-cp-api-srv.sh"
+        [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        exec bash "$SCRIPT" "$KUBE_NAMESPACE"
 {{- end }}

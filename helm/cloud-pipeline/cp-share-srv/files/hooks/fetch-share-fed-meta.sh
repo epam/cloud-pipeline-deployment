@@ -1,6 +1,6 @@
 #!/bin/bash
-# Helm pre-install/pre-upgrade Job: add cp-share-srv-fed-meta.xml to cp-fed-metadata-secret.
-# First tries to copy cp-api-srv-fed-meta.xml from the same secret (already fetched by cp-idp).
+# Helm pre-install/pre-upgrade Job: add cp-share-srv-fed-meta.xml to cp-share-srv-fed-metadata-secret.
+# First tries to copy cp-api-srv-fed-meta.xml from cp-fed-metadata-secret (already fetched by cp-idp).
 # Falls back to fetching directly from the IdP if that key is empty.
 set -euo pipefail
 
@@ -11,7 +11,7 @@ for cmd in kubectl openssl; do
 done
 
 # Idempotency: skip if already populated
-B64CUR=$(kubectl get secret cp-fed-metadata-secret -n "$NAMESPACE" \
+B64CUR=$(kubectl get secret cp-share-srv-fed-metadata-secret -n "$NAMESPACE" \
   -o jsonpath='{.data.cp-share-srv-fed-meta\.xml}' 2>/dev/null || true)
 if [ -n "${B64CUR:-}" ]; then
   BYTES=$(printf '%s' "$B64CUR" | openssl base64 -d -A 2>/dev/null | wc -c || echo 0)
@@ -48,8 +48,8 @@ else
   B64=$(openssl base64 -A -in cp-share-srv-fed-meta.xml)
 fi
 
-kubectl patch secret cp-fed-metadata-secret \
+kubectl patch secret cp-share-srv-fed-metadata-secret \
   -n "$NAMESPACE" \
   --type merge \
   -p "{\"data\":{\"cp-share-srv-fed-meta.xml\":\"${B64}\"}}"
-echo "cp-share-srv-fed-meta.xml patched into cp-fed-metadata-secret."
+echo "cp-share-srv-fed-meta.xml patched into cp-share-srv-fed-metadata-secret."
