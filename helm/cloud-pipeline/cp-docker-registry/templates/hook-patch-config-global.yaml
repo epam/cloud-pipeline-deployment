@@ -22,8 +22,10 @@
 {{- $_ := set $data "CP_DOCKER_EXTERNAL_PORT" $externalPort -}}
 {{- $_ := set $data "CP_DOCKER_INTERNAL_PORT" $internalPort -}}
 {{- $_ := set $data "CP_DOCKER_COMP_INTERNAL_HOST" (printf "cp-docker-comp.%s.svc.cluster.local" $namespace) -}}
+{{- if .Values.clair.enabled -}}
 {{- $_ := set $data "CP_CLAIR_INTERNAL_HOST" (printf "cp-clair.%s.svc.cluster.local" $namespace) -}}
 {{- $_ := set $data "CP_CLAIR_DATABASE_HOST" (printf "cp-api-db.%s.svc.cluster.local" $namespace) -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -39,3 +41,4 @@ data:
 {{- end }}
 ---
 {{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "jobName" "patch-config-global-docker-registry" "hookWeight" "2" "activeDeadlineSeconds" 900) }}
+

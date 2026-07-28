@@ -32,9 +32,19 @@ echo "data.sharing.base.api preference set successfully."
 
 ENDPOINT_ID="https://${CP_SHARE_SRV_EXTERNAL_HOST}:${CP_SHARE_SRV_EXTERNAL_PORT}/proxy"
 ENDPOINT_VALUE=$(jq -cn --arg id "$ENDPOINT_ID" \
-  '[{endpointId:$id,metadataPath:"/opt/api/sso/cp-share-srv-fed-meta.xml",external:true}]')
+  '[{endpointId:$id,metadataPath:"/opt/share-srv/sso/cp-share-srv-fed-meta.xml",external:"true"}]')
 echo "Setting preference system.external.services.endpoints=${ENDPOINT_VALUE}"
-api_set_preference "system.external.services.endpoints" "$ENDPOINT_VALUE" "false" || exit 1
+_ep_attempt=0
+_ep_max=6
+until api_set_preference "system.external.services.endpoints" "$ENDPOINT_VALUE" "false"; do
+  _ep_attempt=$((_ep_attempt + 1))
+  if [ "$_ep_attempt" -ge "$_ep_max" ]; then
+    echo "ERROR: Could not set system.external.services.endpoints after $((_ep_max)) attempts"
+    exit 1
+  fi
+  echo "Retrying system.external.services.endpoints in 30s (attempt ${_ep_attempt}/${_ep_max})..."
+  sleep 30
+done
 echo "system.external.services.endpoints preference set successfully."
 
 [ -z "${CP_SHARE_SRV_SHARED_STORAGE_NAME:-}" ] && { echo "ERROR: CP_SHARE_SRV_SHARED_STORAGE_NAME not set"; exit 1; }
@@ -45,3 +55,4 @@ SHARED_STORAGE_ID=$(api_get_entity_id "$SHARED_STORAGE_NAME" "folder") || SHARED
 echo "Setting preference data.sharing.storage.folders.directory=${SHARED_STORAGE_ID}"
 api_set_preference "data.sharing.storage.folders.directory" "$SHARED_STORAGE_ID" "false"
 echo "data.sharing.storage.folders.directory preference set to folder ID ${SHARED_STORAGE_ID}."
+

@@ -37,8 +37,8 @@ spec:
       cloud-pipeline/cp-api-srv: "true"
   strategy:
     rollingUpdate:
-      maxSurge: 0        # terminate old pod first (required with hard anti-affinity on 2-node cluster)
-      maxUnavailable: 1
+      maxSurge: 0        # required anti-affinity (1 pod per node) prevents surge pods from scheduling
+      maxUnavailable: 1  # kill one old pod first to free its node, then schedule the replacement
     type: RollingUpdate
   template:
     metadata:
@@ -116,9 +116,9 @@ spec:
           livenessProbe:
             exec:
               command: ["/bin/sh", "-c", "/liveness-api-srv.sh"]
-            initialDelaySeconds: 180
+            initialDelaySeconds: 420
             periodSeconds: 15
-            failureThreshold: 4
+            failureThreshold: 8
           lifecycle:
             preStop:
               exec:
@@ -152,6 +152,9 @@ spec:
               readOnly: true   
             - mountPath: /root/.kube
               name: kube-config
+              readOnly: true
+            - mountPath: /opt/share-srv/sso
+              name: cp-share-srv-fed-metadata-secret
               readOnly: true
       dnsConfig:
         options:
@@ -193,6 +196,11 @@ spec:
           secret:
             secretName: cp-cluster-ssh-key
             defaultMode: 0400
+        - name: cp-share-srv-fed-metadata-secret
+          secret:
+            secretName: cp-share-srv-fed-metadata-secret
+            optional: true
         - name: kube-config
           hostPath:
             path: /root/.kube
+

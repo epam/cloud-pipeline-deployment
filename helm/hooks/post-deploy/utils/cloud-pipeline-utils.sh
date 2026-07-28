@@ -99,6 +99,13 @@ function api_apply_preference {
     echo "WARNING: API does not recognize preference '$pref_name'; skipping it. This CP_PREF_* key is likely a deployment-only setting." >&2
     return 0
   fi
+  # The API validates URL preferences by connecting to the target service. Fails when the
+  # service is disabled (empty host → malformed URL) or not yet ready. Non-fatal: the
+  # preference can be set manually or by re-running apply-preferences.sh once the service starts.
+  if [[ "$message" == *"contains invalid value"* ]]; then
+    echo "WARNING: Preference '$pref_name' rejected (service may be disabled or not yet ready): $message — skipping." >&2
+    return 0
+  fi
 
   echo "ERROR: Failed to set preference '$pref_name': $response" >&2
   return 1
@@ -122,6 +129,40 @@ function api_wait_for_ready {
     sleep "$sleep_sec"
   done
   echo "ERROR: api_wait_for_ready: API did not become available after ${max_attempts} attempts."
+  return 1
+}
+
+# Waits for the API to be consistently healthy: requires CONSECUTIVE_OK consecutive
+# successful responses (default 5) before returning. Resets the counter on any failure.
+# Usage: api_wait_for_stable [max_attempts] [sleep_sec] [consecutive_ok]
+function api_wait_for_stable {
+  local max_attempts="${1:-60}"
+  local sleep_sec="${2:-10}"
+  local consecutive_ok="${3:-5}"
+  local attempt ok_streak=0 health_response response_status
+  for attempt in $(seq 1 "$max_attempts"); do
+    health_response=$(curl -k -sS --connect-timeout 10 --max-time 30 \
+        -H "Authorization: Bearer ${CP_API_JWT_ADMIN}" \
+        "${API_URL}/whoami" 2>/dev/null || true)
+    response_status=$(echo "$health_response" | jq -r '.status // ""' 2>/dev/null || true)
+    if [ -n "$response_status" ] && [ "$response_status" != "ERROR" ] && [[ "$response_status" != 4* ]]; then
+      ok_streak=$((ok_streak + 1))
+      if [ "$ok_streak" -ge "$consecutive_ok" ]; then
+        echo "api_wait_for_stable: API stable (${consecutive_ok} consecutive OK responses)."
+        return 0
+      fi
+      echo "api_wait_for_stable: attempt ${attempt}/${max_attempts}: OK (${ok_streak}/${consecutive_ok} consecutive)..."
+    else
+      if [ "$ok_streak" -gt 0 ]; then
+        echo "api_wait_for_stable: attempt ${attempt}/${max_attempts}: not ready (streak reset); retrying in ${sleep_sec}s..."
+      else
+        echo "api_wait_for_stable: attempt ${attempt}/${max_attempts}: not ready; retrying in ${sleep_sec}s..."
+      fi
+      ok_streak=0
+    fi
+    sleep "$sleep_sec"
+  done
+  echo "ERROR: api_wait_for_stable: API did not stabilize after ${max_attempts} attempts."
   return 1
 }
 
@@ -258,4 +299,5 @@ function api_register_datastorage {
   echo "ERROR: api_register_datastorage: no id in response for path='$path': $register_storage_response" >&2
   return 1
 }
+
 

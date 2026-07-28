@@ -157,7 +157,7 @@ function api_get_or_create_tool_group {
   local registry_id="$1" registry_path="$2" group_name="$3"
   local tool_group_list_response group_id
   tool_group_list_response=$(curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" "${API_URL}/toolGroup/list?registry=$(printf '%s' "$registry_path" | jq -sRr @uri)")
-  group_id=$(echo "$tool_group_list_response" | jq -r --arg g "$group_name" '.payload[] | select(.name == $g) | .id // empty')
+  group_id=$(echo "$tool_group_list_response" | jq -r --arg g "$group_name" '(.payload // []) | .[] | select(.name == $g) | .id // empty')
   if [ -n "$group_id" ] && [ "$group_id" != "null" ]; then
     echo "$group_id"
     return 0
@@ -207,10 +207,16 @@ function docker_register_image {
   image_without_tag="${docker_image_name%%:*}"
   [ -z "$image_without_tag" ] && image_without_tag="$docker_image_name"
   local docker_image_id
-  docker_image_id=$(api_find_docker_image "$image_without_tag" "$docker_registry_path")
+  local _find_attempt _find_max=12 _find_sleep=5
+  for _find_attempt in $(seq 1 "$_find_max"); do
+    docker_image_id=$(api_find_docker_image "$image_without_tag" "$docker_registry_path")
+    [ -n "$docker_image_id" ] && break
+    echo "Tool $image_without_tag not yet visible (attempt $_find_attempt/$_find_max), waiting for registry webhook..."
+    sleep "$_find_sleep"
+  done
   if [ -z "$docker_image_id" ]; then
-    echo "Tool not found, registering via /tool/register..."
-    docker_image_id=$(api_register_tool "$docker_registry_id" "$docker_registry_path" "$image_without_tag") || { echo "Cannot register docker image \"$docker_image_name\""; return 1; }
+    echo "ERROR: Tool $image_without_tag not found after $((_find_max * _find_sleep))s — registry webhook may have failed; skipping metadata registration."
+    return 1
   fi
   local docker_icon_path="$docker_manifest_path/icon.png"
   [ ! -f "$docker_icon_path" ] && unset docker_icon_path
@@ -273,10 +279,13 @@ while IFS=, read -r docker_name docker_pretty_name; do
     docker_tool_manifest_path="$MANIFEST_DIR/$docker_pretty_name"
   fi
   docker_full_pretty_name="$REGISTRY_PATH/$docker_pretty_name"
+  echo "Checking API stability before push of $docker_pretty_name..."
+  api_wait_for_stable 180 10 5 || { echo "ERROR: API not stable before push, aborting"; exit 1; }
   echo "Pushing docker image from \"$docker_name\" to \"$docker_full_pretty_name\""
   if docker pull "$docker_name" && docker tag "$docker_name" "$docker_full_pretty_name" && docker push "$docker_full_pretty_name"; then
-    echo "Waiting 15s for registry to index before API registration..."
-    sleep 15
+    echo "Waiting for registry webhook to be dispatched..."
+    sleep 5
+    api_wait_for_ready 12 10 || echo "WARNING: API not responding after push, proceeding with registration"
     if ! docker_register_image "$docker_pretty_name" "$docker_tool_manifest_path" "$REGISTRY_ID" "$REGISTRY_IDENTIFIER"; then
       push_result=1
     fi
@@ -288,3 +297,4 @@ done < "$MANIFEST_FILE"
 
 echo "Pushing tools completed with result: $push_result"
 exit $push_result
+

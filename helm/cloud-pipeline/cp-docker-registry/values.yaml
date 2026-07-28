@@ -26,6 +26,7 @@ dockerComp:
     pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 clair:
+  enabled: true
   image:
     tag: clair-v4
     # buildVersion: ""  # overrides general.buildVersion for this image
@@ -73,5 +74,6 @@ config:
   CP_CLAIR_DATABASE_USERNAME: clair
   CP_CLAIR_INTERNAL_PORT: "31083"
   CP_CLAIR_VERSION: v4
+
 
 
