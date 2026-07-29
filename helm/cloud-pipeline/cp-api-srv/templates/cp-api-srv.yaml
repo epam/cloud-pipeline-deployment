@@ -116,9 +116,9 @@ spec:
           livenessProbe:
             exec:
               command: ["/bin/sh", "-c", "/liveness-api-srv.sh"]
-            initialDelaySeconds: 420
+            initialDelaySeconds: 180
             periodSeconds: 15
-            failureThreshold: 8
+            failureThreshold: 4
           lifecycle:
             preStop:
               exec:

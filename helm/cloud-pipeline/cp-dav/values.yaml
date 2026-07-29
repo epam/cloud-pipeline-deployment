@@ -16,12 +16,6 @@ image:
 
 logsHostPath: /opt/dav/logs  # Node local path for log files
 
-# Mount cp-cloud-credentials. Disable if secret is absent (node uses instance profile instead).
-cloudCredentials:
-  enabled: false
-  secretName: cp-cloud-credentials
-  optional: true
-
 config:
   CP_DAV_EXTRA_INTERNAL_PORT: "31086"
   CP_DAV_URL_PATH: webdav

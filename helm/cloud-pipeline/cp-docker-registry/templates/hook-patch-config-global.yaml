@@ -15,7 +15,9 @@
 {{- end -}}
 {{- $data := dict -}}
 {{- range $key, $value := (.Values.config | default dict) -}}
+{{- if or (not (hasPrefix "CP_CLAIR_" $key)) ($.Values.clair.enabled) -}}
 {{- $_ := set $data $key (toString $value) -}}
+{{- end -}}
 {{- end -}}
 {{- $_ := set $data "CP_DOCKER_EXTERNAL_HOST" $externalHost -}}
 {{- $_ := set $data "CP_DOCKER_INTERNAL_HOST" $internalHost -}}

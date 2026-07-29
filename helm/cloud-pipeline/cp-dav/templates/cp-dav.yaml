@@ -84,11 +84,6 @@ spec:
           volumeMounts:
             - mountPath: /var/log/dav
               name: dav-logs
-            {{- if .Values.cloudCredentials.enabled }}
-            - mountPath: /root/.cloud/regioncreds
-              name: cp-cloud-credentials
-              readOnly: true
-            {{- end }}
             - mountPath: /opt/api/pki
               name: api-pki
               readOnly: true
@@ -97,12 +92,6 @@ spec:
           hostPath:
             path: {{ .Values.logsHostPath }}
             type: DirectoryOrCreate
-        {{- if .Values.cloudCredentials.enabled }}
-        - name: cp-cloud-credentials
-          secret:
-            secretName: {{ .Values.cloudCredentials.secretName }}
-            optional: {{ .Values.cloudCredentials.optional | default true }}
-        {{- end }}
         - name: api-pki
           projected:
             sources:
