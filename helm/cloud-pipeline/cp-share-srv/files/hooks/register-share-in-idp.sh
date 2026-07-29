@@ -4,9 +4,7 @@ set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-default}"
 
-for cmd in kubectl; do
-  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
-done
+command -v kubectl >/dev/null || { echo "ERROR: kubectl required but not installed"; exit 1; }
 
 [ -z "${CP_SHARE_SRV_EXTERNAL_HOST:-}" ] && { echo "ERROR: CP_SHARE_SRV_EXTERNAL_HOST not set in cp-config-global"; exit 1; }
 [ -z "${CP_SHARE_SRV_EXTERNAL_PORT:-}" ] && { echo "ERROR: CP_SHARE_SRV_EXTERNAL_PORT not set in cp-config-global"; exit 1; }
