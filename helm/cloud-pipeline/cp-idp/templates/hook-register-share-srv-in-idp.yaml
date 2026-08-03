@@ -1,5 +1,18 @@
 {{- if and .Values.enabled .Values.shareSrv.enabled }}
 apiVersion: v1
+kind: Secret
+metadata:
+  name: cp-share-srv-fed-metadata-secret
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation
+type: Opaque
+data:
+  cp-share-srv-fed-meta.xml: ""
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: cp-hook-script-register-share-in-idp
@@ -9,8 +22,10 @@ metadata:
     "helm.sh/hook-weight": "12"
     "helm.sh/hook-delete-policy": hook-succeeded
 data:
-  register-share-in-idp.sh: |
-{{ .Files.Get "files/hooks/register-share-in-idp.sh" | indent 4 }}
+  fetch-fed-meta.sh: |
+{{ .Files.Get "files/hooks/fetch-fed-meta.sh" | indent 4 }}
+  register-in-idp.sh: |
+{{ .Files.Get "files/hooks/register-in-idp.sh" | indent 4 }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -46,7 +61,13 @@ spec:
               value: {{ .Values.shareSrv.service.host.external | quote }}
             - name: CP_SHARE_SRV_EXTERNAL_PORT
               value: {{ .Values.shareSrv.service.port.external | quote }}
-          command: ["/bin/bash", "/scripts/register-share-in-idp.sh"]
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          command:
+            - /bin/bash
+            - -c
+            - /scripts/fetch-fed-meta.sh cp-share-srv && /scripts/register-in-idp.sh "https://${CP_SHARE_SRV_EXTERNAL_HOST}:${CP_SHARE_SRV_EXTERNAL_PORT}/proxy/"
           volumeMounts:
             - name: scripts
               mountPath: /scripts

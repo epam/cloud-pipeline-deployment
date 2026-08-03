@@ -9,8 +9,8 @@ metadata:
     "helm.sh/hook-weight": "14"
     "helm.sh/hook-delete-policy": hook-succeeded
 data:
-  register-gitlab-in-idp.sh: |
-{{ .Files.Get "files/hooks/register-gitlab-in-idp.sh" | indent 4 }}
+  register-in-idp.sh: |
+{{ .Files.Get "files/hooks/register-in-idp.sh" | indent 4 }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -44,7 +44,7 @@ spec:
               value: {{ include "lib.application.namespace" . | quote }}
             - name: ISSUER
               value: {{ if .Values.git.ssoEndpointId }}{{ .Values.git.ssoEndpointId | quote }}{{ else }}{{ printf "https://%s:%s" .Values.git.service.host.external (.Values.git.service.port.external | toString) | quote }}{{ end }}
-          command: ["/bin/bash", "/scripts/register-gitlab-in-idp.sh"]
+          command: ["/bin/bash", "-c", "/scripts/register-in-idp.sh \"$ISSUER\""]
           volumeMounts:
             - name: scripts
               mountPath: /scripts

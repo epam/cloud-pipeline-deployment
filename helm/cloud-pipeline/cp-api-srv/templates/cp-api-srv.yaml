@@ -129,7 +129,7 @@ spec:
             - mountPath: /opt/api/pki
               name: cp-api-secret
             - mountPath: /opt/api/sso
-              name: cp-fed-metadata-secret  
+              name: cp-api-srv-fed-metadata-secret  
             - mountPath: /opt/idp/pki
               name: cp-idp-pki
               readOnly: true
@@ -168,9 +168,9 @@ spec:
                   name: cp-pki-secret
               - secret:
                   name: cp-jwt-pki-secret
-        - name: cp-fed-metadata-secret
+        - name: cp-api-srv-fed-metadata-secret
           secret:
-            secretName: cp-fed-metadata-secret
+            secretName: cp-api-srv-fed-metadata-secret
         - name: cp-idp-pki
           secret:
             secretName: cp-idp-secret

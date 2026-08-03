@@ -12,7 +12,7 @@ Secrets:
 
 - `cp-pki-secret`
 - `cp-jwt-pki-secret`
-- `cp-fed-metadata-secret`
+- `cp-api-srv-fed-metadata-secret`
 - `cp-idp-secret`
 
 The sections below describe how to create each secret.
@@ -137,7 +137,7 @@ kubectl create secret generic cp-jwt-pki-secret \
 kubectl get secret cp-jwt-pki-secret -n <namespace-name>
 ```
 
-### Secret: `cp-fed-metadata-secret`
+### Secret: `cp-api-srv-fed-metadata-secret`
 
 **Description**  
 Contains the SSO federation metadata for Cloud-Pipeline SSO/SAML integration.
@@ -161,7 +161,7 @@ mv <your-idp-metadata>.xml cp-api-srv-fed-meta.xml
 **Create secret**
 
 ```
-kubectl create secret generic cp-fed-metadata-secret \
+kubectl create secret generic cp-api-srv-fed-metadata-secret \
   --from-file=cp-api-srv-fed-meta.xml=cp-api-srv-fed-meta.xml \
   -n <namespace-name>
 ```
@@ -169,7 +169,7 @@ kubectl create secret generic cp-fed-metadata-secret \
 **Verify**
 
 ```
-kubectl get secret cp-fed-metadata-secret -n <namespace-name>
+kubectl get secret cp-api-srv-fed-metadata-secret -n <namespace-name>
 ```
 
 ### Secret: `cp-idp-secret` (external IdP)
