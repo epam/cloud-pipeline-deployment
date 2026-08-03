@@ -50,6 +50,8 @@ releases:
 {{- dict "apiSrv" (dict "service" (index $apiSrvValues "service" | default dict)) | toYaml | nindent 8 }}
       -
 {{- dict "git" (dict "enabled" (index $gitValues "enabled" | default false) "service" (index $gitValues "service" | default dict) "ssoEndpointId" (index (index $gitValues "config" | default dict) "CP_GITLAB_SSO_ENDPOINT_ID" | default "")) | toYaml | nindent 8 }}
+      -
+{{- dict "shareSrv" (dict "enabled" ($shareSrvValues.enabled | default false) "service" (index $shareSrvValues "service" | default dict)) | toYaml | nindent 8 }}
     needs:
       - cp-resources
     wait: true
@@ -198,8 +200,6 @@ releases:
 {{- toYaml $generalValues | nindent 8 }}
       -
 {{- toYaml $shareSrvValues | nindent 8 }}
-      -
-{{- dict "idp" (dict "enabled" ($idpValues.enabled | default false)) | toYaml | nindent 8 }}
     needs:
       - cp-resources
       - cp-idp

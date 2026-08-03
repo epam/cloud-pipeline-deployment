@@ -1,13 +1,13 @@
-{{- if and .Values.enabled (index (.Values.idp | default dict) "enabled" | default false) }}
+{{- if and .Values.enabled .Values.shareSrv.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: cp-hook-script-register-share-in-idp
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "10"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "12"
+    "helm.sh/hook-delete-policy": hook-succeeded
 data:
   register-share-in-idp.sh: |
 {{ .Files.Get "files/hooks/register-share-in-idp.sh" | indent 4 }}
@@ -15,12 +15,12 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: cp-register-share-in-idp
+  name: hook-register-share-srv-in-idp
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "11"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "13"
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 600
@@ -36,15 +36,16 @@ spec:
       serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
       restartPolicy: Never
       containers:
-        - name: register-share-in-idp
+        - name: hook-register-share-srv-in-idp
           image: {{ include "lib.hook.deploymentImage" . | quote }}
           imagePullPolicy: IfNotPresent
           env:
             - name: NAMESPACE
               value: {{ include "lib.application.namespace" . | quote }}
-          envFrom:
-            - configMapRef:
-                name: cp-config-global
+            - name: CP_SHARE_SRV_EXTERNAL_HOST
+              value: {{ .Values.shareSrv.service.host.external | quote }}
+            - name: CP_SHARE_SRV_EXTERNAL_PORT
+              value: {{ .Values.shareSrv.service.port.external | quote }}
           command: ["/bin/bash", "/scripts/register-share-in-idp.sh"]
           volumeMounts:
             - name: scripts

@@ -1,13 +1,13 @@
-{{- if and .Values.enabled (index (.Values.idp | default dict) "enabled" | default false) }}
+{{- if and .Values.enabled .Values.shareSrv.enabled }}
 apiVersion: v1
 kind: Secret
 metadata:
   name: cp-share-srv-fed-metadata-secret
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-4"
-    helm.sh/hook-delete-policy: before-hook-creation
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation
 type: Opaque
 data:
   cp-share-srv-fed-meta.xml: ""
@@ -18,9 +18,9 @@ metadata:
   name: cp-hook-script-fetch-share-fed-meta
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-3"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "6"
+    "helm.sh/hook-delete-policy": hook-succeeded
 data:
   fetch-share-fed-meta.sh: |
 {{ .Files.Get "files/hooks/fetch-share-fed-meta.sh" | indent 4 }}
@@ -28,12 +28,12 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: cp-fetch-share-fed-meta
+  name: hook-fetch-share-fed-meta
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-2"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "7"
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 600
@@ -49,15 +49,20 @@ spec:
       serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
       restartPolicy: Never
       containers:
-        - name: fetch-share-fed-meta
+        - name: hook-fetch-share-fed-meta
           image: {{ include "lib.hook.deploymentImage" . | quote }}
           imagePullPolicy: IfNotPresent
           env:
             - name: NAMESPACE
               value: {{ include "lib.application.namespace" . | quote }}
-          envFrom:
-            - configMapRef:
-                name: cp-config-global
+            - name: CP_IDP_INTERNAL_HOST
+              value: {{ .Values.service.host.internal | quote }}
+            - name: CP_IDP_INTERNAL_PORT
+              value: {{ .Values.service.port.internal | quote }}
+            - name: CP_IDP_EXTERNAL_HOST
+              value: {{ .Values.service.host.external | quote }}
+            - name: CP_IDP_EXTERNAL_PORT
+              value: {{ .Values.service.port.external | quote }}
           command: ["/bin/bash", "/scripts/fetch-share-fed-meta.sh"]
           volumeMounts:
             - name: scripts

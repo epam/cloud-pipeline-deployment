@@ -26,9 +26,6 @@ staticHostPath: /opt/share-srv/static  # Static web assets (read-only)
 
 sharedStorageName: "SharedStorages"  # CP folder created/used as container for shared storage entries (data.sharing.storage.folders.directory)
 
-idp:
-  enabled: false  # Enables IdP metadata fetch and IdP registration hooks. Auto-set by helmfile from top-level idp.enabled.
-
 config:
   CP_SHARE_SRV_CERT_DIR: /opt/share-srv/pki
   CP_SHARE_SRV_FED_META_DIR: /opt/share-srv/sso
