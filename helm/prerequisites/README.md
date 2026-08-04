@@ -12,9 +12,9 @@ Requires: `openssl`, `kubectl` (for `create-cp-secrets.sh` only).
 | `generate-cp-jwt-pki-certs.sh` | `cp-jwt-pki-secret`                                                            |
 | `generate-idp-certs.sh`        | `cp-idp-secret`                                                                |
 
-| Create secrets         |                              |
-|------------------------|------------------------------|
-| `create-cp-secrets.sh` | All of the above in one step |
+| Create secrets         |                                                                                      |
+|------------------------|--------------------------------------------------------------------------------------|
+| `create-cp-secrets.sh` | All of the above in one step; also creates `cp-share-srv-pki-secret` automatically  |
 
 Shared helpers: `lib/cert-common.sh`.
 

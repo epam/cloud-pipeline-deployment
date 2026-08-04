@@ -1,34 +1,40 @@
 # Helmfile layout for Cloud Pipeline
 
 This directory uses [Helmfile](https://github.com/helmfile/helmfile) to deploy
-Cloud Pipeline as **eleven ordered releases** with explicit dependencies.
+Cloud Pipeline as **fifteen ordered releases** with explicit dependencies.
 
 ## Release order and dependencies
 
-| Order | Release name           | Installed condition            | Depends on                                                   |
-|-------|------------------------|--------------------------------|--------------------------------------------------------------|
-| 1     | **cp-resources**       | Always                         | —                                                            |
-| 2     | **cp-idp**             | `idp.enabled: true`            | cp-resources                                                 |
-| 3     | **cp-api-db**          | `apiSrv.db.type: internal`     | cp-resources                                                 |
-| 4     | **cp-api-srv**         | Always                         | cp-resources, cp-idp (+ cp-api-db if internal DB)            |
-| 5     | **cp-monitoring**      | `monitoring.enabled: true`     | cp-resources, cp-api-srv                                     |
-| 5     | **cp-docker-registry** | `dockerRegistry.enabled: true` | cp-api-srv                                                   |
-| 5     | **cp-search**          | `search.enabled: true`         | cp-resources, cp-api-srv                                     |
-| 5     | **cp-billing-srv**     | `billing.enabled: true`        | cp-resources, cp-api-srv, cp-search                          |
-| 5     | **cp-git**             | `git.enabled: true`            | cp-resources, cp-idp, cp-api-srv                             |
-| 5     | **cp-notifier**        | `notifier.enabled: true`       | cp-resources, cp-api-srv                                     |
-| 6     | **cp-edge**            | Always                         | cp-resources, cp-idp, cp-api-srv, cp-docker-registry, cp-git |
+| Order | Release name                       | Installed condition                          | Depends on                                                   |
+|-------|------------------------------------|----------------------------------------------|--------------------------------------------------------------|
+| 1     | **cp-resources**                   | Always                                       | —                                                            |
+| 2     | **cp-idp**                         | `idp.enabled: true`                          | cp-resources                                                 |
+| 3     | **cp-api-db**                      | `apiSrv.db.type: internal`                   | cp-resources                                                 |
+| 4     | **cp-api-srv**                     | Always                                       | cp-resources, cp-idp (+ cp-api-db if internal DB)            |
+| 5     | **cp-monitoring**                  | `monitoring.enabled: true` (default on)      | cp-resources, cp-api-srv                                     |
+| 5     | **cp-docker-registry**             | `dockerRegistry.enabled: true` (default on)  | cp-api-srv                                                   |
+| 5     | **cp-search**                      | `search.enabled: true` (default off)         | cp-resources, cp-api-srv                                     |
+| 5     | **cp-billing-srv**                 | `billing.enabled: true` (default on)         | cp-resources, cp-api-srv, cp-search                          |
+| 5     | **cp-git**                         | `git.enabled: true` (default on)             | cp-resources, cp-idp, cp-api-srv                             |
+| 5     | **cp-notifier**                    | `notifier.enabled: true` (default off)       | cp-resources, cp-api-srv                                     |
+| 5     | **cp-storage-lifecycle-service**   | `storageLifecycle.enabled: true` (default on)| cp-resources, cp-api-srv                                     |
+| 5     | **cp-dav**                         | `dav.enabled: true` (default on)             | —                                                            |
+| 5     | **cp-share-srv**                   | `shareSrv.enabled: true` (default off)       | cp-resources, cp-idp, cp-api-srv                             |
+| 5     | **cp-run-policy-manager**          | `runPolicyManager.enabled: true` (default off)| cp-resources, cp-api-srv                                    |
+| 6     | **cp-edge**                        | Always                                       | cp-resources, cp-idp, cp-api-srv, cp-docker-registry, cp-git |
 
-Releases 5 in the table are independent of each other and run in parallel once cp-api-srv is ready.
+Releases at order 5 are independent of each other and run in parallel once cp-api-srv is ready.
 
 ## Secrets
 
-| Secret                   | When needed                 | Source                                                                                                                                                                                                                      |
-|--------------------------|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `cp-pki-secret`          | Always                      | `prerequisites/generate-cp-pki-certs.sh` + `prerequisites/create-cp-secrets.sh` (see `prerequisites/README.md`)                                                                                                             |
-| `cp-jwt-pki-secret`      | Always                      | `prerequisites/generate-cp-jwt-pki-certs.sh` + `prerequisites/create-cp-secrets.sh` (see `prerequisites/README.md`)                                                                                                         |
-| `cp-api-srv-fed-metadata-secret` | Always (API expects volume) | **`idp.enabled: true`:** seeded empty by cp-resources, patched by cp-api-srv hook from IdP `/metadata`. **`idp.enabled: false`:** create manually from IdP metadata XML (see `cloud-pipeline/readme.md`) before cp-api-srv. |
-| `cp-idp-secret`          | Always (API expects volume) | **`idp.enabled: true`:** created by cp-idp chart; cert hook fills keys. **`idp.enabled: false`:** create manually (see `cloud-pipeline/readme.md`).                                                                         |
+| Secret                             | When needed                              | Source                                                                                                                                                                                                                        |
+|------------------------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `cp-pki-secret`                    | Always                                   | `prerequisites/generate-cp-pki-certs.sh` + `prerequisites/create-cp-secrets.sh` (see `prerequisites/README.md`)                                                                                                               |
+| `cp-jwt-pki-secret`                | Always                                   | `prerequisites/generate-cp-jwt-pki-certs.sh` + `prerequisites/create-cp-secrets.sh` (see `prerequisites/README.md`)                                                                                                           |
+| `cp-api-srv-fed-metadata-secret`   | Always (API expects volume)              | **`idp.enabled: true`:** seeded empty by cp-idp pre-install hook, patched with IdP metadata by `hook-register-api-srv-in-idp`. **`idp.enabled: false`:** create manually from IdP metadata XML before cp-api-srv.            |
+| `cp-idp-secret`                    | Always (API expects volume)              | **`idp.enabled: true`:** created by cp-idp chart; cert hook fills keys. **`idp.enabled: false`:** create manually.                                                                                                            |
+| `cp-share-srv-pki-secret`          | `shareSrv.enabled: true`                 | `prerequisites/create-cp-secrets.sh` — created automatically alongside `cp-pki-secret` using the same TLS material.                                                                                                           |
+| `cp-share-srv-fed-metadata-secret` | `shareSrv.enabled: true`                 | **`idp.enabled: true`:** seeded empty and patched by `hook-register-share-srv-in-idp`. **`idp.enabled: false`:** create manually.                                                                                             |
 
 ## Configuration
 
@@ -186,6 +192,8 @@ edge:
 ### `git`
 
 GitLab (`cp-git`). When `enabled: false`, the release and cp-edge dependency on cp-git are skipped.
+Includes an optional GitLab Postgres (`cp-gitlab-db`, on by default) and a GitLab Reader sidecar
+(`cp-gitlab-reader`, on by default) that provides git content browsing API.
 
 ```yaml
 git:
@@ -205,6 +213,10 @@ git:
     CP_GITLAB_SSO_TARGET_URL: ""
     CP_GITLAB_SSO_TARGET_URL_TRAIL: ""
     GITLAB_ROOT_PASSWORD: ""
+  gitlabDb:
+    enabled: true               # Deploy in-cluster GitLab Postgres
+  gitlabReader:
+    enabled: true               # Deploy GitLab Reader sidecar
 ```
 
 ### `search`
@@ -280,12 +292,78 @@ monitoring:
     logsHostPath: /opt/vm-monitor/logs
 ```
 
+### `storageLifecycle`
+
+Storage lifecycle service (`cp-storage-lifecycle-service`). Schedules and executes S3 archive/restore
+operations. Requires node label `cloud-pipeline/cp-storage-lifecycle-service=true`.
+
+```yaml
+storageLifecycle:
+  enabled: true
+  archive:
+    startAt: "23:00"        # Time of day to run the archive job (HH:MM)
+  restore:
+    startEach: "20"         # Interval in minutes between restore checks
+  reportBucketPrefix: "storage-lifecycle-service/tagging-job-reports"
+  regions: []
+  # Per-region overrides — inline list or path to a JSON file.
+  # - awsRegionId: "us-east-1"
+  #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+```
+
+A `configure-storage-lifecycle-regions.sh` cleanup hook runs post-deploy when this service is enabled,
+registering each entry in `storageLifecycle.regions` via the Cloud Pipeline API.
+
+### `dav`
+
+WebDAV gateway (`cp-dav`). Provides WebDAV access to Cloud Pipeline data storages. Patches
+`cp-config-global` with `CP_DAV_*` keys. Requires node label `cloud-pipeline/cp-dav=true`.
+
+```yaml
+dav:
+  enabled: true
+```
+
+### `shareSrv`
+
+Data sharing service (`cp-share-srv`). Shares Cloud Pipeline storages with external users over SAML SSO.
+Requires `idp.enabled: true` or an external IdP configured in cp-api-srv, and
+`cp-share-srv-pki-secret` / `cp-share-srv-fed-metadata-secret` must exist before deployment.
+Requires node label `cloud-pipeline/cp-share-srv=true`.
+
+```yaml
+shareSrv:
+  enabled: false
+  service:
+    host:
+      external: ""          # e.g. share.example.com
+    port:
+      external: "443"
+      internal: "31084"
+  config: {}
+```
+
+### `runPolicyManager`
+
+Run policy manager (`cp-run-policy-manager`). Evaluates and enforces run lifecycle policies (pause,
+terminate) on a configurable polling interval. Requires node label
+`cloud-pipeline/cp-run-policy-manager=true`.
+
+```yaml
+runPolicyManager:
+  enabled: false
+  pollPeriodSec: "5"        # Interval between run policy evaluation cycles in seconds
+```
+
 ### `postDeploy`
 
-Cleanup hooks run after all releases are deployed.
+Cleanup hooks run after all releases are deployed. Set `enabled: true` to activate them;
+`false` is safe for template/diff checks without a live cluster.
 
 ```yaml
 postDeploy:
+  enabled: false                  # true = run post-deploy hooks (register tools, prefs, etc.)
+
   additionalCloudRegions: [ ]
   # - regionId: "us-east-2"
   #   kmsKeyArn: ""

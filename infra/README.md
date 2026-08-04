@@ -154,14 +154,17 @@ When `CP_MASTER_NODE_LABELS` is **unset**, the full default set is applied with
 `kubectl label nodes --all` after `kubeadm init`:
 
 ```
-cloud-pipeline/cp-api-srv=true          cloud-pipeline/cp-edge=true
-cloud-pipeline/cp-idp=true              cloud-pipeline/cp-docker-registry=true
-cloud-pipeline/cp-api-db=true           cloud-pipeline/cp-git=true
-cloud-pipeline/cp-gitlab-db=true        cloud-pipeline/cp-notifier=true
-cloud-pipeline/cp-search-elk=true       cloud-pipeline/cp-search-srv=true
-cloud-pipeline/cp-heapster-elk=true     cloud-pipeline/cp-heapster=true
-cloud-pipeline/cp-vm-monitor=true       cloud-pipeline/cp-billing-srv=true
-cloud-pipeline/application-node=true    (and others)
+cloud-pipeline/cp-api-srv=true                    cloud-pipeline/cp-edge=true
+cloud-pipeline/cp-idp=true                        cloud-pipeline/cp-docker-registry=true
+cloud-pipeline/cp-api-db=true                     cloud-pipeline/cp-git=true
+cloud-pipeline/cp-gitlab-db=true                  cloud-pipeline/cp-gitlab-reader=true
+cloud-pipeline/cp-notifier=true                   cloud-pipeline/cp-search-elk=true
+cloud-pipeline/cp-search-srv=true                 cloud-pipeline/cp-heapster-elk=true
+cloud-pipeline/cp-heapster=true                   cloud-pipeline/cp-vm-monitor=true
+cloud-pipeline/cp-monitoring-srv=true             cloud-pipeline/cp-billing-srv=true
+cloud-pipeline/cp-storage-lifecycle-service=true  cloud-pipeline/cp-dav=true
+cloud-pipeline/cp-share-srv=true                  cloud-pipeline/application-node=true
+(and others)
 ```
 
 When `CP_MASTER_NODE_LABELS` **is set**, only those labels are applied (plus `cloud-pipeline/region`).
