@@ -199,10 +199,16 @@ cp-resources → cp-idp (if idp.enabled)
                           → cp-billing-srv (if billing.enabled)
                           → cp-git → [Kubernetes Job: configure-git]
                           → cp-notifier (if notifier.enabled)
+                          → cp-storage-lifecycle-service (if storageLifecycle.enabled, default true)
+                          → cp-dav (if dav.enabled, default true)
+                          → cp-share-srv (if shareSrv.enabled, default false)
+                          → cp-run-policy-manager (if runPolicyManager.enabled, default false)
                           → cp-edge
 [global cleanup hooks: wait-for-api, apply-preferences, apply-cluster-networks-config,
                        register-additional-cloud-regions, register-docker-tools,
-                       register-demo-pipelines, register-email-templates]
+                       configure-storage-lifecycle-regions (if storageLifecycle.enabled),
+                       register-demo-pipelines, register-email-templates,
+                       restart-cp-api-srv]
 ```
 
 | Release              | Chart                | Purpose                                                                                                                                              |
@@ -215,9 +221,13 @@ cp-resources → cp-idp (if idp.enabled)
 | `cp-docker-registry` | `cp-docker-registry` | Internal Docker registry                                                                                                                             |
 | `cp-search`          | `cp-search`          | Elasticsearch + search-srv (optional). Node labelling required: `cloud-pipeline/cp-search-srv` and `cloud-pipeline/cp-search-elk`                    |
 | `cp-billing-srv`     | `cp-billing-srv`     | Billing report agent; syncs billing data to Elasticsearch. Requires node label `cloud-pipeline/cp-billing-srv=true`                                  |
-| `cp-git`             | `cp-git`             | GitLab instance + optional Postgres (`cp-gitlab-db`)                                                                                                 |
-| `cp-notifier`        | `cp-notifier`        | Email / Azure-Graph notifier (optional). Patches `cp-config-global` with `CP_NOTIFIER_*` keys                                                        |
-| `cp-edge`            | `cp-edge`            | Edge proxy/gateway                                                                                                                                   |
+| `cp-git`                       | `cp-git`                       | GitLab instance + optional Postgres (`cp-gitlab-db`) + optional GitLab Reader sidecar (`cp-gitlab-reader`; `git.gitlabReader.enabled`) |
+| `cp-notifier`                  | `cp-notifier`                  | Email / Azure-Graph notifier (optional). Patches `cp-config-global` with `CP_NOTIFIER_*` keys                                         |
+| `cp-storage-lifecycle-service` | `cp-storage-lifecycle-service` | Storage lifecycle service — schedules and executes S3 archive/restore operations; configured on cloud regions post-deploy (default on) |
+| `cp-dav`                       | `cp-dav`                       | WebDAV gateway — provides WebDAV access to Cloud Pipeline data storages. Patches `cp-config-global` with `CP_DAV_*` keys (default on)  |
+| `cp-share-srv`                 | `cp-share-srv`                 | Data sharing service (optional) — shares CP storages with external users over SAML SSO. Requires `shareSrv.service.host.external`      |
+| `cp-run-policy-manager`        | `cp-run-policy-manager`        | Run policy manager (optional) — evaluates and enforces run lifecycle policies (pause, terminate) on a configurable polling interval     |
+| `cp-edge`                      | `cp-edge`                      | Edge proxy/gateway                                                                                                                      |
 
 ### cp-config-global patching pattern
 
@@ -236,21 +246,35 @@ ConfigMap. The pattern is:
 Four Kubernetes secrets are required before deployment (see `helm/prerequisites/` and the
 [Prerequisites section](#prerequisites-tls-and-pki-secrets) above for required file formats):
 
-| Secret                   | Source                                                                                    |
-|--------------------------|-------------------------------------------------------------------------------------------|
-| `cp-pki-secret`          | Org-provided or `generate-cp-pki-certs.sh` → `create-cp-secrets.sh`                       |
-| `cp-jwt-pki-secret`      | `generate-cp-jwt-pki-certs.sh` → `create-cp-secrets.sh` (internal; no org PKI equivalent) |
-| `cp-api-srv-fed-metadata-secret` | SAML IdP metadata XML; seeded automatically when `idp.enabled: true`                      |
-| `cp-idp-secret`          | Org-provided or `generate-idp-certs.sh` → `create-cp-secrets.sh`                          |
+| Secret                             | Source                                                                                                                          |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `cp-pki-secret`                    | Org-provided or `generate-cp-pki-certs.sh` → `create-cp-secrets.sh`                                                            |
+| `cp-jwt-pki-secret`                | `generate-cp-jwt-pki-certs.sh` → `create-cp-secrets.sh` (internal; no org PKI equivalent)                                      |
+| `cp-api-srv-fed-metadata-secret`   | `idp.enabled: true`: seeded empty by cp-idp pre-install hook, patched with IdP metadata by `hook-register-api-srv-in-idp`. `idp.enabled: false`: create manually before deploy. |
+| `cp-share-srv-fed-metadata-secret` | `shareSrv.enabled: true` + `idp.enabled: true`: seeded and patched by `hook-register-share-srv-in-idp`. Otherwise: create manually. |
+| `cp-idp-secret`                    | Org-provided or `generate-idp-certs.sh` → `create-cp-secrets.sh`                                                               |
 
 ### Hooks overview
 
 **Pre-deploy `prepare` hook** (bash, runs on the deploying host before any release):
 
 - `hooks/validation/validate-values.sh` — validates `values.yaml` against per-release rules in
-  `hooks/validation/releases/`. Fails fast on misconfigured values before any Kubernetes changes.
+  `hooks/validation/releases/`. Also checks required Kubernetes secrets exist via `kubectl` (warns and skips
+  if the cluster is unreachable). Fails fast on misconfigured values before any Kubernetes changes.
 
 **Post-release Kubernetes Jobs** (run inside the cluster after each release syncs):
+
+- After `cp-idp` (when `idp.enabled: true`):
+  - `hook-register-api-srv-in-idp` — fetches IdP `/metadata` and patches `cp-api-srv-fed-metadata-secret`;
+    registers cp-api-srv SAML endpoint with the IdP
+  - `hook-register-share-srv-in-idp` (when `shareSrv.enabled: true`) — same for `cp-share-srv-fed-metadata-secret`;
+    registers cp-share-srv SAML endpoint
+  - `hook-register-gitlab-in-idp` (when `git.enabled: true`) — registers GitLab SAML endpoint
+
+  Both hooks use two shared scripts from `cp-idp/files/hooks/`:
+  - `fetch-fed-meta.sh <service-name>` — fetches IdP metadata and patches `<service-name>-fed-metadata-secret`
+    (key: `<service-name>-fed-meta.xml`); skips if the secret key is already populated
+  - `register-in-idp.sh <endpoint>` — runs `saml-idp add-connection <endpoint>` inside the cp-idp pod
 
 - After `cp-api-srv`: `register-cloud-region.sh`, `register-system-folder.sh`, `register-system-storage.sh`
   (scripts live in `cp-api-srv/files/hooks/` and are mounted into hook Job pods)
@@ -296,12 +320,22 @@ the full manifest directory is the superset.
 - `edge.region` — AWS region of the edge node
 - `edge.externalIP` — Public IP of the edge node (used in DNS and run endpoints)
 - `git.enabled` — Deploy GitLab (true/false); also controls whether `cp-edge` waits on `cp-git`
+- `git.gitlabReader.enabled` — Deploy GitLab Reader sidecar (true by default); provides git content browsing API
 - `search.enabled` — Deploy search stack (false by default)
 - `billing.enabled` — Deploy billing agent (true by default)
 - `notifier.enabled` — Deploy email/Azure notifier (false by default)
 - `monitoring.enabled` — Deploy entire monitoring stack (true by default); individual components toggled via
   `monitoring.heapster.enabled`, `monitoring.nodeLogger.enabled`, `monitoring.nodeReporter.enabled`,
   `monitoring.vmMonitor.enabled`
+- `storageLifecycle.enabled` — Deploy storage lifecycle service (true by default)
+- `storageLifecycle.archive.startAt` — Time of day to run the archive job (HH:MM, default `23:00`)
+- `storageLifecycle.restore.startEach` — Interval in minutes between restore checks (default `20`)
+- `storageLifecycle.regions` — Path to JSON file or inline list of region configs for post-deploy SLS setup
+- `storageLifecycle.reportBucketPrefix` — S3 path prefix for SLS job reports (default: `storage-lifecycle-service/tagging-job-reports`)
+- `dav.enabled` — Deploy WebDAV gateway (true by default)
+- `shareSrv.enabled` — Deploy data sharing service (false by default); requires `shareSrv.service.host.external`
+- `runPolicyManager.enabled` — Deploy run policy manager (false by default)
+- `runPolicyManager.pollPeriodSec` — Interval between run policy evaluation cycles in seconds (default: `5`)
 - `postDeploy.systemPreferenceConfig` — Path to a custom preferences JSON file or directory; overrides
   `hooks/post-deploy/assets/preferences/` defaults. Can also be set via `CP_SYSTEM_PREFERENCE_CONFIG` env var.
 - `postDeploy.clusterNetworksConfig` — AMI IDs, subnets, security groups for worker node pools
