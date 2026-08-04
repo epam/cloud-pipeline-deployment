@@ -35,6 +35,29 @@ if [ -n "$BACKUP_DURATION" ] && ! [[ "$BACKUP_DURATION" =~ ^[0-9]+$ ]]; then
   add_error "apiSrv.cloudRegion.backupDuration='$BACKUP_DURATION' must be a non-negative integer"
 fi
 
+# Required secrets
+NAMESPACE=$(jq_val '.general.namespace // "default"')
+IDP_ENABLED=$(jq_val '.idp.enabled // false')
+
+check_secret() {
+  kubectl get secret "$1" -n "$NAMESPACE" >/dev/null 2>&1 || \
+    add_error "required secret '$1' not found in namespace '$NAMESPACE' — see prerequisites docs"
+}
+
+if ! command -v kubectl >/dev/null 2>&1; then
+  add_warning "kubectl not found — cannot verify required secrets in namespace '$NAMESPACE'"
+elif ! kubectl cluster-info >/dev/null 2>&1; then
+  add_warning "kubectl cannot reach cluster — cannot verify required secrets in namespace '$NAMESPACE'"
+else
+  check_secret "cp-pki-secret"
+  check_secret "cp-jwt-pki-secret"
+  # When idp.enabled=true these are created by cp-idp Helm hooks at deploy time.
+  if [ "$IDP_ENABLED" != "true" ]; then
+    check_secret "cp-api-srv-fed-metadata-secret"
+    check_secret "cp-idp-secret"
+  fi
+fi
+
 while IFS= read -r fs_json; do
   mount_type=$(printf '%s' "$fs_json" | jq -r '.mountType // ""')
   mount_root=$(printf '%s' "$fs_json" | jq -r '.mountRoot // ""')
