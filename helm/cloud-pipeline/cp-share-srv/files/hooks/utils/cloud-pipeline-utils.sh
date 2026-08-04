@@ -2,24 +2,11 @@
 # Shared utilities sourced by all helmfile hook scripts.
 # Requires: $API_URL and $CP_API_JWT_ADMIN set before calling any API function.
 
-function usage {
-  echo "Usage: $0 NAMESPACE"
-  exit 1
-}
-
-function validate_api_port {
-  local port="${1:-}"
-  if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
-    echo "ERROR: API port '$port' is not a valid TCP port (1-65535)"
-    return 1
-  fi
-}
-
 function check_api_response_status {
   local response_json="$1"
   local response_status
   response_status=$(echo "$response_json" | jq -r ".status")
-  if [ "$response_status" = "ERROR" ] || [[ "$response_status" =~ ^[45][0-9][0-9]$ ]]; then
+  if [ "$response_status" = "ERROR" ] || [[ "$response_status" == "40"* ]]; then
     return 1
   fi
   return 0
@@ -37,14 +24,6 @@ function call_api {
     response=$(curl -X POST -k -s -H 'Content-Type: application/json' -H "Authorization: Bearer $jwt_token" -d "$payload" "${API_URL}${api_endpoint}")
   else
     response=$(curl -X GET -k -s -H "Authorization: Bearer $jwt_token" "${API_URL}${api_endpoint}")
-  fi
-  if [ -z "$response" ]; then
-    echo "ERROR: Empty response from API: ${API_URL}${api_endpoint}" >&2
-    return 1
-  fi
-  if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-    echo "ERROR: Non-JSON response from API (${API_URL}${api_endpoint}): ${response:0:200}" >&2
-    return 1
   fi
   echo "$response"
   check_api_response_status "$response"
@@ -81,36 +60,6 @@ function api_set_preference {
   return $rc
 }
 
-# Apply one preference to the API, but tolerate CP_PREF_* keys that are
-# deployment settings rather than real API preferences.
-function api_apply_preference {
-  local pref_name="$1" pref_value="$2" pref_visible="${3:-true}"
-  local payload response message
-
-  payload="[$(api_preference_get_templated "$pref_name" "$pref_value" "$pref_visible")]"
-
-  if response=$(call_api "/preferences" "$CP_API_JWT_ADMIN" "$payload"); then
-    return 0
-  fi
-
-  message=$(printf '%s' "$response" | jq -r '.message // ""' 2>/dev/null || true)
-  # This is the backend message for names that are not registered API preferences.
-  if [[ "$message" == *"No preference type specified"* ]]; then
-    echo "WARNING: API does not recognize preference '$pref_name'; skipping it. This CP_PREF_* key is likely a deployment-only setting." >&2
-    return 0
-  fi
-  # The API validates URL preferences by connecting to the target service. Fails when the
-  # service is disabled (empty host → malformed URL) or not yet ready. Non-fatal: the
-  # preference can be set manually or by re-running apply-preferences.sh once the service starts.
-  if [[ "$message" == *"contains invalid value"* ]]; then
-    echo "WARNING: Preference '$pref_name' rejected (service may be disabled or not yet ready): $message — skipping." >&2
-    return 0
-  fi
-
-  echo "ERROR: Failed to set preference '$pref_name': $response" >&2
-  return 1
-}
-
 # Polls ${API_URL}/whoami until the API responds successfully.
 function api_wait_for_ready {
   local max_attempts="${1:-30}"
@@ -132,40 +81,6 @@ function api_wait_for_ready {
   return 1
 }
 
-# Waits for the API to be consistently healthy: requires CONSECUTIVE_OK consecutive
-# successful responses (default 5) before returning. Resets the counter on any failure.
-# Usage: api_wait_for_stable [max_attempts] [sleep_sec] [consecutive_ok]
-function api_wait_for_stable {
-  local max_attempts="${1:-60}"
-  local sleep_sec="${2:-10}"
-  local consecutive_ok="${3:-5}"
-  local attempt ok_streak=0 health_response response_status
-  for attempt in $(seq 1 "$max_attempts"); do
-    health_response=$(curl -k -sS --connect-timeout 10 --max-time 30 \
-        -H "Authorization: Bearer ${CP_API_JWT_ADMIN}" \
-        "${API_URL}/whoami" 2>/dev/null || true)
-    response_status=$(echo "$health_response" | jq -r '.status // ""' 2>/dev/null || true)
-    if [ -n "$response_status" ] && [ "$response_status" != "ERROR" ] && [[ "$response_status" != 4* ]]; then
-      ok_streak=$((ok_streak + 1))
-      if [ "$ok_streak" -ge "$consecutive_ok" ]; then
-        echo "api_wait_for_stable: API stable (${consecutive_ok} consecutive OK responses)."
-        return 0
-      fi
-      echo "api_wait_for_stable: attempt ${attempt}/${max_attempts}: OK (${ok_streak}/${consecutive_ok} consecutive)..."
-    else
-      if [ "$ok_streak" -gt 0 ]; then
-        echo "api_wait_for_stable: attempt ${attempt}/${max_attempts}: not ready (streak reset); retrying in ${sleep_sec}s..."
-      else
-        echo "api_wait_for_stable: attempt ${attempt}/${max_attempts}: not ready; retrying in ${sleep_sec}s..."
-      fi
-      ok_streak=0
-    fi
-    sleep "$sleep_sec"
-  done
-  echo "ERROR: api_wait_for_stable: API did not stabilize after ${max_attempts} attempts."
-  return 1
-}
-
 # GET /<type>/find?id=<name> → echoes .payload.id; returns 1 if not found.
 function api_get_entity_id {
   local entity_name="$1"
@@ -176,57 +91,6 @@ function api_get_entity_id {
   entity_id=$(echo "$entity_lookup_response" | jq -r '.payload.id // empty')
   if [ -n "$entity_id" ] && [ "$entity_id" != "null" ]; then
     echo "$entity_id"
-    return 0
-  fi
-  return 1
-}
-
-# POST /filesharemount to register a fileshare mount on an existing cloud region.
-function api_register_fileshare {
-  local region_id="$1"
-  local mount_point="$2"
-  local mount_type="${3:-}"
-  local mount_options="${4:-}"
-  local payload response rc
-  payload=$(jq -nc \
-    --argjson rid "$region_id" \
-    --arg root "$mount_point" \
-    --arg type "$mount_type" \
-    --arg opts "$mount_options" \
-    '{"regionId":$rid,"mountRoot":$root,"mountType":$type,"mountOptions":$opts}')
-  response=$(call_api "/filesharemount" "$CP_API_JWT_ADMIN" "$payload" || true)
-  rc=$?
-  if [ $rc -ne 0 ]; then
-    echo "ERROR: api_register_fileshare: failed for $mount_point: $response" >&2
-  fi
-  return $rc
-}
-
-# GET /entities?identifier=<region_name>&aclClass=CLOUD_REGION → echoes .payload.id; returns 1 if not found.
-function api_get_cloud_region_id {
-  local region_name="$1"
-  local encoded_name response region_id
-  [ -z "$region_name" ] && return 1
-  encoded_name=$(printf '%s' "$region_name" | jq -sRr @uri)
-  response=$(call_api "/entities?identifier=${encoded_name}&aclClass=CLOUD_REGION" "$CP_API_JWT_ADMIN" "" || true)
-  region_id=$(echo "$response" | jq -r '.payload.id // empty')
-  if [ -n "$region_id" ] && [ "$region_id" != "null" ]; then
-    echo "$region_id"
-    return 0
-  fi
-  return 1
-}
-
-# GET /entities?identifier=<id>&aclClass=DOCKER_REGISTRY → echoes .payload.id; returns 1 if not found.
-function api_get_docker_registry_id {
-  local identifier="$1"
-  local encoded_identifier response registry_id
-  [ -z "$identifier" ] && return 1
-  encoded_identifier=$(printf '%s' "$identifier" | jq -sRr @uri)
-  response=$(call_api "/entities?identifier=${encoded_identifier}&aclClass=DOCKER_REGISTRY" "$CP_API_JWT_ADMIN" "" || true)
-  registry_id=$(echo "$response" | jq -r '.payload.id // empty')
-  if [ -n "$registry_id" ] && [ "$registry_id" != "null" ]; then
-    echo "$registry_id"
     return 0
   fi
   return 1
@@ -299,5 +163,4 @@ function api_register_datastorage {
   echo "ERROR: api_register_datastorage: no id in response for path='$path': $register_storage_response" >&2
   return 1
 }
-
 

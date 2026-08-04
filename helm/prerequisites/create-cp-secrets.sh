@@ -69,6 +69,8 @@ CP_PKI_FILES=(
   sso-public-cert.pem
   cp-api-srv-ssl.p12
   cp-api-srv-sso.p12
+  cp-share-srv-ssl.p12
+  cp-share-srv-sso.p12
 )
 cert_common_require_files "generate-cp-pki-certs.sh" "${CP_PKI_FILES[@]}"
 echo "==> cp-pki-secret"
@@ -82,6 +84,14 @@ cert_common_delete_secret_if_needed cp-pki-secret
   --from-file="${ASSETS_DIR}/sso-public-cert.pem" \
   --from-file="${ASSETS_DIR}/cp-api-srv-ssl.p12" \
   --from-file="${ASSETS_DIR}/cp-api-srv-sso.p12"
+
+# cp-share-srv-pki-secret
+echo "==> cp-share-srv-pki-secret"
+cert_common_delete_secret_if_needed cp-share-srv-pki-secret
+"$KUBECTL" create secret generic cp-share-srv-pki-secret -n "$NAMESPACE" \
+  --from-file="${ASSETS_DIR}/cp-share-srv-ssl.p12" \
+  --from-file="${ASSETS_DIR}/cp-share-srv-sso.p12" \
+  --from-file=ssl-public-cert.pem="${ASSETS_DIR}/ssl-public-cert.pem"
 
 # cp-jwt-pki-secret
 JWT_FILES=(jwt.key.private jwt.key.public jwt.key.x509)
@@ -102,4 +112,4 @@ cert_common_delete_secret_if_needed cp-idp-secret
   --from-file="${ASSETS_DIR}/idp-private-key.pem" \
   --from-file="${ASSETS_DIR}/idp-public-cert.pem"
 
-echo "Done. Secrets cp-pki-secret, cp-jwt-pki-secret, and cp-idp-secret are ready in namespace ${NAMESPACE}."
+echo "Done. Secrets cp-pki-secret, cp-share-srv-pki-secret, cp-jwt-pki-secret, and cp-idp-secret are ready in namespace ${NAMESPACE}."

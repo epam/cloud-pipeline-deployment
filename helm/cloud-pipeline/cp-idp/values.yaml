@@ -48,3 +48,11 @@ git:
       external: "443"
   ssoEndpointId: ""
 
+shareSrv:
+  enabled: true  # true = fetch share-srv federation metadata and register share-srv with this IdP
+  service:
+    host:
+      external: ""
+    port:
+      external: "443"
+

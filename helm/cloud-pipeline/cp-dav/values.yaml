@@ -1,0 +1,25 @@
+# Used by lib.cpConfigGlobal.patchHookTemplate to derive the configmap-to-update-* name
+service:
+  name: cp-dav
+  port:
+    internal: "31085"
+    extraInternal: "31086"
+
+enabled: true
+# buildVersion: ""  # overrides general.buildVersion for this release
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: dav
+  # buildVersion: ""  # overrides general.buildVersion for this image
+  pullPolicy: Always  # IfNotPresent | Always | Never
+
+logsHostPath: /opt/dav/logs  # Node local path for log files
+
+config:
+  CP_DAV_EXTRA_INTERNAL_PORT: "31086"
+  CP_DAV_URL_PATH: webdav
+  CP_DAV_AUTH_URL_PATH: webdav/auth-sso
+  CP_DAV_SERVE_DIR: /dav-serve
+  CP_DAV_MOUNT_POINT: /dav-mount
+  CP_DAV_INSTRUCTIONS_URL: ""

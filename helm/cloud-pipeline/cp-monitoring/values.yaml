@@ -69,6 +69,15 @@ vmMonitor:
 
   logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files
 
+monitoringSrv:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: monitoring-service
+    # buildVersion: ""  # overrides general.buildVersion for this image
+    pullPolicy: Always  # IfNotPresent | Always | Never
+  logsHostPath: /opt/monitoring/logs  # Node local path for monitoring-srv log files
+
 config:
   CP_VM_MONITOR_HOUR_INTERVAL: "1"
   CP_VM_MONITOR_INSTANCE_TAG_NAME: monitored

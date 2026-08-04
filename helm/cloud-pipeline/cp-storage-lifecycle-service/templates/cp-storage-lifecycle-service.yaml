@@ -1,0 +1,96 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-storage-lifecycle-service
+  namespace: {{ include "lib.application.namespace" . }}
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-storage-lifecycle-service: "true"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        cloud-pipeline/cp-storage-lifecycle-service: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      nodeSelector:
+        cloud-pipeline/cp-storage-lifecycle-service: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-storage-lifecycle-service-archive
+          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/start.sh"]
+          env:
+            - name: CP_STORAGE_LIFECYCLE_DAEMON_MODE
+              value: daemon
+            - name: CP_STORAGE_LIFECYCLE_RUN_COMMAND
+              value: archive
+            - name: CP_STORAGE_LIFECYCLE_DAEMON_START_AT
+              value: {{ .Values.archive.startAt | quote }}
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness.sh
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 4
+          volumeMounts:
+            - mountPath: /opt/cp-sls/logs
+              name: cp-sls-logs
+        - name: cp-storage-lifecycle-service-restore
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/start.sh"]
+          env:
+            - name: CP_STORAGE_LIFECYCLE_DAEMON_MODE
+              value: daemon
+            - name: CP_STORAGE_LIFECYCLE_RUN_COMMAND
+              value: restore
+            - name: CP_STORAGE_LIFECYCLE_DAEMON_START_EACH
+              value: {{ .Values.restore.startEach | quote }}
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness.sh
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 4
+          volumeMounts:
+            - mountPath: /opt/cp-sls/logs
+              name: cp-sls-logs
+      volumes:
+        - name: cp-sls-logs
+          hostPath:
+            path: {{ .Values.logsHostPath }}
+            type: DirectoryOrCreate
+{{- end }}

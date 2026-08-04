@@ -179,7 +179,7 @@ chmod +x *.sh lib/*.sh
 | `idp-private-key.pem` | SAML signing private key                                                        |
 | `idp-public-cert.pem` | SAML signing certificate; must be registered with the external IdP if using one |
 
-**`cp-fed-metadata-secret`** — SAML federation metadata XML from the IdP (not a file in `certificates/`; created
+**`cp-api-srv-fed-metadata-secret`** — SAML federation metadata XML from the IdP (not a file in `certificates/`; created
 separately or seeded automatically when `idp.enabled: true`).
 
 ---
@@ -240,7 +240,7 @@ Four Kubernetes secrets are required before deployment (see `helm/prerequisites/
 |--------------------------|-------------------------------------------------------------------------------------------|
 | `cp-pki-secret`          | Org-provided or `generate-cp-pki-certs.sh` → `create-cp-secrets.sh`                       |
 | `cp-jwt-pki-secret`      | `generate-cp-jwt-pki-certs.sh` → `create-cp-secrets.sh` (internal; no org PKI equivalent) |
-| `cp-fed-metadata-secret` | SAML IdP metadata XML; seeded automatically when `idp.enabled: true`                      |
+| `cp-api-srv-fed-metadata-secret` | SAML IdP metadata XML; seeded automatically when `idp.enabled: true`                      |
 | `cp-idp-secret`          | Org-provided or `generate-idp-certs.sh` → `create-cp-secrets.sh`                          |
 
 ### Hooks overview

@@ -173,6 +173,63 @@ monitoring:
       tag: vm-monitor
     logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files
 
+# Storage lifecycle service (cp-storage-lifecycle-service). Archives/restores S3 objects between storage classes.
+# Requires node label cloud-pipeline/cp-storage-lifecycle-service=true.
+storageLifecycle:
+  enabled: true
+  archive:
+    startAt: "23:00"  # Time of day to run the archive job (HH:MM)
+  restore:
+    startEach: "20"   # Interval in minutes between restore checks
+  reportBucketPrefix: "storage-lifecycle-service/tagging-job-reports"  # S3 key prefix for job reports; applied to all regions unless overridden per-region via slsProperties
+  # Per-region overrides. Inline list or path to a JSON file.
+  # Each entry: awsRegionId (required), slsRoleArn or full slsProperties object.
+  regions: []
+  # - awsRegionId: "us-east-1"          # use slsRoleArn to override the S3 Batch Operations role
+  #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+  # - awsRegionId: "eu-west-1"          # use slsProperties to set all properties explicitly
+  #   slsProperties:
+  #     properties:
+  #       batch_operation_job_aws_account_id: "<account-id>"
+  #       batch_operation_job_role_arn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+  #       batch_operation_job_report_bucket: "my-bucket"
+  #       batch_operation_job_report_bucket_prefix: "storage-lifecycle-service/tagging-job-reports"
+  #       batch_operation_job_poll_status_retry_count: "30"
+  #       batch_operation_job_poll_status_sleep_sec: "5"
+  #       storage_skip_archiving_tag: "disable_storage_lifecycle"
+  # or: regions: "./path/to/sls-regions.json"
+  
+# WebDAV service (cp-dav). Provides WebDAV access to Cloud Pipeline storage.
+# Requires node label cloud-pipeline/cp-dav=true.
+dav:
+  enabled: true
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: dav
+    pullPolicy: Always
+
+# Data sharing service (cp-share-srv). Requires idp.enabled: true or an external IdP configured in cp-api-srv.
+# cp-share-srv-pki-secret must exist before deployment (created by helm/prerequisites/create-cp-secrets.sh).
+shareSrv:
+  enabled: false
+  service:
+    host:
+      external: ""   # e.g. share.example.com
+      # internal: ""  # defaults to cp-share-srv.<namespace>.svc.cluster.local
+    port:
+      external: "443"
+      internal: "31084"
+  config: {}
+  # config:
+  #   CP_API_SRV_ANONYMOUS_URLS: "/restapi/route,/restapi/whoami,/restapi/static-resources/**,/restapi/datastorage/**"
+
+# Run policy manager (cp-run-policy-manager). Evaluates and enforces run lifecycle policies.
+runPolicyManager:
+  enabled: false
+  pollPeriodSec: "5"
+  kubeConfigHostPath: /root/.kube
+  logsHostPath: /opt/run-policy-manager/logs
+
 postDeploy:
   enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
   # Additional (non-default) AWS cloud regions to register after deployment.

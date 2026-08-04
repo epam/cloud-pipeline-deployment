@@ -2,28 +2,30 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: cp-hook-script-generate-idp-metadata
+  name: cp-hook-script-register-app-in-idp
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install
-    helm.sh/hook-weight: "4"
-    helm.sh/hook-delete-policy: hook-succeeded
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "9"
+    "helm.sh/hook-delete-policy": hook-succeeded
 data:
-  generate-idp-metadata.sh: |
-{{ .Files.Get "files/hooks/generate-idp-metadata.sh" | indent 4 }}
+  fetch-fed-meta.sh: |
+{{ .Files.Get "files/hooks/fetch-fed-meta.sh" | indent 4 }}
+  register-in-idp.sh: |
+{{ .Files.Get "files/hooks/register-in-idp.sh" | indent 4 }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: generate-idp-fed-meta-secret
+  name: hook-register-app-in-idp
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install
-    helm.sh/hook-weight: "5"
-    helm.sh/hook-delete-policy: hook-succeeded
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   backoffLimit: 0
-  activeDeadlineSeconds: 600
+  activeDeadlineSeconds: 1800
   template:
     spec:
       tolerations:
@@ -36,22 +38,29 @@ spec:
       serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
       restartPolicy: Never
       containers:
-        - name: generate-idp-fed-meta-secret
+        - name: hook-register-app-in-idp
           image: {{ include "lib.hook.deploymentImage" . | quote }}
           imagePullPolicy: IfNotPresent
           env:
             - name: NAMESPACE
               value: {{ include "lib.application.namespace" . | quote }}
+            - name: API_SRV_HOST
+              value: {{ .Values.apiSrv.service.host.external | quote }}
+            - name: API_SRV_PORT
+              value: {{ .Values.apiSrv.service.port.external | quote }}
           envFrom:
             - configMapRef:
                 name: cp-config-global
-          command: ["/bin/bash", "/scripts/generate-idp-metadata.sh"]
+          command:
+            - /bin/bash
+            - -c
+            - /scripts/fetch-fed-meta.sh cp-api-srv && /scripts/register-in-idp.sh "https://${API_SRV_HOST}:${API_SRV_PORT}/pipeline/"
           volumeMounts:
             - name: scripts
               mountPath: /scripts
       volumes:
         - name: scripts
           configMap:
-            name: cp-hook-script-generate-idp-metadata
+            name: cp-hook-script-register-app-in-idp
             defaultMode: 0755
 {{- end }}

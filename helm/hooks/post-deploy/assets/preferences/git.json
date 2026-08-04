@@ -10,5 +10,9 @@
     "git.fsbrowser.workdir": {
         "value": "/git-workdir",
         "visible": true
+    },
+    "git.reader.service.host": {
+        "value": "http://cp-gitlab-reader.default.svc.cluster.local:35800",
+        "visible": false
     }
 }

@@ -1,0 +1,79 @@
+{{- if and .Values.enabled .Values.shareSrv.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cp-share-srv-fed-metadata-secret
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation
+type: Opaque
+data:
+  cp-share-srv-fed-meta.xml: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-hook-script-register-share-in-idp
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "12"
+    "helm.sh/hook-delete-policy": hook-succeeded
+data:
+  fetch-fed-meta.sh: |
+{{ .Files.Get "files/hooks/fetch-fed-meta.sh" | indent 4 }}
+  register-in-idp.sh: |
+{{ .Files.Get "files/hooks/register-in-idp.sh" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hook-register-share-srv-in-idp
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "13"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
+      restartPolicy: Never
+      containers:
+        - name: hook-register-share-srv-in-idp
+          image: {{ include "lib.hook.deploymentImage" . | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              value: {{ include "lib.application.namespace" . | quote }}
+            - name: CP_SHARE_SRV_EXTERNAL_HOST
+              value: {{ .Values.shareSrv.service.host.external | quote }}
+            - name: CP_SHARE_SRV_EXTERNAL_PORT
+              value: {{ .Values.shareSrv.service.port.external | quote }}
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          command:
+            - /bin/bash
+            - -c
+            - /scripts/fetch-fed-meta.sh cp-share-srv && /scripts/register-in-idp.sh "https://${CP_SHARE_SRV_EXTERNAL_HOST}:${CP_SHARE_SRV_EXTERNAL_PORT}/proxy/"
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: cp-hook-script-register-share-in-idp
+            defaultMode: 0755
+{{- end }}

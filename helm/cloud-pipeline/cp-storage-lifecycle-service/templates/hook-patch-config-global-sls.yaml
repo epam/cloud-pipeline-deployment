@@ -1,0 +1,22 @@
+{{- $config := .Values.config | default dict -}}
+{{- if $config -}}
+{{- $data := dict -}}
+{{- range $key, $value := $config -}}
+{{- $_ := set $data $key ($value | toString) -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-to-update-cp-storage-lifecycle-service
+  namespace: {{ include "lib.application.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install, pre-upgrade
+    "helm.sh/hook-weight": "-11"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+{{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "hookWeight" "-10") }}
+{{- end }}

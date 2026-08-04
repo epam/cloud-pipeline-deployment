@@ -1,0 +1,16 @@
+service:
+  name: cp-run-policy-manager
+
+enabled: true
+# buildVersion: ""  # overrides general.buildVersion for this release
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: run-policy-manager
+  # buildVersion: ""  # overrides general.buildVersion for this image
+  pullPolicy: Always  # IfNotPresent | Always | Never
+
+pollPeriodSec: "5"  # Interval in seconds between policy evaluation cycles
+
+kubeConfigHostPath: /root/.kube  # Node path to kubeconfig directory (read-only)
+logsHostPath: /opt/run-policy-manager/logs  # Node local path for log files

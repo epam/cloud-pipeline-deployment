@@ -164,7 +164,7 @@ curl -fsSk "https://cp-idp.default.svc.cluster.local:443/metadata" \
   -H "Host: $IDP_HOST:443" \
   -o cp-api-srv-fed-meta.xml
 
-kubectl create secret generic cp-fed-metadata-secret -n "$NAMESPACE" \
+kubectl create secret generic cp-api-srv-fed-metadata-secret -n "$NAMESPACE" \
   --from-file=cp-api-srv-fed-meta.xml=cp-api-srv-fed-meta.xml \
   --dry-run -o yaml | kubectl apply -f -
 
