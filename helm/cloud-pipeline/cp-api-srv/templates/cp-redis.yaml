@@ -32,6 +32,7 @@ spec:
         cloud-pipeline/cp-redis: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-redis: "true"
       tolerations:

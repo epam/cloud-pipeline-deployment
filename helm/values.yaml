@@ -1,6 +1,13 @@
 general:
   # buildVersion: ""  # top-level build version applied to all cloud-pipeline images
   namespace: default
+  # Optional private registry credentials. Set user+password or secret (not both).
+  # Leave all fields empty (default) to disable imagePullSecrets on all deployments.
+  imagePullCredentials:
+    registry: ""    # registry hostname, e.g. my-registry.example.com
+    user: ""
+    password: ""
+    secret: ""      # name of a pre-existing docker-registry Secret
 
 resources:
   config:

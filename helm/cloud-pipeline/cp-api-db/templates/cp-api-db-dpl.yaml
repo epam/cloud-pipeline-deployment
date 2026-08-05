@@ -31,6 +31,7 @@ spec:
         cloud-pipeline/cp-api-db: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-api-db: "true"
       tolerations:
@@ -82,6 +83,4 @@ spec:
         - name: dshm
           emptyDir:
             medium: Memory
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret
 {{- end }}

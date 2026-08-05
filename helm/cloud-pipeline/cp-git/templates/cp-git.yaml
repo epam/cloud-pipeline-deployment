@@ -41,6 +41,7 @@ spec:
         cloud-pipeline/cp-git: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-git: "true"
       tolerations:
@@ -135,5 +136,3 @@ spec:
         - name: common-pki
           secret:
             secretName: cp-pki-secret
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret

@@ -31,6 +31,7 @@ spec:
         cloud-pipeline/cp-billing-srv: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-billing-srv: "true"
       tolerations:
@@ -75,6 +76,4 @@ spec:
             secretName: {{ .Values.cloudCredentials.secretName }}
             optional: {{ .Values.cloudCredentials.optional | default true }}
         {{- end }}
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret
 {{- end }}
