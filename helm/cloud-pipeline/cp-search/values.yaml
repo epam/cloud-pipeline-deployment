@@ -12,9 +12,6 @@ nodeSelector:
   srv:
     cloud-pipeline/cp-search-srv: "true"
 
-imagePullSecrets:
-  - name: cp-distr-docker-registry-secret
-
 # In-cluster Elasticsearch (install.sh when CP_SEARCH_ELK_TYPE == elasticsearch).
 elk:
   elasticsearch:

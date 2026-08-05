@@ -14,6 +14,7 @@ spec:
         cloud-pipeline/cp-notifier: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-notifier: "true"
       tolerations:
@@ -49,5 +50,3 @@ spec:
           hostPath:
             path: /opt/notifier/logs
             type: DirectoryOrCreate
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret

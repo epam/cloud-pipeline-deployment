@@ -34,6 +34,7 @@ spec:
         cloud-pipeline/cp-docker-comp: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-docker-comp: "true"
       tolerations:
@@ -62,5 +63,3 @@ spec:
           hostPath:
             path: {{ printf "%s/docker-comp/wd" .Values.hostPath.basePath | quote }}
             type: DirectoryOrCreate
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret

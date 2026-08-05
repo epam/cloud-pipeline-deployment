@@ -36,6 +36,7 @@ spec:
         cloud-pipeline/cp-gitlab-db: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-gitlab-db: "true"
       tolerations:
@@ -89,6 +90,4 @@ spec:
         - name: gitlab-dshm
           emptyDir:
             medium: Memory
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret
 {{- end }}

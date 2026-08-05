@@ -26,6 +26,16 @@ config:
   CP_DEFAULT_ADMIN_PASS: ""
   CP_DEFAULT_ADMIN_EMAIL: ""
 
+# Optional image pull credentials for a private Docker registry.
+# Set user+password to have cp-resources create a docker-registry Secret automatically,
+# or set secret to reference a pre-existing Secret by name.
+# Leave all fields empty (default) to disable imagePullSecrets entirely.
+imagePullCredentials:
+  registry: ""    # registry hostname, e.g. my-registry.example.com
+  user: ""
+  password: ""
+  secret: ""      # name of a pre-existing docker-registry Secret (mutually exclusive with user+password)
+
 # Static DNS entries added to cp-dnsmasq-hosts (kube-dns). Use for external hosts
 # that are not Kubernetes services (e.g. RDS endpoints, NFS servers, external APIs).
 customDNS:

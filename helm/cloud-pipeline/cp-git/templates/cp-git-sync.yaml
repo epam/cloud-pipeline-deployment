@@ -18,6 +18,7 @@ spec:
         cloud-pipeline/cp-git-sync: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       {{- with .Values.gitSync.nodeSelector }}
       nodeSelector:
 {{ toYaml . | nindent 8 }}
@@ -65,6 +66,4 @@ spec:
       volumes:
         - name: git-sync-logs
           emptyDir: {}
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret
 {{- end }}

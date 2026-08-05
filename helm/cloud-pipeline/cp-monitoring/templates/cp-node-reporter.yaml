@@ -18,6 +18,7 @@ spec:
         cloud-pipeline/cp-node-reporter: "true"
         cloud-pipeline/core-component: "DaemonSet"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       hostPID: true
       nodeSelector:
         beta.kubernetes.io/os: "linux"
@@ -97,6 +98,4 @@ spec:
         - name: docker-bin
           hostPath:
             path: /usr/bin/docker
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret
 {{- end }}

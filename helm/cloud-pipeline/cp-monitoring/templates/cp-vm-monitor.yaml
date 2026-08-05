@@ -19,6 +19,7 @@ spec:
         cloud-pipeline/cp-vm-monitor: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-vm-monitor: "true"
       tolerations:
@@ -125,6 +126,4 @@ spec:
         - name: kube-pki
           hostPath:
             path: /etc/kubernetes/pki
-      imagePullSecrets:
-        - name: cp-distr-docker-registry-secret
 {{- end }}

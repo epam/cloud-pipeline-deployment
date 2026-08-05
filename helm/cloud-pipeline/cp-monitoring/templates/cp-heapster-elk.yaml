@@ -36,6 +36,7 @@ spec:
         cloud-pipeline/cp-heapster-elk: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-heapster-elk: "true"
       tolerations:
