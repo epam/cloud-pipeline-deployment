@@ -35,6 +35,7 @@ spec:
         cloud-pipeline/cp-share-srv: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-share-srv: "true"
       tolerations:

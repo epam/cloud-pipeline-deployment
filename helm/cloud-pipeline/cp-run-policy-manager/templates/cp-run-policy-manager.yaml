@@ -18,6 +18,7 @@ spec:
         cloud-pipeline/cp-run-policy-manager: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-run-policy-manager: "true"
       tolerations:

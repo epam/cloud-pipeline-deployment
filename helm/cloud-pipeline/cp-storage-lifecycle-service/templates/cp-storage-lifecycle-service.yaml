@@ -15,6 +15,7 @@ spec:
         cloud-pipeline/cp-storage-lifecycle-service: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-storage-lifecycle-service: "true"
       tolerations:

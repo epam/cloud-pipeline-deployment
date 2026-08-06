@@ -37,6 +37,7 @@ spec:
         cloud-pipeline/cp-gitlab-reader: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-gitlab-reader: "true"
       tolerations:

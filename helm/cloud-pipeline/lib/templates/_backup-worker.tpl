@@ -28,6 +28,7 @@ spec:
       labels:
         app: cp-bkp-worker-{{ $serviceName }}
     spec:
+      {{- include "lib.imagePullSecret" $ctx | nindent 6 }}
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists

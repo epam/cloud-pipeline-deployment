@@ -39,6 +39,7 @@ spec:
         cloud-pipeline/cp-dav: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-dav: "true"
       tolerations:

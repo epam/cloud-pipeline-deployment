@@ -19,6 +19,7 @@ spec:
         cloud-pipeline/cp-monitoring-srv: "true"
         cloud-pipeline/core-component: "Deployment"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       nodeSelector:
         cloud-pipeline/cp-monitoring-srv: "true"
       tolerations:
