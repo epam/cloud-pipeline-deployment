@@ -49,7 +49,7 @@ build {
 
   provisioner "shell" {
     inline = [
-      "sudo mkdir /cp_temp",
+      "sudo mkdir -p /cp_temp/helm",
       "sudo chmod -R 777 /cp_temp"
     ]
   }
@@ -63,8 +63,18 @@ build {
     destination = "/cp_temp/"
   }
   provisioner "file" {
-    source      = "../../helm"
+    source      = "../../helm/prerequisites"
     destination = "/cp_temp/"
+  }
+  provisioner "file" {
+    source      = "../../helm/README.md"
+    destination = "/cp_temp/helm"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "echo \"helmfiles:\\n  - path: 'git::https://github.com/epam/cloud-pipeline-deployment.git@helm/helmfile.yaml.gotmpl?ref=${var.cloud_pipeline_deployment_commit}'\" > /cp_temp/helm/helmfile.yaml"
+    ]
   }
 
   provisioner "shell" {

@@ -1,7 +1,7 @@
 helmDefaults:
   timeout: 1200
 
-{{- $ValuesFilePath := env "HELMFILE_VALUES" | default "values.yaml" }}
+{{- $ValuesFilePath := env "HELMFILE_VALUES" | default (printf "%s/values.yaml" (env "PWD")) }}
 {{- $deployValues := readFile $ValuesFilePath | fromYaml }}
 {{- $generalValues := index $deployValues "general" | default dict }}
 {{- $resourcesValues := index $deployValues "resources" | default dict }}
