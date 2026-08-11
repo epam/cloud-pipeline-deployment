@@ -50,8 +50,8 @@ variable "cloud_pipeline_build_version" {
 
 variable "cloud_pipeline_deployment_commit" {
   type        = string
-  default     = "main"
-  description = "Git ref (commit hash or branch) of cloud-pipeline-deployment repo to pin the helmfile charts version."
+  default     = ""
+  description = "Git commit hash of cloud-pipeline-deployment repo to pin the helmfile charts version. Defaults to latest commit on main when left empty."
 }
 
 variable "cloud_pipeline_deploy_dir_path" {

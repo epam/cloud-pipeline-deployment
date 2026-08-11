@@ -64,16 +64,25 @@ build {
   }
   provisioner "file" {
     source      = "../../helm/prerequisites"
-    destination = "/cp_temp/"
+    destination = "/cp_temp/helm/"
   }
   provisioner "file" {
     source      = "../../helm/README.md"
-    destination = "/cp_temp/helm"
+    destination = "/cp_temp/helm/README.md"
+  }
+  provisioner "file" {
+    source      = "../../helm/values.yaml"
+    destination = "/cp_temp/helm/values.yaml"
   }
 
   provisioner "shell" {
+    environment_vars = [
+      "CP_DEPLOYMENT_COMMIT=${var.cloud_pipeline_deployment_commit}",
+    ]
     inline = [
-      "echo \"helmfiles:\\n  - path: 'git::https://github.com/epam/cloud-pipeline-deployment.git@helm/helmfile.yaml.gotmpl?ref=${var.cloud_pipeline_deployment_commit}'\" > /cp_temp/helm/helmfile.yaml"
+      "COMMIT=$${CP_DEPLOYMENT_COMMIT:-$(git ls-remote https://github.com/epam/cloud-pipeline-deployment.git refs/heads/main | cut -f1)}",
+      "echo 'helmfiles:' > /cp_temp/helm/helmfile.yaml",
+      "echo \"  - path: 'git::https://github.com/epam/cloud-pipeline-deployment.git@helm/helmfile.yaml.gotmpl?ref=$COMMIT'\" >> /cp_temp/helm/helmfile.yaml"
     ]
   }
 
