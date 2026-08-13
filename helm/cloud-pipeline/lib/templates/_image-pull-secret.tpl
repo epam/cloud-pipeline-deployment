@@ -1,22 +1,26 @@
 {{/*
-  Renders imagePullSecrets block for pod specs when a private registry is configured.
-  Uses "cp-distr-docker-registry-secret" (created by cp-resources) when user+password are set,
-  or a pre-existing Secret when imagePullCredentials.secret is set.
-  Renders nothing when imagePullCredentials is absent or all fields are empty.
+  Returns the image pull secret name, or empty string when none is configured.
+  - user+password set → "cp-distr-docker-registry-secret" (auto-created by cp-resources)
+  - secret set       → the user-supplied pre-existing Secret name
+  - neither          → ""
 */}}
-{{- define "lib.imagePullSecret" -}}
+{{- define "lib.imagePullSecretName" -}}
 {{- $ipc := .Values.imagePullCredentials | default dict -}}
 {{- $user := index $ipc "user" | default "" -}}
 {{- $password := index $ipc "password" | default "" -}}
-{{- $secret := index $ipc "secret" | default "" -}}
-{{- $secretName := "" -}}
-{{- if and $user $password -}}
-  {{- $secretName = "cp-distr-docker-registry-secret" -}}
-{{- else if $secret -}}
-  {{- $secretName = $secret -}}
+{{- if and $user $password -}}cp-distr-docker-registry-secret
+{{- else -}}{{ index $ipc "secret" | default "" }}
 {{- end -}}
-{{- if $secretName -}}
+{{- end -}}
+
+{{/*
+  Renders the imagePullSecrets block for pod specs.
+  Renders nothing when no credentials are configured.
+*/}}
+{{- define "lib.imagePullSecret" -}}
+{{- $name := include "lib.imagePullSecretName" . -}}
+{{- if $name -}}
 imagePullSecrets:
-  - name: {{ $secretName }}
+  - name: {{ $name }}
 {{- end -}}
 {{- end -}}

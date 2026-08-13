@@ -1,7 +1,7 @@
 helmDefaults:
   timeout: 1200
 
-{{- $ValuesFilePath := env "HELMFILE_VALUES" | default "values.yaml" }}
+{{- $ValuesFilePath := env "HELMFILE_VALUES" | default (printf "%s/values.yaml" (env "PWD")) }}
 {{- $deployValues := readFile $ValuesFilePath | fromYaml }}
 {{- $generalValues := index $deployValues "general" | default dict }}
 {{- $resourcesValues := index $deployValues "resources" | default dict }}
@@ -21,7 +21,7 @@ helmDefaults:
 {{- $runPolicyManagerValues := index $deployValues "runPolicyManager" | default dict }}
 
 {{/* Put buildVersion value from CP_BUILD_VERSION.txt only if not set by values.yaml */}}
-{{- $fileVersion := exec "sh" (list "-c" "cat ./CP_BUILD_VERSION.txt 2>/dev/null | tr -d '[:space:]'") }}
+{{- $fileVersion := exec "sh" (list "-c" (printf "cat '%s/CP_BUILD_VERSION.txt' 2>/dev/null | tr -d '[:space:]'" (env "PWD"))) }}
 {{- if and $fileVersion (not (index $generalValues "buildVersion")) }}{{- $_ := set $generalValues "buildVersion" $fileVersion }}{{- end }}
 
 releases:

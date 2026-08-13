@@ -48,6 +48,12 @@ variable "cloud_pipeline_build_version" {
   description = "Cloud Pipeline build version used for docker image tags (e.g. api-srv-<version>, dns-hosts-sync-<version>, etc.)."
 }
 
+variable "cloud_pipeline_deployment_commit" {
+  type        = string
+  default     = ""
+  description = "Git commit hash of cloud-pipeline-deployment repo to pin the helmfile charts version. Defaults to latest commit on main when left empty."
+}
+
 variable "cloud_pipeline_deploy_dir_path" {
   type        = string
   default     = "/var/lib/cloud-pipeline/deploy"

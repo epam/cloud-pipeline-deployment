@@ -18,6 +18,7 @@ spec:
         cloud-pipeline/cp-node-logger: "true"
         cloud-pipeline/core-component: "DaemonSet"
     spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
       containers:
         - name: cp-node-logger
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.nodeLogger.image.buildVersion .Values.buildVersion "") }}

@@ -49,7 +49,7 @@ build {
 
   provisioner "shell" {
     inline = [
-      "sudo mkdir /cp_temp",
+      "sudo mkdir -p /cp_temp/helm",
       "sudo chmod -R 777 /cp_temp"
     ]
   }
@@ -63,8 +63,27 @@ build {
     destination = "/cp_temp/"
   }
   provisioner "file" {
-    source      = "../../helm"
-    destination = "/cp_temp/"
+    source      = "../../helm/prerequisites"
+    destination = "/cp_temp/helm/"
+  }
+  provisioner "file" {
+    source      = "../../helm/README.md"
+    destination = "/cp_temp/helm/README.md"
+  }
+  provisioner "file" {
+    source      = "../../helm/values.yaml"
+    destination = "/cp_temp/helm/values.yaml"
+  }
+
+  provisioner "shell" {
+    environment_vars = [
+      "CP_DEPLOYMENT_COMMIT=${var.cloud_pipeline_deployment_commit}",
+    ]
+    inline = [
+      "COMMIT=$${CP_DEPLOYMENT_COMMIT:-$(git ls-remote https://github.com/epam/cloud-pipeline-deployment.git refs/heads/main | cut -f1)}",
+      "echo 'helmfiles:' > /cp_temp/helm/helmfile.yaml",
+      "echo \"  - path: 'git::https://github.com/epam/cloud-pipeline-deployment.git@helm/helmfile.yaml.gotmpl?ref=$COMMIT'\" >> /cp_temp/helm/helmfile.yaml"
+    ]
   }
 
   provisioner "shell" {
