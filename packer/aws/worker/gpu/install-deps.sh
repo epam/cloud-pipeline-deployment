@@ -79,8 +79,8 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 yum install -y vulkan-devel \
                 gcc \
                 gcc-c++ \
-                kernel-devel \
-                kernel-modules-extra
+                kernel6.18-devel \
+                kernel6.18-modules-extra
 
 DRIVER_VERSION=595.58.03
 curl -k -L -O https://us.download.nvidia.com/tesla/$DRIVER_VERSION/NVIDIA-Linux-$(arch)-$DRIVER_VERSION.run

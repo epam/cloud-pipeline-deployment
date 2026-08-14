@@ -4,7 +4,17 @@ packer {
       version = ">= 1.2.8"
       source  = "github.com/hashicorp/amazon"
     }
+    git = {
+      version = ">= 0.6.2"
+      source  = "github.com/ethanmdavidson/git"
+    }
   }
+}
+
+data "git-commit" "cwd-head" {}
+
+locals {
+  git_sha = substr(data.git-commit.cwd-head.hash, 0, 8)
 }
 
 source "amazon-ebs" "this" {
@@ -22,6 +32,12 @@ source "amazon-ebs" "this" {
   ssh_username  = "ec2-user"
   ssh_timeout   = "10m"
   ssh_interface = var.ssh_interface
+  tags = {
+    OS_Version    = "amzn2023"
+    Base_AMI_Name = "{{ .SourceAMIName }}"
+    Type          = "application-node"
+    SHA           = local.git_sha
+  }
 }
 
 build {

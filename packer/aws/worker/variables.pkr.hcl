@@ -1,6 +1,6 @@
 variable "ami_name_prefix" {
   type        = string
-  default     = "CloudPipeline-Worker"
+  default     = "CloudPipeline"
   description = "Custom string to prepend to the resulting AMI name."
 }
 
