@@ -59,3 +59,9 @@ variable "cloud_pipeline_deploy_dir_path" {
   default     = "/var/lib/cloud-pipeline/deploy"
   description = "Filesystem path on the AMI where Cloud Pipeline deployment artifacts are stored. Exposed on the instance as CLOUD_PIPELINE_DISTRO_DIR in /etc/environment."
 }
+
+variable "docker_data_root" {
+  type        = string
+  default     = ""
+  description = "Custom Docker data root directory (e.g. /opt/docker). Leave empty to use the Docker default (/var/lib/docker)."
+}

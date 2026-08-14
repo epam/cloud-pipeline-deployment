@@ -41,6 +41,7 @@ build {
   provisioner "shell" {
     environment_vars = [
       "CLOUD_PIPELINE_DISTRO_DIR=${var.cloud_pipeline_deploy_dir_path}",
+      "DOCKER_DATA_ROOT=${var.docker_data_root}",
     ]
     execute_command   = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
     script            = "${path.root}/../common/scripts/install_prerequsites.sh"
@@ -103,6 +104,7 @@ build {
     environment_vars = [
       "CP_CLOUD_PIPELINE_NODE_REGION=${var.region}",
       "CLOUD_PIPELINE_DISTRO_DIR=${var.cloud_pipeline_deploy_dir_path}",
+      "DOCKER_DATA_ROOT=${var.docker_data_root}",
     ]
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
     script          = "${path.root}/../common/scripts/install_kubernetes.sh"
