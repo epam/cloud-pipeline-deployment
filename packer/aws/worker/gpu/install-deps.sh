@@ -83,9 +83,10 @@ yum install -y vulkan-devel \
                 kernel6.18-modules-extra
 
 DRIVER_VERSION=595.58.03
-curl -k -L -O https://us.download.nvidia.com/tesla/$DRIVER_VERSION/NVIDIA-Linux-$(arch)-$DRIVER_VERSION.run
-chmod +x ./NVIDIA-Linux-$(arch)-$DRIVER_VERSION.run
-./NVIDIA-Linux-$(arch)-$DRIVER_VERSION.run -s
+ARCH="$(arch)"
+curl -k -L -O "https://us.download.nvidia.com/tesla/${DRIVER_VERSION}/NVIDIA-Linux-${ARCH}-${DRIVER_VERSION}.run"
+chmod +x "./NVIDIA-Linux-${ARCH}-${DRIVER_VERSION}.run"
+"./NVIDIA-Linux-${ARCH}-${DRIVER_VERSION}.run" -s
 
 # Fabric Manager for A100, H100, H200 and friends
 dnf install nvidia-release -y
