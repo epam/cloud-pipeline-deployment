@@ -72,13 +72,22 @@ EOF
 systemctl daemon-reload
 
 mkdir -p /etc/docker
-cat <<EOT > /etc/docker/daemon.json
+if [ -n "${DOCKER_DATA_ROOT:-}" ]; then
+  cat > /etc/docker/daemon.json <<EOT
 {
-  $DOCKER_DATA_ROOT_ENTRY
+  "data-root": "${DOCKER_DATA_ROOT}",
   "exec-opts": ["native.cgroupdriver=systemd"],
   "storage-driver": "overlay2"
 }
 EOT
+else
+  cat > /etc/docker/daemon.json <<'EOT'
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "storage-driver": "overlay2"
+}
+EOT
+fi
 
 if [ -f /etc/sysconfig/docker ]; then
   sed -i "s/--default-ulimit nofile=1024:4096/--default-ulimit nofile=65535:65535/g" /etc/sysconfig/docker

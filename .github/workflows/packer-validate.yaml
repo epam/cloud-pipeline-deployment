@@ -8,9 +8,14 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir:
+          - packer/aws/application_node
+          - packer/aws/worker_node
     defaults:
       run:
-        working-directory: packer/aws
+        working-directory: ${{ matrix.dir }}
     steps:
       - uses: actions/checkout@v4
 
@@ -18,6 +23,9 @@ jobs:
 
       - name: Check formatting
         run: packer fmt --check .
+
+      - name: Init plugins
+        run: packer init .
 
       - name: Validate syntax
         run: packer validate -syntax-only .

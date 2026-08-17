@@ -28,13 +28,22 @@ docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-pau
 systemctl stop docker
 
 mkdir -p /etc/docker
-cat <<EOT > /etc/docker/daemon.json
+if [ -n "${DOCKER_DATA_ROOT:-}" ]; then
+  cat > /etc/docker/daemon.json <<EOT
 {
-  $DOCKER_DATA_ROOT_ENTRY
+  "data-root": "${DOCKER_DATA_ROOT}",
   "exec-opts": ["native.cgroupdriver=systemd"],
   "storage-driver": "overlay2"
 }
 EOT
+else
+  cat > /etc/docker/daemon.json <<'EOT'
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "storage-driver": "overlay2"
+}
+EOT
+fi
 
 wget -q --no-check-certificate https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/rpm/kube-1.15.4.el7.tgz -O kube.tgz && \
      tar -xf kube.tgz && \
