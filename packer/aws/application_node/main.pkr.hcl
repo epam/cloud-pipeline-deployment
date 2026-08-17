@@ -60,7 +60,7 @@ build {
       "DOCKER_DATA_ROOT=${var.docker_data_root}",
     ]
     execute_command   = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
-    script            = "${path.root}/../common/scripts/install_prerequsites.sh"
+    script            = "${path.root}/../../common/scripts/install_prerequsites.sh"
     expect_disconnect = true
   }
 
@@ -72,23 +72,23 @@ build {
   }
 
   provisioner "file" {
-    sources     = ["../common/resources/config/canal.yaml.raw", "../common/resources/config/kubeadm-init-config.yaml.raw"]
+    sources     = ["${path.root}/../../common/resources/config/canal.yaml.raw", "${path.root}/../../common/resources/config/kubeadm-init-config.yaml.raw"]
     destination = "/cp_temp/"
   }
   provisioner "file" {
-    source      = "../common/scripts/patch-kube-dns.sh"
+    source      = "${path.root}/../../common/scripts/patch-kube-dns.sh"
     destination = "/cp_temp/"
   }
   provisioner "file" {
-    source      = "../../helm/prerequisites"
+    source      = "${path.root}/../../../helm/prerequisites"
     destination = "/cp_temp/helm/"
   }
   provisioner "file" {
-    source      = "../../helm/README.md"
+    source      = "${path.root}/../../../helm/README.md"
     destination = "/cp_temp/helm/README.md"
   }
   provisioner "file" {
-    source      = "../../helm/values.yaml"
+    source      = "${path.root}/../../../helm/values.yaml"
     destination = "/cp_temp/helm/values.yaml"
   }
 
@@ -123,7 +123,7 @@ build {
       "DOCKER_DATA_ROOT=${var.docker_data_root}",
     ]
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
-    script          = "${path.root}/../common/scripts/install_kubernetes.sh"
+    script          = "${path.root}/../../common/scripts/install_kubernetes.sh"
     pause_before    = "30s"
   }
 }
