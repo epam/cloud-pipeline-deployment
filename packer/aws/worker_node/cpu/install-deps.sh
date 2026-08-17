@@ -15,6 +15,8 @@
 
 set -euo pipefail
 
+CP_OSS_BUILDS_URL="${CP_OSS_BUILDS_URL:-https://cloud-pipeline-oss-builds.s3.us-east-1.amazonaws.com}"
+
 # Disable automatic packages upgrade, if cloud-init is configured
 if [ -d "/etc/cloud/cloud.cfg.d" ]; then
 
@@ -40,13 +42,13 @@ update-alternatives --set iptables /usr/sbin/iptables-legacy
 # - https://btrfs.readthedocs.io/en/latest/INSTALL.html#all-in-one-binary-busybox-style
 # - https://github.com/kdave/btrfs-progs
 cd /usr/bin && \
-wget -q "https://cloud-pipeline-oss-builds.s3.us-east-1.amazonaws.com/tools/btrfs/6.17/btrfs.box.static" -O btrfs && \
+wget -q "${CP_OSS_BUILDS_URL}/tools/btrfs/6.17/btrfs.box.static" -O btrfs && \
 chmod +x btrfs && \
 ln -s btrfs mkfs.btrfs
 
 # python2
 cd /opt && \
-wget -q "https://cloud-pipeline-oss-builds.s3.us-east-1.amazonaws.com/tools/python/2/Miniconda2-4.7.12.1-Linux-x86_64.tar.gz" && \
+wget -q "${CP_OSS_BUILDS_URL}/tools/python/2/Miniconda2-4.7.12.1-Linux-x86_64.tar.gz" && \
 tar -zxf Miniconda2-4.7.12.1-Linux-x86_64.tar.gz && \
 rm -f Miniconda2-4.7.12.1-Linux-x86_64.tar.gz && \
 ln -s /opt/conda/bin/python2 /usr/bin/python2 && \
@@ -55,7 +57,7 @@ ln -s /opt/conda/bin/pip /usr/bin/pip2 && \
 ln -s /opt/conda/bin/pip /usr/bin/pip
 
 # Install jq
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/jq/jq-1.6/jq-linux64" -O /usr/bin/jq && \
+wget -q "${CP_OSS_BUILDS_URL}/tools/jq/jq-1.6/jq-linux64" -O /usr/bin/jq && \
 chmod +x /usr/bin/jq
 
 # Enable forwarding

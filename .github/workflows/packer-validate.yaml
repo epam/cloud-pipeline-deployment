@@ -12,7 +12,7 @@ jobs:
       matrix:
         dir:
           - packer/aws/application_node
-          - packer/aws/worker
+          - packer/aws/worker_node
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
