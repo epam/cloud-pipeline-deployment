@@ -33,6 +33,8 @@ spec:
     matchLabels:
       cloud-pipeline/cp-dav: "true"
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata:
       annotations:
