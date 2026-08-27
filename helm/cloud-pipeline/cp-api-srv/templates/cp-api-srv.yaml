@@ -42,6 +42,8 @@ spec:
     type: RollingUpdate
   template:
     metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-api-srv: "true"
         cloud-pipeline/core-component: "Deployment"

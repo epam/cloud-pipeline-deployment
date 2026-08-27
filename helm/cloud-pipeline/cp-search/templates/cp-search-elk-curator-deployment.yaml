@@ -14,6 +14,8 @@ spec:
       cloud-pipeline/cp-search-elk-curator: "true"
   template:
     metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-search-elk-curator: "true"
         cloud-pipeline/core-component: Deployment

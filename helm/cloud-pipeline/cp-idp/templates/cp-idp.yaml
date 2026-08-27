@@ -35,12 +35,17 @@ metadata:
     {{- end }}
 spec:
   replicas: 1
+  # Recreate: hostPath profile database cannot be shared between old and new pod simultaneously.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       cloud-pipeline/cp-idp: "true"
   template:
     metadata:
       namespace: {{ include "lib.application.namespace" . }}
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-idp: "true"
         {{- with .Values.labels }}

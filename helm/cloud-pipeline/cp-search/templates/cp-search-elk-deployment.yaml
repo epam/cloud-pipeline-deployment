@@ -29,11 +29,16 @@ metadata:
     cloud-pipeline/core-component: Deployment
 spec:
   replicas: 1
+  # Recreate: hostPath Elasticsearch data and backup dirs cannot be shared between old and new pod simultaneously.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       cloud-pipeline/cp-search-elk: "true"
   template:
     metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-search-elk: "true"
         cloud-pipeline/core-component: Deployment

@@ -35,8 +35,13 @@ spec:
     matchLabels:
       cloud-pipeline/cp-git: "true"
   replicas: 1
+  # Recreate: hostPath GitLab application data dir cannot be shared between old and new pod simultaneously.
+  strategy:
+    type: Recreate
   template:
     metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-git: "true"
         cloud-pipeline/core-component: "Deployment"

@@ -32,6 +32,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-heapster: "true"
         cloud-pipeline/core-component: "Deployment"

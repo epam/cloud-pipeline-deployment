@@ -29,9 +29,14 @@ spec:
     matchLabels:
       cloud-pipeline/cp-docker-registry: "true"
   replicas: 1
+  # Recreate: hostPath Docker image layer storage cannot be shared between old and new pod simultaneously.
+  strategy:
+    type: Recreate
   template:
     metadata:
       namespace: {{ include "lib.application.namespace" . }}
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-docker-registry: "true"
     spec:
