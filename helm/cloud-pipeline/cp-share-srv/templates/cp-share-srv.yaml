@@ -31,6 +31,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        redeploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-share-srv: "true"
         cloud-pipeline/core-component: "Deployment"

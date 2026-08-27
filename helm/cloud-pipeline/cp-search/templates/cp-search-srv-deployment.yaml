@@ -41,6 +41,8 @@ spec:
       cloud-pipeline/cp-search-srv: "true"
   template:
     metadata:
+      annotations:
+        redeploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-search-srv: "true"
         cloud-pipeline/core-component: Deployment

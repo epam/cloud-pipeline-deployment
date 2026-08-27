@@ -32,6 +32,8 @@ spec:
   template:
     metadata:
       namespace: {{ include "lib.application.namespace" . }}
+      annotations:
+        redeploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-docker-registry: "true"
     spec:
