@@ -30,6 +30,8 @@ spec:
     matchLabels:
       cloud-pipeline/cp-gitlab-db: "true"
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata:
       annotations:

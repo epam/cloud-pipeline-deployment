@@ -29,6 +29,8 @@ metadata:
     cloud-pipeline/core-component: Deployment
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       cloud-pipeline/cp-search-elk: "true"

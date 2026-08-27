@@ -27,6 +27,8 @@ spec:
     matchLabels:
       cloud-pipeline/cp-docker-comp: "true"
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata:
       namespace: {{ include "lib.application.namespace" . }}
