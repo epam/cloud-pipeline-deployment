@@ -69,7 +69,7 @@ spec:
   template:
     metadata:
       annotations:
-        redeploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/core-component: "Deployment"
         cloud-pipeline/cp-edge: "true"
