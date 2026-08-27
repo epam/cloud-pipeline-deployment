@@ -29,6 +29,7 @@ spec:
     matchLabels:
       cloud-pipeline/cp-docker-registry: "true"
   replicas: 1
+  # Recreate: hostPath Docker image layer storage cannot be shared between old and new pod simultaneously.
   strategy:
     type: Recreate
   template:

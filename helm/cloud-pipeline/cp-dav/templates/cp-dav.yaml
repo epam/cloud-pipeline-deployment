@@ -33,6 +33,7 @@ spec:
     matchLabels:
       cloud-pipeline/cp-dav: "true"
   replicas: 1
+  # Recreate: slow readiness (downloads pipe CLI at startup); old pod lingers indefinitely under RollingUpdate.
   strategy:
     type: Recreate
   template:

@@ -29,6 +29,7 @@ metadata:
     cloud-pipeline/core-component: Deployment
 spec:
   replicas: 1
+  # Recreate: hostPath Elasticsearch data and backup dirs cannot be shared between old and new pod simultaneously.
   strategy:
     type: Recreate
   selector:

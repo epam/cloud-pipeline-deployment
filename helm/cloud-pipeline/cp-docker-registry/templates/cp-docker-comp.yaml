@@ -27,6 +27,7 @@ spec:
     matchLabels:
       cloud-pipeline/cp-docker-comp: "true"
   replicas: 1
+  # Recreate: hostPath working directory cannot be shared between old and new pod simultaneously.
   strategy:
     type: Recreate
   template:

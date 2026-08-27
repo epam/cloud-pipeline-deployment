@@ -35,6 +35,7 @@ metadata:
     {{- end }}
 spec:
   replicas: 1
+  # Recreate: hostPath profile database cannot be shared between old and new pod simultaneously.
   strategy:
     type: Recreate
   selector:

@@ -24,13 +24,9 @@ spec:
     matchLabels:
       cloud-pipeline/cp-api-db: "true"
   replicas: 1
-  strategy:
-    type: Recreate
   template:
     metadata:
       namespace: {{ include "lib.application.namespace" . }}
-      annotations:
-        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
       labels:
         cloud-pipeline/cp-api-db: "true"
         cloud-pipeline/core-component: "Deployment"

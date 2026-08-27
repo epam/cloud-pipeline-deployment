@@ -36,6 +36,7 @@ metadata:
     cloud-pipeline/core-component: Deployment
 spec:
   replicas: 1
+  # Recreate: slow readiness (waits for Elasticsearch); old pod lingers indefinitely under RollingUpdate.
   strategy:
     type: Recreate
   selector:

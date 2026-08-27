@@ -20,6 +20,7 @@ metadata:
     app: cp-bkp-worker-{{ $serviceName }}
 spec:
   replicas: 1
+  # Recreate: hostPath backup working directory cannot be shared between old and new pod simultaneously.
   strategy:
     type: Recreate
   selector:
