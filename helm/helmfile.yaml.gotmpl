@@ -190,6 +190,10 @@ releases:
 {{- toYaml $generalValues | nindent 8 }}
       -
 {{- toYaml $davValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
 
   - name: cp-share-srv
     installed: {{ index $shareSrvValues "enabled" | default false }}
