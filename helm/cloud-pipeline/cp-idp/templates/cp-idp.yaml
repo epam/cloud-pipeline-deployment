@@ -66,7 +66,8 @@ spec:
       containers:
         - name: cp-idp
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          {{- $imageTag := ternary .Values.image.tag (printf "%s-%s" .Values.image.tag $imageVersion) (hasPrefix "sha" .Values.image.tag) }}
+          image: "{{ .Values.image.repository }}:{{ $imageTag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/init"]
           ports:

@@ -24,7 +24,8 @@ spec:
       containers:
         - name: cp-node-logger
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.nodeLogger.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.nodeLogger.image.repository }}:{{ .Values.nodeLogger.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          {{- $imageTag := ternary .Values.nodeLogger.image.tag (printf "%s-%s" .Values.nodeLogger.image.tag $imageVersion) (hasPrefix "sha" .Values.nodeLogger.image.tag) }}
+          image: "{{ .Values.nodeLogger.image.repository }}:{{ $imageTag }}"
           imagePullPolicy: {{ .Values.nodeLogger.image.pullPolicy }}
           securityContext:
             privileged: true

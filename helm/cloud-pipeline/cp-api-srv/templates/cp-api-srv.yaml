@@ -65,7 +65,8 @@ spec:
       containers:
         - name: cp-api-srv-leader-elector
           {{- $electorImageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.leaderElector.buildVersion .Values.buildVersion "") }}
-          image: {{ .Values.image.leaderElector.repository }}:{{ .Values.image.leaderElector.tag }}-{{ $electorImageVersion }}
+          {{- $electorImageTag := ternary .Values.image.leaderElector.tag (printf "%s-%s" .Values.image.leaderElector.tag $electorImageVersion) (hasPrefix "sha" .Values.image.leaderElector.tag) }}
+          image: {{ .Values.image.leaderElector.repository }}:{{ $electorImageTag }}
           imagePullPolicy: {{ .Values.image.leaderElector.pullPolicy }}
           command: ["/elector/init"]
           env:
@@ -84,7 +85,8 @@ spec:
             privileged: true
         - name: cp-api-srv
           {{- $apiImageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.apiServer.buildVersion .Values.buildVersion "") }}
-          image: {{ .Values.image.apiServer.repository }}:{{ .Values.image.apiServer.tag }}-{{ $apiImageVersion }}
+          {{- $apiImageTag := ternary .Values.image.apiServer.tag (printf "%s-%s" .Values.image.apiServer.tag $apiImageVersion) (hasPrefix "sha" .Values.image.apiServer.tag) }}
+          image: {{ .Values.image.apiServer.repository }}:{{ $apiImageTag }}
           imagePullPolicy: {{ .Values.image.apiServer.pullPolicy }}
           command: ["/init-api"]
           env:

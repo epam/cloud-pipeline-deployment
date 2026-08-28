@@ -50,7 +50,8 @@ spec:
       containers:
         - name: cp-clair
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.clair.image.buildVersion .Values.buildVersion "") }}
-          image: {{ .Values.image.repository }}:{{ .Values.clair.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}
+          {{- $imageTag := ternary .Values.clair.image.tag (printf "%s-%s" .Values.clair.image.tag $imageVersion) (hasPrefix "sha" .Values.clair.image.tag) }}
+          image: {{ .Values.image.repository }}:{{ $imageTag }}
           imagePullPolicy: {{ .Values.clair.image.pullPolicy }}
           ports:
             - containerPort: 8080

@@ -58,7 +58,8 @@ spec:
       containers:
         - name: cp-search-elk
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.elk.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.elk.image.repository }}:{{ .Values.elk.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          {{- $imageTag := ternary .Values.elk.image.tag (printf "%s-%s" .Values.elk.image.tag $imageVersion) (hasPrefix "sha" .Values.elk.image.tag) }}
+          image: "{{ .Values.elk.image.repository }}:{{ $imageTag }}"
           imagePullPolicy: {{ .Values.elk.image.pullPolicy }}
           securityContext:
             privileged: true
