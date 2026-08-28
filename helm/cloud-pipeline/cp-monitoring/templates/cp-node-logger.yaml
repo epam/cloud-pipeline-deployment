@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.nodeLogger.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.nodeLogger.image.repository .Values.nodeLogger.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.nodeLogger.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.nodeLogger.image.repository .Values.nodeLogger.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.nodeLogger.enabled }}
 ---
 apiVersion: apps/v1
@@ -23,8 +30,7 @@ spec:
       {{- include "lib.imagePullSecret" . | nindent 6 }}
       containers:
         - name: cp-node-logger
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.nodeLogger.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.nodeLogger.image.repository }}:{{ .Values.nodeLogger.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.nodeLogger.image.pullPolicy }}
           securityContext:
             privileged: true

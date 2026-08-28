@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.image.repository .Values.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.image.repository .Values.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -32,8 +39,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-run-policy-manager
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             privileged: true

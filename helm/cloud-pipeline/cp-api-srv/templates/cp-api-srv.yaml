@@ -1,3 +1,17 @@
+{{- $electorImageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.image.leaderElector.tag -}}
+{{- $electorImageRef = printf "%s@%s" .Values.image.leaderElector.repository .Values.image.leaderElector.tag -}}
+{{- else -}}
+{{- $electorImageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.leaderElector.buildVersion .Values.buildVersion "") -}}
+{{- $electorImageRef = printf "%s:%s-%s" .Values.image.leaderElector.repository .Values.image.leaderElector.tag $electorImageVersion -}}
+{{- end -}}
+{{- $apiImageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.image.apiServer.tag -}}
+{{- $apiImageRef = printf "%s@%s" .Values.image.apiServer.repository .Values.image.apiServer.tag -}}
+{{- else -}}
+{{- $apiImageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.apiServer.buildVersion .Values.buildVersion "") -}}
+{{- $apiImageRef = printf "%s:%s-%s" .Values.image.apiServer.repository .Values.image.apiServer.tag $apiImageVersion -}}
+{{- end -}}
 # Optional post-install Job: patch kube-dns cp-dnsmasq-hosts (see lib.patchDNSJob).
 {{ include "lib.patchDNSJob" . }}
 ---
@@ -64,8 +78,7 @@ spec:
       terminationGracePeriodSeconds: 50    
       containers:
         - name: cp-api-srv-leader-elector
-          {{- $electorImageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.leaderElector.buildVersion .Values.buildVersion "") }}
-          image: {{ .Values.image.leaderElector.repository }}:{{ .Values.image.leaderElector.tag }}-{{ $electorImageVersion }}
+          image: {{ $electorImageRef }}
           imagePullPolicy: {{ .Values.image.leaderElector.pullPolicy }}
           command: ["/elector/init"]
           env:
@@ -83,8 +96,7 @@ spec:
           securityContext:
             privileged: true
         - name: cp-api-srv
-          {{- $apiImageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.apiServer.buildVersion .Values.buildVersion "") }}
-          image: {{ .Values.image.apiServer.repository }}:{{ .Values.image.apiServer.tag }}-{{ $apiImageVersion }}
+          image: {{ $apiImageRef }}
           imagePullPolicy: {{ .Values.image.apiServer.pullPolicy }}
           command: ["/init-api"]
           env:

@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.gitSync.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.gitSync.image.repository .Values.gitSync.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.gitSync.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.gitSync.image.repository .Values.gitSync.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.gitSync.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -34,8 +41,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-git-sync
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.gitSync.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.gitSync.image.repository }}:{{ .Values.gitSync.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.gitSync.image.pullPolicy }}
           command:
             - /bin/sh

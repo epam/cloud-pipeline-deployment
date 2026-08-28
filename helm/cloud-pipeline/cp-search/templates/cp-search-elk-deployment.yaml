@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.elk.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.elk.image.repository .Values.elk.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.elk.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.elk.image.repository .Values.elk.image.tag $imageVersion -}}
+{{- end -}}
 {{- if and .Values.enabled .Values.elk.elasticsearch.enabled }}
 apiVersion: v1
 kind: Service
@@ -57,8 +64,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-search-elk
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.elk.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.elk.image.repository }}:{{ .Values.elk.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.elk.image.pullPolicy }}
           securityContext:
             privileged: true

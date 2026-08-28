@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.vmMonitor.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.vmMonitor.image.repository .Values.vmMonitor.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.vmMonitor.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.vmMonitor.image.repository .Values.vmMonitor.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.vmMonitor.enabled }}
 ---
 apiVersion: apps/v1
@@ -33,8 +40,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-vm-monitor
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.vmMonitor.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.vmMonitor.image.repository }}:{{ .Values.vmMonitor.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.vmMonitor.image.pullPolicy }}
           securityContext:
             privileged: true

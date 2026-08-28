@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.heapster.elk.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.heapster.elk.image.repository .Values.heapster.elk.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.heapster.elk.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.heapster.elk.image.repository .Values.heapster.elk.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.heapster.enabled }}
 ---
 apiVersion: v1
@@ -55,8 +62,7 @@ spec:
         - name: cp-heapster-elk
           command:
             - /init
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.heapster.elk.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.heapster.elk.image.repository }}:{{ .Values.heapster.elk.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.heapster.elk.image.pullPolicy }}
           ports:
             - containerPort: 9200

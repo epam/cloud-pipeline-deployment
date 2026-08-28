@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.nodeReporter.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.nodeReporter.image.repository .Values.nodeReporter.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.nodeReporter.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.nodeReporter.image.repository .Values.nodeReporter.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.nodeReporter.enabled }}
 ---
 apiVersion: apps/v1
@@ -33,8 +40,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-node-reporter
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.nodeReporter.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.nodeReporter.image.repository }}:{{ .Values.nodeReporter.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.nodeReporter.image.pullPolicy }}
           resources:
             limits:

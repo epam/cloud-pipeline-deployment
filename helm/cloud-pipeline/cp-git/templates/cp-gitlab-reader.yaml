@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.gitlabReader.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.gitlabReader.image.repository .Values.gitlabReader.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.gitlabReader.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.gitlabReader.image.repository .Values.gitlabReader.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.gitlabReader.enabled }}
 ---
 apiVersion: v1
@@ -51,8 +58,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-gitlab-reader
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.gitlabReader.image.buildVersion .Values.buildVersion "") }}
-          image: "{{ .Values.gitlabReader.image.repository }}:{{ .Values.gitlabReader.image.tag }}{{ if $imageVersion }}-{{ $imageVersion }}{{ end }}"
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.gitlabReader.image.pullPolicy }}
           command: ["/init.sh"]
           envFrom:
