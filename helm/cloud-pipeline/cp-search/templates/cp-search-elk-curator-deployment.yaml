@@ -35,7 +35,7 @@ spec:
       containers:
         - name: cp-search-elk-curator
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.curator.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageRef := ternary (printf "%s@%s" .Values.curator.image.repository .Values.curator.image.tag) (printf "%s:%s-%s" .Values.curator.image.repository .Values.curator.image.tag $imageVersion) (hasPrefix "sha" .Values.curator.image.tag) }}
+          {{- $imageRef := ternary (printf "%s@%s" .Values.curator.image.repository .Values.curator.image.tag) (printf "%s:%s-%s" .Values.curator.image.repository .Values.curator.image.tag $imageVersion) (hasPrefix "sha256:" .Values.curator.image.tag) }}
           image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.curator.image.pullPolicy }}
           securityContext:

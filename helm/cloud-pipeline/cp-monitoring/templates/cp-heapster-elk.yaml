@@ -56,7 +56,7 @@ spec:
           command:
             - /init
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.heapster.elk.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageRef := ternary (printf "%s@%s" .Values.heapster.elk.image.repository .Values.heapster.elk.image.tag) (printf "%s:%s-%s" .Values.heapster.elk.image.repository .Values.heapster.elk.image.tag $imageVersion) (hasPrefix "sha" .Values.heapster.elk.image.tag) }}
+          {{- $imageRef := ternary (printf "%s@%s" .Values.heapster.elk.image.repository .Values.heapster.elk.image.tag) (printf "%s:%s-%s" .Values.heapster.elk.image.repository .Values.heapster.elk.image.tag $imageVersion) (hasPrefix "sha256:" .Values.heapster.elk.image.tag) }}
           image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.heapster.elk.image.pullPolicy }}
           ports:

@@ -52,7 +52,7 @@ spec:
       containers:
         - name: cp-docker-comp
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.dockerComp.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageRef := ternary (printf "%s@%s" .Values.image.repository .Values.dockerComp.image.tag) (printf "%s:%s-%s" .Values.image.repository .Values.dockerComp.image.tag $imageVersion) (hasPrefix "sha" .Values.dockerComp.image.tag) }}
+          {{- $imageRef := ternary (printf "%s@%s" .Values.image.repository .Values.dockerComp.image.tag) (printf "%s:%s-%s" .Values.image.repository .Values.dockerComp.image.tag $imageVersion) (hasPrefix "sha256:" .Values.dockerComp.image.tag) }}
           image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.dockerComp.image.pullPolicy }}
           command: ["/init"]

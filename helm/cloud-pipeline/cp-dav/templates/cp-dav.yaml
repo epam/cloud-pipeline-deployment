@@ -57,7 +57,7 @@ spec:
       containers:
         - name: cp-dav
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageRef := ternary (printf "%s@%s" .Values.image.repository .Values.image.tag) (printf "%s:%s-%s" .Values.image.repository .Values.image.tag $imageVersion) (hasPrefix "sha" .Values.image.tag) }}
+          {{- $imageRef := ternary (printf "%s@%s" .Values.image.repository .Values.image.tag) (printf "%s:%s-%s" .Values.image.repository .Values.image.tag $imageVersion) (hasPrefix "sha256:" .Values.image.tag) }}
           image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
