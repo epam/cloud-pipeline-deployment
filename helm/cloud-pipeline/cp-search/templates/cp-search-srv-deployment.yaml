@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.srv.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.srv.image.repository .Values.srv.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.srv.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.srv.image.repository .Values.srv.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.enabled }}
 {{- $mode := .Values.srv.mode | default "default" -}}
 {{- $logsPath := .Values.srv.logsHostPath | default "" -}}
@@ -64,8 +71,6 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-search-srv
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.srv.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageRef := ternary (printf "%s@%s" .Values.srv.image.repository .Values.srv.image.tag) (printf "%s:%s-%s" .Values.srv.image.repository .Values.srv.image.tag $imageVersion) (hasPrefix "sha256:" .Values.srv.image.tag) }}
           image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.srv.image.pullPolicy }}
           securityContext:

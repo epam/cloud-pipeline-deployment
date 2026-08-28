@@ -1,3 +1,10 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.clair.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.image.repository .Values.clair.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.clair.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.image.repository .Values.clair.image.tag $imageVersion -}}
+{{- end -}}
 {{- if .Values.clair.enabled }}
 apiVersion: v1
 kind: Service
@@ -49,8 +56,6 @@ spec:
           effect: NoSchedule
       containers:
         - name: cp-clair
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.clair.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageRef := ternary (printf "%s@%s" .Values.image.repository .Values.clair.image.tag) (printf "%s:%s-%s" .Values.image.repository .Values.clair.image.tag $imageVersion) (hasPrefix "sha256:" .Values.clair.image.tag) }}
           image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.clair.image.pullPolicy }}
           ports:

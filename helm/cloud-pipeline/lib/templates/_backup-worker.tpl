@@ -10,6 +10,13 @@
 {{- $serviceWd := .serviceWd -}}
 {{- $kubectlArgs := .kubectlArgs | default "" -}}
 {{- $initContainers := .initContainers | default "" -}}
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" $ctx.Values.backup.image.tag -}}
+{{- $imageRef = printf "%s@%s" $ctx.Values.backup.image.repository $ctx.Values.backup.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce $ctx.Values.backup.image.buildVersion $ctx.Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" $ctx.Values.backup.image.repository $ctx.Values.backup.image.tag $imageVersion -}}
+{{- end -}}
 {{- if $ctx.Values.backup.enabled -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -66,8 +73,6 @@ spec:
         {{- end }}
       containers:
         - name: cp-bkp-worker
-          {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce $ctx.Values.backup.image.buildVersion $ctx.Values.buildVersion "") }}
-          {{- $imageRef := ternary (printf "%s@%s" $ctx.Values.backup.image.repository $ctx.Values.backup.image.tag) (printf "%s:%s-%s" $ctx.Values.backup.image.repository $ctx.Values.backup.image.tag $imageVersion) (hasPrefix "sha256:" $ctx.Values.backup.image.tag) }}
           image: {{ $imageRef }}
           imagePullPolicy: {{ $ctx.Values.backup.image.pullPolicy }}
           env:
