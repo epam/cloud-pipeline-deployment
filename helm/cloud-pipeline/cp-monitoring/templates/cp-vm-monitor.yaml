@@ -34,8 +34,8 @@ spec:
       containers:
         - name: cp-vm-monitor
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.vmMonitor.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageTag := ternary .Values.vmMonitor.image.tag (printf "%s-%s" .Values.vmMonitor.image.tag $imageVersion) (hasPrefix "sha" .Values.vmMonitor.image.tag) }}
-          image: "{{ .Values.vmMonitor.image.repository }}:{{ $imageTag }}"
+          {{- $imageRef := ternary (printf "%s@%s" .Values.vmMonitor.image.repository .Values.vmMonitor.image.tag) (printf "%s:%s-%s" .Values.vmMonitor.image.repository .Values.vmMonitor.image.tag $imageVersion) (hasPrefix "sha" .Values.vmMonitor.image.tag) }}
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.vmMonitor.image.pullPolicy }}
           securityContext:
             privileged: true

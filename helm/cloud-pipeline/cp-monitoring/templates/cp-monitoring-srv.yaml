@@ -34,8 +34,8 @@ spec:
       containers:
         - name: cp-monitoring-srv
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.monitoringSrv.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageTag := ternary .Values.monitoringSrv.image.tag (printf "%s-%s" .Values.monitoringSrv.image.tag $imageVersion) (hasPrefix "sha" .Values.monitoringSrv.image.tag) }}
-          image: "{{ .Values.monitoringSrv.image.repository }}:{{ $imageTag }}"
+          {{- $imageRef := ternary (printf "%s@%s" .Values.monitoringSrv.image.repository .Values.monitoringSrv.image.tag) (printf "%s:%s-%s" .Values.monitoringSrv.image.repository .Values.monitoringSrv.image.tag $imageVersion) (hasPrefix "sha" .Values.monitoringSrv.image.tag) }}
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.monitoringSrv.image.pullPolicy }}
           command: ["/init"]
           envFrom:

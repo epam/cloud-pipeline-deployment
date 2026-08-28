@@ -35,8 +35,8 @@ spec:
       containers:
         - name: cp-git-sync
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.gitSync.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageTag := ternary .Values.gitSync.image.tag (printf "%s-%s" .Values.gitSync.image.tag $imageVersion) (hasPrefix "sha" .Values.gitSync.image.tag) }}
-          image: "{{ .Values.gitSync.image.repository }}:{{ $imageTag }}"
+          {{- $imageRef := ternary (printf "%s@%s" .Values.gitSync.image.repository .Values.gitSync.image.tag) (printf "%s:%s-%s" .Values.gitSync.image.repository .Values.gitSync.image.tag $imageVersion) (hasPrefix "sha" .Values.gitSync.image.tag) }}
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.gitSync.image.pullPolicy }}
           command:
             - /bin/sh

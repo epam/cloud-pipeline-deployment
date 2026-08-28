@@ -33,8 +33,8 @@ spec:
       containers:
         - name: cp-run-policy-manager
           {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") }}
-          {{- $imageTag := ternary .Values.image.tag (printf "%s-%s" .Values.image.tag $imageVersion) (hasPrefix "sha" .Values.image.tag) }}
-          image: {{ .Values.image.repository }}:{{ $imageTag }}
+          {{- $imageRef := ternary (printf "%s@%s" .Values.image.repository .Values.image.tag) (printf "%s:%s-%s" .Values.image.repository .Values.image.tag $imageVersion) (hasPrefix "sha" .Values.image.tag) }}
+          image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             privileged: true
