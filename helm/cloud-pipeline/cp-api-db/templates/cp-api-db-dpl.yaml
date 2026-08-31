@@ -78,7 +78,7 @@ spec:
       volumes:
         - name: pgdata
           hostPath:
-            path: /opt/postgresql/data
+            path: {{ .Values.db.dataHostPath }}
             type: DirectoryOrCreate
         - name: dshm
           emptyDir:
