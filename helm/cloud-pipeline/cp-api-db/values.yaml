@@ -4,6 +4,7 @@ db:
   type: internal
   port: "5432"
   version: "16.4"  # Postgres major.minor version (used for container image tag)
+  dataHostPath: /opt/postgresql/data  # Node-local path for Postgres data directory
   sharedBuffers: 128MB  # PostgreSQL shared_buffers; use M/MB/G/GB suffix
   maxConnections: 100
 
