@@ -264,6 +264,7 @@ hooks:
         SCRIPT="./hooks/post-deploy/wait-for-api.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- if index $postDeployValues "registerDockerTools" | default true }}
   - events: ["cleanup"]
     showlogs: true
     command: bash
@@ -276,6 +277,8 @@ hooks:
         SCRIPT="./hooks/post-deploy/register-docker-tools.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE" "$MANIFEST_DIR" "$TOOLS_JSON"
+{{- end }}
+{{- if index $postDeployValues "applyPreferences" | default true }}
   - events: ["cleanup"]
     showlogs: true
     command: bash
@@ -287,6 +290,8 @@ hooks:
         SCRIPT="./hooks/post-deploy/apply-preferences.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- end }}
+{{- if index $postDeployValues "applyClusterNetworksConfig" | default true }}
   - events: ["cleanup"]
     showlogs: true
     command: bash
@@ -303,6 +308,8 @@ hooks:
         SCRIPT="./hooks/post-deploy/apply-cluster-networks-config.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- end }}
+{{- if index $postDeployValues "registerAdditionalCloudRegions" | default true }}
   - events: ["cleanup"]
     showlogs: true
     command: bash
@@ -314,6 +321,7 @@ hooks:
         SCRIPT="./hooks/post-deploy/register-additional-cloud-regions.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- end }}
 {{- if index $storageLifecycleValues "enabled" | default true }}
   - events: ["cleanup"]
     showlogs: true
@@ -357,6 +365,7 @@ hooks:
         SCRIPT="./hooks/post-deploy/register-email-templates.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- if index $postDeployValues "restartApiSrv" | default true }}
   - events: ["cleanup"]
     showlogs: true
     command: bash
@@ -367,4 +376,5 @@ hooks:
         SCRIPT="./hooks/post-deploy/restart-cp-api-srv.sh"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
+{{- end }}
 {{- end }}

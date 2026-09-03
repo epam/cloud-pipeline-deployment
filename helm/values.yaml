@@ -66,6 +66,7 @@ apiSrv:
 
 dockerRegistry:
   enabled: true
+  registerInApi: true  # set false to skip docker-registry registration in API (safe when registry already exists in DB)
   service:
     host:
       external: "<docker.example.com>"
@@ -239,6 +240,12 @@ runPolicyManager:
 
 postDeploy:
   enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
+  # Per-script enables (only evaluated when enabled: true above). All default to true.
+  registerDockerTools: true         # run register-docker-tools.sh
+  applyPreferences: true            # run apply-preferences.sh
+  applyClusterNetworksConfig: true  # run apply-cluster-networks-config.sh
+  registerAdditionalCloudRegions: true  # run register-additional-cloud-regions.sh
+  restartApiSrv: true               # run restart-cp-api-srv.sh
   # Additional (non-default) AWS cloud regions to register after deployment.
   # Each entry uses the same field names as apiSrv.cloudRegion; regionId and kmsKeyArn are required.
   additionalCloudRegions: []
@@ -285,7 +292,7 @@ postDeploy:
   # Email notification templates (register-email-templates.sh cleanup hook).
   # Template names match hooks/post-deploy/assets/email-templates/configs/<NAME>.json
   emailNotifications:
-    enabled: true   # false = skip the register-email-templates.sh hook
+    enabled: true   # false = all templates uploaded but disabled (equivalent to empty enableOnly)
     # If non-empty, only these types are enabled; all others get enabled=false (bodies still uploaded).
     enableOnly: []
     # enableOnly:

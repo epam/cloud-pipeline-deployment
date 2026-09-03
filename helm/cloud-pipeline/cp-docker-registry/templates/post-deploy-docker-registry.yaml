@@ -1,3 +1,4 @@
+{{- if .Values.registerInApi }}
 # Job: register this Docker registry in the API after the Deployment exists.
 apiVersion: v1
 kind: ConfigMap
@@ -76,3 +77,4 @@ spec:
           configMap:
             name: cp-hook-script-post-deploy-docker-registry
             defaultMode: 0755
+{{- end }}
