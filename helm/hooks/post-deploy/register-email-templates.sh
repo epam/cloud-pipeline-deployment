@@ -10,14 +10,6 @@ source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
 
 [ -z "$NAMESPACE" ] && usage
 
-if [ -n "${CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64:-}" ]; then
-  _enabled=$(printf '%s' "$CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64" | base64 -d | jq -r 'if .enabled == false then "false" else "true" end')
-  if [ "$_enabled" = "false" ]; then
-    echo "Email notifications disabled (emailNotifications.enabled=false); skipping."
-    exit 0
-  fi
-fi
-
 CONFIGS_DIR="${CP_EMAIL_TEMPLATES_CONFIGS_PATH:-${SCRIPT_DIR}/assets/email-templates/configs}"
 CONTENTS_DIR="${CP_EMAIL_TEMPLATES_CONTENTS_PATH:-${SCRIPT_DIR}/assets/email-templates/contents}"
 

@@ -239,32 +239,20 @@ runPolicyManager:
 
 postDeploy:
   enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
-  # Additional (non-default) AWS cloud regions to register after deployment.
-  # Each entry uses the same field names as apiSrv.cloudRegion; regionId and kmsKeyArn are required.
-  additionalCloudRegions: []
-  # - regionId: "us-east-2"          # AWS region ID (required)
-  #   kmsKeyArn: ""                   # Full ARN: arn:aws:kms:<region>:<account>:key/<id> (required)
-  #   kmsKeyId: ""                    # Key ID (UUID portion of the ARN)
-  #   sshKeyName: ""                  # AWS EC2 key pair name
-  #   tempCredentialsRole: ""         # IAM role ARN for temporary S3 credentials
-  #   backupDuration: 20              # S3 object backup retention in days
-  #   omicsServiceRole: ""            # IAM role ARN for AWS HealthOmics
-  #   omicsEcrUrl: ""                 # ECR registry URL
-  #   corsRules: ""                   # JSON string; empty = use hooks/post-deploy/assets/storage.cors.policy.json
-  #   fileShareMounts: []
-  #   # - mountRoot: "fs-xxx.efs.us-east-2.amazonaws.com:/"
-  #   #   mountType: "NFS"  # NFS | SMB
-  #   #   mountOptions: ""
 
+  registerDockerTools: true  # run register-docker-tools.sh
+  # Docker tools to push to the docker registry and register in Cloud Pipeline as tools.
+  dockers:
+    - "library/rockylinux:latest"
+    - "library/nextflow:latest"
+
+  applyPreferences: true  # run apply-preferences.sh
   # Path to a custom preferences JSON file or directory (same format as hooks/assets/preferences/).
   # Merged after all defaults; entries here win on conflict. Leave empty to skip.
   # Can also be set via the CP_SYSTEM_PREFERENCE_CONFIG env var before running helmfile.
   systemPreferenceConfig: ""
-  # Docker tools to push to docker registry and register in Cloud-Pipeline as tools
-  dockers:
-    - "library/rockylinux:latest"
-    - "library/nextflow:latest"
-  # AWS region CORS defaults: hooks/assets/storage.cors.policy.json (read by upload-preferences.sh). Optional override: set CP_STORAGE_CORS_RULES in a ConfigMap or env.
+
+  applyClusterNetworksConfig: true  # run apply-cluster-networks-config.sh
   # Defines the cluster.networks.config API preference for worker node pools.
   # Leave empty ({}) to skip. Can also be set to a path of a JSON file with the same structure.
   clusterNetworksConfig: {}
@@ -282,13 +270,32 @@ postDeploy:
   #     # proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]  # Default: CoreDNS from CP_EDGE_CLUSTER_RESOLVER
   #     # swap: [{name: "swap_ratio", path: "0.01"}]               # Default: 0.01
 
-  # Email notification templates (register-email-templates.sh cleanup hook).
+  registerAdditionalCloudRegions: true  # run register-additional-cloud-regions.sh
+  # Additional (non-default) AWS cloud regions to register after deployment.
+  # Each entry uses the same field names as apiSrv.cloudRegion; regionId and kmsKeyArn are required.
+  additionalCloudRegions: []
+  # - regionId: "us-east-2"          # AWS region ID (required)
+  #   kmsKeyArn: ""                   # Full ARN: arn:aws:kms:<region>:<account>:key/<id> (required)
+  #   kmsKeyId: ""                    # Key ID (UUID portion of the ARN)
+  #   sshKeyName: ""                  # AWS EC2 key pair name
+  #   tempCredentialsRole: ""         # IAM role ARN for temporary S3 credentials
+  #   backupDuration: 20              # S3 object backup retention in days
+  #   omicsServiceRole: ""            # IAM role ARN for AWS HealthOmics
+  #   omicsEcrUrl: ""                 # ECR registry URL
+  #   corsRules: ""                   # JSON string; empty = use hooks/post-deploy/assets/storage.cors.policy.json
+  #   fileShareMounts: []
+  #   # - mountRoot: "fs-xxx.efs.us-east-2.amazonaws.com:/"
+  #   #   mountType: "NFS"  # NFS | SMB
+  #   #   mountOptions: ""
+
+  registerEmailTemplates: true  # run register-email-templates.sh
   # Template names match hooks/post-deploy/assets/email-templates/configs/<NAME>.json
   emailNotifications:
-    enabled: true   # false = skip the register-email-templates.sh hook
     # If non-empty, only these types are enabled; all others get enabled=false (bodies still uploaded).
     enableOnly: []
     # enableOnly:
     #   - IDLE_RUN
     #   - LONG_RUNNING
+
+  restartApiSrv: true  # run restart-cp-api-srv.sh
 
