@@ -66,7 +66,6 @@ apiSrv:
 
 dockerRegistry:
   enabled: true
-  registerInApi: true  # set false to skip docker-registry registration in API (safe when registry already exists in DB)
   service:
     host:
       external: "<docker.example.com>"

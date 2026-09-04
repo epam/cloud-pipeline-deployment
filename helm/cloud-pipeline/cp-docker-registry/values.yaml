@@ -1,7 +1,5 @@
 # buildVersion: ""  # overrides general.buildVersion for this release
 
-registerInApi: true  # set false to skip docker-registry registration in API
-
 service:
   name: cp-docker-registry
   host:
