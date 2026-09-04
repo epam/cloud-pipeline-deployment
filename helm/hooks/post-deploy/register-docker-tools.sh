@@ -12,8 +12,8 @@ function usage {
 }
 
 NAMESPACE="${1:-}"
-MANIFEST_DIR="${2:-}"
-TOOLS_FILTER_JSON="${3:-[]}"
+MANIFEST_DIR="${CP_MANIFEST_DIR:-${2:-}}"
+TOOLS_FILTER_JSON="${CP_TOOLS_JSON:-${3:-[]}}"
 
 [ -z "$NAMESPACE" ] || [ -z "$MANIFEST_DIR" ] && usage
 
