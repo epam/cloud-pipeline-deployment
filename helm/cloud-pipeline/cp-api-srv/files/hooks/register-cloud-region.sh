@@ -266,6 +266,8 @@ function register_region {
   return 0
 }
 
+api_wait_for_ready 30 10 || { echo "ERROR: API did not become ready; aborting cloud region registration."; exit 1; }
+
 echo "Registering default cloud region (POST /cloud/region)..."
 max_registration_attempts=5
 registration_attempt=0
