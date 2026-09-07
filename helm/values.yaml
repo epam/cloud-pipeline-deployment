@@ -239,6 +239,7 @@ runPolicyManager:
 
 postDeploy:
   enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
+  # hooksFile: "./hooks/post-deploy/hooks.yaml"  # override hook registry; default: hooks/post-deploy/hooks.yaml
 
   registerDockerTools: true  # run register-docker-tools.sh
   # Docker tools to push to the docker registry and register in Cloud Pipeline as tools.

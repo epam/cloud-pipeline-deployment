@@ -1,0 +1,49 @@
+# Post-deploy hook registry.
+# Each entry declares a script and its enabled condition.
+#
+# Fields:
+#   script        - filename under hooks/post-deploy/
+#   enabledKey    - key in postDeploy values dict that controls this hook (optional)
+#   enabledVar    - name of an installed-release variable from the template (optional)
+#   enabledDefault - fallback when neither key nor var resolves (true/false)
+#
+# Exactly one of enabledKey / enabledVar should be set, or neither (always-on hooks).
+# Env vars passed to each script are computed in helmfile.yaml.gotmpl ($envByScript)
+# because they require template functions (toJson, b64enc, readFile, env) that are
+# unavailable in plain YAML files.
+
+hooks:
+  - script: wait-for-api.sh
+    enabledDefault: true
+
+  - script: register-docker-tools.sh
+    enabledKey: registerDockerTools
+    enabledDefault: true
+
+  - script: apply-preferences.sh
+    enabledKey: applyPreferences
+    enabledDefault: true
+
+  - script: apply-cluster-networks-config.sh
+    enabledKey: applyClusterNetworksConfig
+    enabledDefault: true
+
+  - script: register-additional-cloud-regions.sh
+    enabledKey: registerAdditionalCloudRegions
+    enabledDefault: true
+
+  - script: configure-storage-lifecycle-regions.sh
+    enabledVar: storageLifecycleInstalled
+    enabledDefault: true
+
+  - script: register-demo-pipelines.sh
+    enabledVar: gitInstalled
+    enabledDefault: false
+
+  - script: register-email-templates.sh
+    enabledKey: registerEmailTemplates
+    enabledDefault: true
+
+  - script: restart-cp-api-srv.sh
+    enabledKey: restartApiSrv
+    enabledDefault: true

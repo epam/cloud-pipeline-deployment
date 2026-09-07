@@ -2,7 +2,8 @@ helmDefaults:
   timeout: 1200
 
 {{/* ===== Load values file ===== */}}
-{{- $ValuesFilePath := env "HELMFILE_VALUES" | default (printf "%s/values.yaml" (env "PWD")) }}
+{{/* Lookup order: environment helmfileValues → HELMFILE_VALUES env var → $PWD/values.yaml */}}
+{{- $ValuesFilePath := .Environment.Values.helmfileValues | default (env "HELMFILE_VALUES") | default (printf "%s/values.yaml" (env "PWD")) }}
 {{- $deployValues   := readFile $ValuesFilePath | fromYaml }}
 
 {{/* ===== Per-component value slices ===== */}}
@@ -312,53 +313,59 @@ hooks:
 
 {{- $namespace := index $generalValues "namespace" | default "default" -}}
 
-{{/* Each hook entry: script filename, enabled flag, env vars exported before the script runs */}}
-{{- $hooks := list
+{{/* ── env vars per script ──────────────────────────────────────────────────────
+   Kept here (not in hooks.yaml or values.yaml) because all values use template
+   functions — toJson, b64enc, readFile, env — that are only available in the
+   Go template context and cannot be expressed in plain YAML files.
+*/}}
+{{- $envByScript := dict
+  "register-docker-tools.sh"            (dict
+    "CP_MANIFEST_DIR" "./hooks/post-deploy/assets/dockers-manifest"
+    "CP_TOOLS_JSON"   (index $postDeployValues "dockers" | default list | toJson))
 
-  (dict "script"  "wait-for-api.sh"
-        "enabled" true
-        "env"     (dict))
+  "apply-preferences.sh"                (dict
+    "CP_SYSTEM_PREFERENCE_CONFIG" (env "CP_SYSTEM_PREFERENCE_CONFIG" | default (index $postDeployValues "systemPreferenceConfig" | default "")))
 
-  (dict "script"  "register-docker-tools.sh"
-        "enabled" (index $postDeployValues "registerDockerTools" | default true)
-        "env"     (dict
-                    "CP_MANIFEST_DIR" "./hooks/post-deploy/assets/dockers-manifest"
-                    "CP_TOOLS_JSON"   (index $postDeployValues "dockers" | default list | toJson)))
+  "apply-cluster-networks-config.sh"    (dict
+    "CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64" $clusterNetworksB64)
 
-  (dict "script"  "apply-preferences.sh"
-        "enabled" (index $postDeployValues "applyPreferences" | default true)
-        "env"     (dict
-                    "CP_SYSTEM_PREFERENCE_CONFIG" (env "CP_SYSTEM_PREFERENCE_CONFIG" | default (index $postDeployValues "systemPreferenceConfig" | default ""))))
+  "register-additional-cloud-regions.sh" (dict
+    "CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64" (index $postDeployValues "additionalCloudRegions" | default list | toJson | b64enc))
 
-  (dict "script"  "apply-cluster-networks-config.sh"
-        "enabled" (index $postDeployValues "applyClusterNetworksConfig" | default true)
-        "env"     (dict
-                    "CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64" $clusterNetworksB64))
+  "configure-storage-lifecycle-regions.sh" (dict
+    "CP_POST_DEPLOY_SLS_REGIONS_B64"          $slsRegionsB64
+    "CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX" (index $storageLifecycleValues "reportBucketPrefix" | default "storage-lifecycle-service/tagging-job-reports"))
 
-  (dict "script"  "register-additional-cloud-regions.sh"
-        "enabled" (index $postDeployValues "registerAdditionalCloudRegions" | default true)
-        "env"     (dict
-                    "CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64" (index $postDeployValues "additionalCloudRegions" | default list | toJson | b64enc)))
+  "register-email-templates.sh"         (dict
+    "CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64" (index $postDeployValues "emailNotifications" | default dict | toJson | b64enc))
+-}}
 
-  (dict "script"  "configure-storage-lifecycle-regions.sh"
-        "enabled" $storageLifecycleInstalled
-        "env"     (dict
-                    "CP_POST_DEPLOY_SLS_REGIONS_B64"          $slsRegionsB64
-                    "CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX" (index $storageLifecycleValues "reportBucketPrefix" | default "storage-lifecycle-service/tagging-job-reports")))
+{{/* ── installed-release flags for hooks driven by release state ─────────────── */}}
+{{- $installedVars := dict
+  "storageLifecycleInstalled" $storageLifecycleInstalled
+  "gitInstalled"              $gitInstalled
+-}}
 
-  (dict "script"  "register-demo-pipelines.sh"
-        "enabled" $gitInstalled
-        "env"     (dict))
-
-  (dict "script"  "register-email-templates.sh"
-        "enabled" (index $postDeployValues "registerEmailTemplates" | default true)
-        "env"     (dict
-                    "CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64" (index $postDeployValues "emailNotifications" | default dict | toJson | b64enc)))
-
-  (dict "script"  "restart-cp-api-srv.sh"
-        "enabled" (index $postDeployValues "restartApiSrv" | default true)
-        "env"     (dict))
-}}
+{{/* ── build $hooks list from hooks.yaml registry ────────────────────────────── */}}
+{{/* Lookup order: environment hooksFile → postDeploy.hooksFile in values → default */}}
+{{- $hooksFile := .Environment.Values.hooksFile | default (index $postDeployValues "hooksFile") | default "./hooks/post-deploy/hooks.yaml" -}}
+{{- $hookDefs := (readFile $hooksFile | fromYaml).hooks | default list -}}
+{{- $hooks := list -}}
+{{- range $hookDefs -}}
+  {{- $enabled    := index . "enabledDefault" | default false -}}
+  {{- $enabledKey := index . "enabledKey" -}}
+  {{- $enabledVar := index . "enabledVar" -}}
+  {{- if $enabledKey -}}
+    {{- if hasKey $postDeployValues $enabledKey -}}
+      {{- $enabled = index $postDeployValues $enabledKey -}}
+    {{- end -}}
+  {{- else if $enabledVar -}}
+    {{- if hasKey $installedVars $enabledVar -}}
+      {{- $enabled = index $installedVars $enabledVar -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $hooks = append $hooks (dict "script" (index . "script") "enabled" $enabled "env" (index $envByScript (index . "script") | default dict)) -}}
+{{- end -}}
 
 {{- range $hooks }}
 {{- if .enabled }}
