@@ -13,6 +13,11 @@ source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
 
 [ -z "$NAMESPACE" ] && usage
 
+if ! kubectl get deployment cp-storage-lifecycle-service -n "$NAMESPACE" &>/dev/null; then
+  echo "cp-storage-lifecycle-service not found in namespace $NAMESPACE, skipping"
+  exit 0
+fi
+
 for cmd in kubectl curl jq; do
   command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
 done

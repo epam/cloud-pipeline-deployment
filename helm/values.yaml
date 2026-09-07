@@ -238,65 +238,79 @@ runPolicyManager:
   logsHostPath: /opt/run-policy-manager/logs
 
 postDeploy:
-  enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
-  # hooksFile: "./hooks/post-deploy/hooks.yaml"  # override hook registry; default: hooks/post-deploy/hooks.yaml
+  enabled: false  # true = run post-deploy hooks after all releases sync; false = skip
 
-  registerDockerTools: true  # run register-docker-tools.sh
-  # Docker tools to push to the docker registry and register in Cloud Pipeline as tools.
-  dockers:
-    - "library/rockylinux:latest"
-    - "library/nextflow:latest"
+  hooks:
+    - name: Wait for API
+      enable: true
 
-  applyPreferences: true  # run apply-preferences.sh
-  # Path to a custom preferences JSON file or directory (same format as hooks/assets/preferences/).
-  # Merged after all defaults; entries here win on conflict. Leave empty to skip.
-  # Can also be set via the CP_SYSTEM_PREFERENCE_CONFIG env var before running helmfile.
-  systemPreferenceConfig: ""
+    - name: Register docker tools
+      enable: true
+      data:
+        CP_MANIFEST_DIR: "./hooks/post-deploy/assets/dockers-manifest"
+        CP_TOOLS_JSON:
+          - "library/rockylinux:latest"
+          - "library/nextflow:latest"
 
-  applyClusterNetworksConfig: true  # run apply-cluster-networks-config.sh
-  # Defines the cluster.networks.config API preference for worker node pools.
-  # Leave empty ({}) to skip. Can also be set to a path of a JSON file with the same structure.
-  clusterNetworksConfig: {}
-  # tags: {}                    # Optional: instance tags applied to all worker nodes (key-value pairs).
-  #                             # Default: {<CP_VM_MONITOR_INSTANCE_TAG_NAME>: <value>} or {monitored: "true"}.
-  # regions:
-  #   - name: ""            # AWS region ID; omit or leave empty to use CP_CLOUD_REGION_ID
-  #     networks: {}            # Map of subnet-id to network-name, e.g. { "subnet-xxx": "my-net" }
-  #     amis:
-  #       - ami: "ami-..."      # Required: explicit AMI ID (null and empty are rejected)
-  #         # platform: linux   # linux (default) | windows
-  #         # instance_mask: "*"  # Instance type glob, e.g. "p*" for GPU instances
-  #         # init_script: ""   # Override default init script path for this AMI
-  #     securityGroupIds: []    # Security group IDs to attach to worker nodes
-  #     # proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]  # Default: CoreDNS from CP_EDGE_CLUSTER_RESOLVER
-  #     # swap: [{name: "swap_ratio", path: "0.01"}]               # Default: 0.01
+    - name: Apply preferences
+      enable: true
+      data:
+        # Path to a custom preferences JSON file or directory; merged after defaults, wins on conflict.
+        # Leave empty to use only the built-in defaults from hooks/post-deploy/assets/preferences/.
+        CP_SYSTEM_PREFERENCE_CONFIG: ""
 
-  registerAdditionalCloudRegions: true  # run register-additional-cloud-regions.sh
-  # Additional (non-default) AWS cloud regions to register after deployment.
-  # Each entry uses the same field names as apiSrv.cloudRegion; regionId and kmsKeyArn are required.
-  additionalCloudRegions: []
-  # - regionId: "us-east-2"          # AWS region ID (required)
-  #   kmsKeyArn: ""                   # Full ARN: arn:aws:kms:<region>:<account>:key/<id> (required)
-  #   kmsKeyId: ""                    # Key ID (UUID portion of the ARN)
-  #   sshKeyName: ""                  # AWS EC2 key pair name
-  #   tempCredentialsRole: ""         # IAM role ARN for temporary S3 credentials
-  #   backupDuration: 20              # S3 object backup retention in days
-  #   omicsServiceRole: ""            # IAM role ARN for AWS HealthOmics
-  #   omicsEcrUrl: ""                 # ECR registry URL
-  #   corsRules: ""                   # JSON string; empty = use hooks/post-deploy/assets/storage.cors.policy.json
-  #   fileShareMounts: []
-  #   # - mountRoot: "fs-xxx.efs.us-east-2.amazonaws.com:/"
-  #   #   mountType: "NFS"  # NFS | SMB
-  #   #   mountOptions: ""
+    - name: Apply cluster networks config
+      enable: true
+      data:
+        # Inline structure or path to a JSON file (string path → file is read and base64-encoded by helmfile).
+        CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64: {}
+        # tags: {}
+        # regions:
+        #   - name: ""            # AWS region ID; omit or leave empty to use CP_CLOUD_REGION_ID
+        #     networks: {}        # Map of subnet-id → network-name, e.g. { "subnet-xxx": "my-net" }
+        #     amis:
+        #       - ami: "ami-..."      # Required
+        #         platform: linux     # linux (default) | windows
+        #         instance_mask: "*"  # Instance type glob, e.g. "p*" for GPU
+        #         init_script: ""
+        #     securityGroupIds: []
+        #     proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]
+        #     swap: [{name: "swap_ratio", path: "0.01"}]
 
-  registerEmailTemplates: true  # run register-email-templates.sh
-  # Template names match hooks/post-deploy/assets/email-templates/configs/<NAME>.json
-  emailNotifications:
-    # If non-empty, only these types are enabled; all others get enabled=false (bodies still uploaded).
-    enableOnly: []
-    # enableOnly:
-    #   - IDLE_RUN
-    #   - LONG_RUNNING
+    - name: Register additional cloud regions
+      enable: true
+      data:
+        CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64: []
+        # - regionId: "us-east-2"        # required
+        #   kmsKeyArn: ""                 # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
+        #   kmsKeyId: ""
+        #   sshKeyName: ""
+        #   tempCredentialsRole: ""
+        #   backupDuration: 20
+        #   omicsServiceRole: ""
+        #   omicsEcrUrl: ""
+        #   corsRules: ""
+        #   fileShareMounts: []
 
-  restartApiSrv: true  # run restart-cp-api-srv.sh
+    - name: Configure storage lifecycle regions
+      enable: true
+      data:
+        # CP_POST_DEPLOY_SLS_REGIONS_B64: sourced from storageLifecycle.regions at helmfile render time
+        CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX: "storage-lifecycle-service/tagging-job-reports"
+
+    - name: Register demo pipelines
+      enable: true
+
+    - name: Register email templates
+      enable: true
+      data:
+        CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64:
+          # If non-empty, only these types are enabled; all others get enabled=false.
+          enableOnly: []
+          # enableOnly:
+          #   - IDLE_RUN
+          #   - LONG_RUNNING
+
+    - name: Restart API server
+      enable: true
 

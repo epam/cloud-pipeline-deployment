@@ -13,7 +13,11 @@ function usage {
 
 NAMESPACE="${1:-}"
 MANIFEST_DIR="${CP_MANIFEST_DIR:-${2:-}}"
-TOOLS_FILTER_JSON="${CP_TOOLS_JSON:-${3:-[]}}"
+if [ -n "${CP_TOOLS_JSON:-}" ]; then
+  TOOLS_FILTER_JSON="$(printf '%s' "$CP_TOOLS_JSON" | base64 -d)"
+else
+  TOOLS_FILTER_JSON="${3:-[]}"
+fi
 
 [ -z "$NAMESPACE" ] || [ -z "$MANIFEST_DIR" ] && usage
 

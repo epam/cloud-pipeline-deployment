@@ -12,6 +12,11 @@ export CP_DOLLAR='$'
 # shellcheck source=utils/cloud-pipeline-utils.sh
 source "$(dirname "${BASH_SOURCE[0]}")/utils/cloud-pipeline-utils.sh"
 
+if ! kubectl get deployment cp-git -n "$NAMESPACE" &>/dev/null; then
+  echo "cp-git not found in namespace $NAMESPACE, skipping"
+  exit 0
+fi
+
 ASSET_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/assets" && pwd)"
 
 if ! command -v tar >/dev/null 2>&1; then
