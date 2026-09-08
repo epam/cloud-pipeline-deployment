@@ -1,36 +1,30 @@
 # Post-deploy hook registry.
-# Defines execution order, script paths, and release-gating conditions.
-# Enable flags and data (env vars) are configured in values.yaml postDeploy.hooks by name.
-#
-# Fields:
-#   name       - matches the hook entry name in postDeploy.hooks
-#   script     - path to the script under the deployment root
-#   enabledVar - name of an installed-release variable from helmfile.yaml.gotmpl (optional)
+# Maps hook name to script path. Execution order is controlled by postDeploy.hooks in values.yaml.
 
 hooks:
-  - name: Wait for API
+  WaitForApi:
     script: hooks/post-deploy/wait-for-api.sh
 
-  - name: Register docker tools
+  RegisterDockerTools:
     script: hooks/post-deploy/register-docker-tools.sh
 
-  - name: Apply preferences
+  ApplyPreferences:
     script: hooks/post-deploy/apply-preferences.sh
 
-  - name: Apply cluster networks config
+  ApplyClusterNetworksConfig:
     script: hooks/post-deploy/apply-cluster-networks-config.sh
 
-  - name: Register additional cloud regions
+  RegisterAdditionalCloudRegions:
     script: hooks/post-deploy/register-additional-cloud-regions.sh
 
-  - name: Configure storage lifecycle regions
+  StorageLifecycleRegionsConfiguration:
     script: hooks/post-deploy/configure-storage-lifecycle-regions.sh
 
-  - name: Register demo pipelines
+  RegisterDemoPipelines:
     script: hooks/post-deploy/register-demo-pipelines.sh
 
-  - name: Register email templates
+  RegisterEmailTemplates:
     script: hooks/post-deploy/register-email-templates.sh
 
-  - name: Restart API server
+  RestartApiServer:
     script: hooks/post-deploy/restart-cp-api-srv.sh

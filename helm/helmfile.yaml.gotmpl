@@ -294,33 +294,16 @@ hooks:
         exec bash "$SCRIPT" "$VALUES_FILE"
 
 {{- if index $postDeployValues "enabled" | default false }}
-{{/* ── post-deploy cleanup hooks ──────────────────────────────────────────────── */}}
-{{- $namespace := index $generalValues "namespace" | default "default" -}}
+{{/* ── post-deploy configuration hooks ──────────────────────────────────────────────── */}}
 
-{{/* SLS regions: cross-section reference from storageLifecycle.regions.
-     The raw value (string path or list) is injected here; the per-key type logic
-     in the range below handles string→readFile|b64enc vs list→toJson|b64enc. */}}
-{{- $slsRegionsValue := index $storageLifecycleValues "regions" | default list -}}
-{{- $hookDataDefaults := dict
-  "hooks/post-deploy/configure-storage-lifecycle-regions.sh" (dict
-    "CP_POST_DEPLOY_SLS_REGIONS_B64" $slsRegionsValue)
--}}
+{{/* Load hooks.yaml: name → script mapping */}}
+{{- $hookScripts := (readFile "./hooks/post-deploy/hooks.yaml" | fromYaml).hooks | default dict -}}
 
-{{/* Load hooks.yaml for script paths and execution order */}}
-{{- $hookDefs := (readFile "./hooks/post-deploy/hooks.yaml" | fromYaml).hooks | default list -}}
-
-{{/* Build name → hook-values map from postDeploy.hooks */}}
-{{- $hookValsByName := dict -}}
 {{- range (index $postDeployValues "hooks" | default list) -}}
-  {{- $_ := set $hookValsByName (index . "name") . -}}
-{{- end -}}
-
-{{- range $hookDefs -}}
-{{- $name     := index . "name" -}}
-{{- $script   := index . "script" -}}
-{{- $valEntry := index $hookValsByName $name | default dict -}}
-{{- $enabled    := index $valEntry "enable" | default false -}}
-{{- $data := merge (index $valEntry "data" | default dict) (index $hookDataDefaults $script | default dict) -}}
+{{- $name    := index . "name" -}}
+{{- $script  := index . "script" | default (index (index $hookScripts $name | default dict) "script") -}}
+{{- $enabled := index . "enable" | default false -}}
+{{- $data    := index . "data" | default dict -}}
 {{- if $enabled }}
   - events: ["cleanup"]
     showlogs: true
@@ -328,20 +311,20 @@ hooks:
     args:
       - -c
       - |
-        KUBE_NAMESPACE="{{ $namespace }}"
         {{- range $k, $v := $data }}
-        {{- if kindIs "string" $v }}
-        {{- if and (hasSuffix "_B64" $k) $v }}
-        export {{ $k }}='{{ readFile $v | b64enc }}'
-        {{- else }}
-        export {{ $k }}='{{ $v }}'
-        {{- end }}
-        {{- else if not (kindIs "invalid" $v) }}
-        export {{ $k }}='{{ $v | toJson | b64enc }}'
-        {{- end }}
+            {{- if kindIs "string" $v }}
+                {{- if and (hasSuffix "_SPEC" $k) $v }}
+                    export {{ $k }}='{{ readFile $v | b64enc }}'
+                {{- else }}
+                    export {{ $k }}='{{ $v }}'
+                {{- end }}
+            {{- else if not (kindIs "invalid" $v) }}
+                export {{ $k }}='{{ $v | toJson | b64enc }}'
+            {{- end }}
         {{- end }}
         SCRIPT="{{ $script }}"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
+        KUBE_NAMESPACE="{{ index $generalValues "namespace" | default "default" }}"
         exec bash "$SCRIPT" "$KUBE_NAMESPACE"
 {{- end }}
 {{- end }}

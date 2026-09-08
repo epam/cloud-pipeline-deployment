@@ -189,22 +189,6 @@ storageLifecycle:
   restore:
     startEach: "20"   # Interval in minutes between restore checks
   reportBucketPrefix: "storage-lifecycle-service/tagging-job-reports"  # S3 key prefix for job reports; applied to all regions unless overridden per-region via slsProperties
-  # Per-region overrides. Inline list or path to a JSON file.
-  # Each entry: awsRegionId (required), slsRoleArn or full slsProperties object.
-  regions: []
-  # - awsRegionId: "us-east-1"          # use slsRoleArn to override the S3 Batch Operations role
-  #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
-  # - awsRegionId: "eu-west-1"          # use slsProperties to set all properties explicitly
-  #   slsProperties:
-  #     properties:
-  #       batch_operation_job_aws_account_id: "<account-id>"
-  #       batch_operation_job_role_arn: "arn:aws:iam::<account-id>:role/cp-sls-role"
-  #       batch_operation_job_report_bucket: "my-bucket"
-  #       batch_operation_job_report_bucket_prefix: "storage-lifecycle-service/tagging-job-reports"
-  #       batch_operation_job_poll_status_retry_count: "30"
-  #       batch_operation_job_poll_status_sleep_sec: "5"
-  #       storage_skip_archiving_tag: "disable_storage_lifecycle"
-  # or: regions: "./path/to/sls-regions.json"
   
 # WebDAV service (cp-dav). Provides WebDAV access to Cloud Pipeline storage.
 # Requires node label cloud-pipeline/cp-dav=true.
@@ -241,10 +225,10 @@ postDeploy:
   enabled: false  # true = run post-deploy hooks after all releases sync; false = skip
 
   hooks:
-    - name: Wait for API
+    - name: WaitForApi
       enable: true
 
-    - name: Register docker tools
+    - name: RegisterDockerTools
       enable: true
       data:
         CP_MANIFEST_DIR: "./hooks/post-deploy/assets/dockers-manifest"
@@ -252,18 +236,18 @@ postDeploy:
           - "library/rockylinux:latest"
           - "library/nextflow:latest"
 
-    - name: Apply preferences
+    - name: ApplyPreferences
       enable: true
       data:
         # Path to a custom preferences JSON file or directory; merged after defaults, wins on conflict.
         # Leave empty to use only the built-in defaults from hooks/post-deploy/assets/preferences/.
         CP_SYSTEM_PREFERENCE_CONFIG: ""
 
-    - name: Apply cluster networks config
+    - name: ApplyClusterNetworksConfig
       enable: true
       data:
         # Inline structure or path to a JSON file (string path → file is read and base64-encoded by helmfile).
-        CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64: {}
+        CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC: {}
         # tags: {}
         # regions:
         #   - name: ""            # AWS region ID; omit or leave empty to use CP_CLOUD_REGION_ID
@@ -277,10 +261,10 @@ postDeploy:
         #     proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]
         #     swap: [{name: "swap_ratio", path: "0.01"}]
 
-    - name: Register additional cloud regions
+    - name: RegisterAdditionalCloudRegions
       enable: true
       data:
-        CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64: []
+        CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC: []
         # - regionId: "us-east-2"        # required
         #   kmsKeyArn: ""                 # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
         #   kmsKeyId: ""
@@ -292,25 +276,40 @@ postDeploy:
         #   corsRules: ""
         #   fileShareMounts: []
 
-    - name: Configure storage lifecycle regions
+    - name: StorageLifecycleRegionsConfiguration
       enable: true
       data:
-        # CP_POST_DEPLOY_SLS_REGIONS_B64: sourced from storageLifecycle.regions at helmfile render time
         CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX: "storage-lifecycle-service/tagging-job-reports"
+        # Per-region overrides. Inline list or path to a JSON file.
+        # Each entry: awsRegionId (required), slsRoleArn or full slsProperties object.
+        CP_POST_DEPLOY_SLS_REGIONS_SPEC: []
+        # - awsRegionId: "us-east-1"          # use slsRoleArn to override the S3 Batch Operations role
+        #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+        # - awsRegionId: "eu-west-1"          # use slsProperties to set all properties explicitly
+        #   slsProperties:
+        #     properties:
+        #       batch_operation_job_aws_account_id: "<account-id>"
+        #       batch_operation_job_role_arn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+        #       batch_operation_job_report_bucket: "my-bucket"
+        #       batch_operation_job_report_bucket_prefix: "storage-lifecycle-service/tagging-job-reports"
+        #       batch_operation_job_poll_status_retry_count: "30"
+        #       batch_operation_job_poll_status_sleep_sec: "5"
+        #       storage_skip_archiving_tag: "disable_storage_lifecycle"
+        # or: CP_POST_DEPLOY_SLS_REGIONS_SPEC: "./path/to/sls-regions.json"
 
-    - name: Register demo pipelines
+    - name: RegisterDemoPipelines
       enable: true
 
-    - name: Register email templates
+    - name: RegisterEmailTemplates
       enable: true
       data:
-        CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64:
+        CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC:
           # If non-empty, only these types are enabled; all others get enabled=false.
           enableOnly: []
           # enableOnly:
           #   - IDLE_RUN
           #   - LONG_RUNNING
 
-    - name: Restart API server
+    - name: RestartApiServer
       enable: true
 

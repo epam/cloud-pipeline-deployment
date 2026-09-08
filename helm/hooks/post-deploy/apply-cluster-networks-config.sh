@@ -26,9 +26,9 @@ eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r \
   '.data | to_entries[] | select(.value != null and .value != "") | "export \(.key)=\(.value | @sh)"')"
 
 # Decode cluster networks config: { regions: [...], tags: {...} }  (tags optional)
-if [ -n "${CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64:-}" ]; then
+if [ -n "${CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC:-}" ]; then
   _decoded_cluster_networks_spec=""
-  if _decoded_cluster_networks_spec=$(printf '%s' "$CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64" | base64 -d 2>/dev/null); then
+  if _decoded_cluster_networks_spec=$(printf '%s' "$CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC" | base64 -d 2>/dev/null); then
     if printf '%s' "$_decoded_cluster_networks_spec" | jq -e 'type == "object"' >/dev/null 2>&1; then
       export CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC
       CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC=$(printf '%s' "$_decoded_cluster_networks_spec" | jq '.regions // []')
@@ -37,10 +37,10 @@ if [ -n "${CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64:-}" ]; then
       unset _tags
       echo "Loaded clusterNetworksConfig from Helmfile."
     else
-      echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64 decoded to non-object JSON; ignoring."
+      echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC decoded to non-object JSON; ignoring."
     fi
   else
-    echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC_B64 is not valid base64."
+    echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC is not valid base64."
   fi
   unset _decoded_cluster_networks_spec
 fi
