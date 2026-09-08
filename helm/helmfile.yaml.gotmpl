@@ -312,15 +312,15 @@ hooks:
       - -c
       - |
         {{- range $k, $v := $data }}
-            {{- if kindIs "string" $v }}
-                {{- if and (hasSuffix "_SPEC" $k) $v }}
-                    export {{ $k }}='{{ readFile $v | b64enc }}'
-                {{- else }}
-                    export {{ $k }}='{{ $v }}'
-                {{- end }}
-            {{- else if not (kindIs "invalid" $v) }}
-                export {{ $k }}='{{ $v | toJson | b64enc }}'
-            {{- end }}
+        {{- if kindIs "string" $v }}
+        {{- if and (hasSuffix "_SPEC" $k) $v }}
+        export {{ $k }}='{{ readFile $v | b64enc }}'
+        {{- else }}
+        export {{ $k }}='{{ $v }}'
+        {{- end }}
+        {{- else if not (kindIs "invalid" $v) }}
+        export {{ $k }}='{{ $v | toJson | b64enc }}'
+        {{- end }}
         {{- end }}
         SCRIPT="{{ $script }}"
         [ -f "$SCRIPT" ] || { echo "ERROR: Script not found: $SCRIPT"; exit 1; }
