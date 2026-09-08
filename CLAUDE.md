@@ -330,7 +330,7 @@ the full manifest directory is the superset.
 - `storageLifecycle.enabled` — Deploy storage lifecycle service (true by default)
 - `storageLifecycle.archive.startAt` — Time of day to run the archive job (HH:MM, default `23:00`)
 - `storageLifecycle.restore.startEach` — Interval in minutes between restore checks (default `20`)
-- `storageLifecycle.regions` — Path to JSON file or inline list of region configs for post-deploy SLS setup
+- `postDeploy.hooks.StorageLifecycleRegionsConfiguration.data.CP_POST_DEPLOY_SLS_REGIONS_SPEC` — Path to JSON file or inline list of region configs for post-deploy SLS setup
 - `storageLifecycle.reportBucketPrefix` — S3 path prefix for SLS job reports (default: `storage-lifecycle-service/tagging-job-reports`)
 - `dav.enabled` — Deploy WebDAV gateway (true by default)
 - `shareSrv.enabled` — Deploy data sharing service (false by default); requires `shareSrv.service.host.external`

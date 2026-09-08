@@ -14,21 +14,21 @@ for cmd in kubectl curl jq base64; do
   command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
 done
 
-if [ -z "${CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64:-}" ]; then
-  echo "CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64 is not set; no additional regions to register."
+if [ -z "${CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC:-}" ]; then
+  echo "CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC is not set; no additional regions to register."
   exit 0
 fi
-if ! printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64" | base64 -d >/dev/null 2>&1; then
-  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64 is not valid base64"
+if ! printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC" | base64 -d >/dev/null 2>&1; then
+  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC is not valid base64"
   exit 1
 fi
-REGIONS_JSON=$(printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64" | base64 -d)
+REGIONS_JSON=$(printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC" | base64 -d)
 if [ -z "$REGIONS_JSON" ] || [ "$REGIONS_JSON" = "null" ]; then
   echo "No additional cloud regions configured; skipping."
   exit 0
 fi
 if ! echo "$REGIONS_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
-  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_B64 decodes to a non-array JSON value"
+  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC decodes to a non-array JSON value"
   exit 1
 fi
 if [ "$(echo "$REGIONS_JSON" | jq 'length')" -eq 0 ]; then

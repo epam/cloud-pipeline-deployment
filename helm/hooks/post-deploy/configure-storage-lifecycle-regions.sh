@@ -13,6 +13,11 @@ source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
 
 [ -z "$NAMESPACE" ] && usage
 
+if ! kubectl get deployment cp-storage-lifecycle-service -n "$NAMESPACE" &>/dev/null; then
+  echo "cp-storage-lifecycle-service not found in namespace $NAMESPACE, skipping"
+  exit 0
+fi
+
 for cmd in kubectl curl jq; do
   command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
 done
@@ -71,7 +76,7 @@ while IFS= read -r region_entry; do
     continue
   fi
 
-  sls_region_override=$(echo "$CP_POST_DEPLOY_SLS_REGIONS_B64" | base64 -d \
+  sls_region_override=$(echo "$CP_POST_DEPLOY_SLS_REGIONS_SPEC" | base64 -d \
     | jq -c --arg rid "$aws_region_id" '.[] | select(.awsRegionId == $rid)' 2>/dev/null || true)
 
   # If a full slsProperties object is provided for this region, use it as-is.

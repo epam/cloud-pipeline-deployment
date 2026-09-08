@@ -189,22 +189,6 @@ storageLifecycle:
   restore:
     startEach: "20"   # Interval in minutes between restore checks
   reportBucketPrefix: "storage-lifecycle-service/tagging-job-reports"  # S3 key prefix for job reports; applied to all regions unless overridden per-region via slsProperties
-  # Per-region overrides. Inline list or path to a JSON file.
-  # Each entry: awsRegionId (required), slsRoleArn or full slsProperties object.
-  regions: []
-  # - awsRegionId: "us-east-1"          # use slsRoleArn to override the S3 Batch Operations role
-  #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
-  # - awsRegionId: "eu-west-1"          # use slsProperties to set all properties explicitly
-  #   slsProperties:
-  #     properties:
-  #       batch_operation_job_aws_account_id: "<account-id>"
-  #       batch_operation_job_role_arn: "arn:aws:iam::<account-id>:role/cp-sls-role"
-  #       batch_operation_job_report_bucket: "my-bucket"
-  #       batch_operation_job_report_bucket_prefix: "storage-lifecycle-service/tagging-job-reports"
-  #       batch_operation_job_poll_status_retry_count: "30"
-  #       batch_operation_job_poll_status_sleep_sec: "5"
-  #       storage_skip_archiving_tag: "disable_storage_lifecycle"
-  # or: regions: "./path/to/sls-regions.json"
   
 # WebDAV service (cp-dav). Provides WebDAV access to Cloud Pipeline storage.
 # Requires node label cloud-pipeline/cp-dav=true.
@@ -238,64 +222,94 @@ runPolicyManager:
   logsHostPath: /opt/run-policy-manager/logs
 
 postDeploy:
-  enabled: false  # true = run post-deploy cleanup hooks (wait-for-api, register tools/prefs/etc); false = skip (safe for helmfile template checks)
+  enabled: false  # true = run post-deploy hooks after all releases sync; false = skip
 
-  registerDockerTools: true  # run register-docker-tools.sh
-  # Docker tools to push to the docker registry and register in Cloud Pipeline as tools.
-  dockers:
-    - "library/rockylinux:latest"
-    - "library/nextflow:latest"
+  hooks:
+    - name: WaitForApi
+      enable: true
 
-  applyPreferences: true  # run apply-preferences.sh
-  # Path to a custom preferences JSON file or directory (same format as hooks/assets/preferences/).
-  # Merged after all defaults; entries here win on conflict. Leave empty to skip.
-  # Can also be set via the CP_SYSTEM_PREFERENCE_CONFIG env var before running helmfile.
-  systemPreferenceConfig: ""
+    - name: RegisterDockerTools
+      enable: true
+      data:
+        CP_MANIFEST_DIR: "./hooks/post-deploy/assets/dockers-manifest"
+        CP_TOOLS_JSON:
+          - "library/rockylinux:latest"
+          - "library/nextflow:latest"
 
-  applyClusterNetworksConfig: true  # run apply-cluster-networks-config.sh
-  # Defines the cluster.networks.config API preference for worker node pools.
-  # Leave empty ({}) to skip. Can also be set to a path of a JSON file with the same structure.
-  clusterNetworksConfig: {}
-  # tags: {}                    # Optional: instance tags applied to all worker nodes (key-value pairs).
-  #                             # Default: {<CP_VM_MONITOR_INSTANCE_TAG_NAME>: <value>} or {monitored: "true"}.
-  # regions:
-  #   - name: ""            # AWS region ID; omit or leave empty to use CP_CLOUD_REGION_ID
-  #     networks: {}            # Map of subnet-id to network-name, e.g. { "subnet-xxx": "my-net" }
-  #     amis:
-  #       - ami: "ami-..."      # Required: explicit AMI ID (null and empty are rejected)
-  #         # platform: linux   # linux (default) | windows
-  #         # instance_mask: "*"  # Instance type glob, e.g. "p*" for GPU instances
-  #         # init_script: ""   # Override default init script path for this AMI
-  #     securityGroupIds: []    # Security group IDs to attach to worker nodes
-  #     # proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]  # Default: CoreDNS from CP_EDGE_CLUSTER_RESOLVER
-  #     # swap: [{name: "swap_ratio", path: "0.01"}]               # Default: 0.01
+    - name: ApplyPreferences
+      enable: true
+      data:
+        # Path to a custom preferences JSON file or directory; merged after defaults, wins on conflict.
+        # Leave empty to use only the built-in defaults from hooks/post-deploy/assets/preferences/.
+        CP_SYSTEM_PREFERENCE_CONFIG: ""
 
-  registerAdditionalCloudRegions: true  # run register-additional-cloud-regions.sh
-  # Additional (non-default) AWS cloud regions to register after deployment.
-  # Each entry uses the same field names as apiSrv.cloudRegion; regionId and kmsKeyArn are required.
-  additionalCloudRegions: []
-  # - regionId: "us-east-2"          # AWS region ID (required)
-  #   kmsKeyArn: ""                   # Full ARN: arn:aws:kms:<region>:<account>:key/<id> (required)
-  #   kmsKeyId: ""                    # Key ID (UUID portion of the ARN)
-  #   sshKeyName: ""                  # AWS EC2 key pair name
-  #   tempCredentialsRole: ""         # IAM role ARN for temporary S3 credentials
-  #   backupDuration: 20              # S3 object backup retention in days
-  #   omicsServiceRole: ""            # IAM role ARN for AWS HealthOmics
-  #   omicsEcrUrl: ""                 # ECR registry URL
-  #   corsRules: ""                   # JSON string; empty = use hooks/post-deploy/assets/storage.cors.policy.json
-  #   fileShareMounts: []
-  #   # - mountRoot: "fs-xxx.efs.us-east-2.amazonaws.com:/"
-  #   #   mountType: "NFS"  # NFS | SMB
-  #   #   mountOptions: ""
+    - name: ApplyClusterNetworksConfig
+      enable: true
+      data:
+        # Inline structure or path to a JSON file (string path → file is read and base64-encoded by helmfile).
+        CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC: {}
+        # tags: {}
+        # regions:
+        #   - name: ""            # AWS region ID; omit or leave empty to use CP_CLOUD_REGION_ID
+        #     networks: {}        # Map of subnet-id → network-name, e.g. { "subnet-xxx": "my-net" }
+        #     amis:
+        #       - ami: "ami-..."      # Required
+        #         platform: linux     # linux (default) | windows
+        #         instance_mask: "*"  # Instance type glob, e.g. "p*" for GPU
+        #         init_script: ""
+        #     securityGroupIds: []
+        #     proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]
+        #     swap: [{name: "swap_ratio", path: "0.01"}]
 
-  registerEmailTemplates: true  # run register-email-templates.sh
-  # Template names match hooks/post-deploy/assets/email-templates/configs/<NAME>.json
-  emailNotifications:
-    # If non-empty, only these types are enabled; all others get enabled=false (bodies still uploaded).
-    enableOnly: []
-    # enableOnly:
-    #   - IDLE_RUN
-    #   - LONG_RUNNING
+    - name: RegisterAdditionalCloudRegions
+      enable: true
+      data:
+        CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC: []
+        # - regionId: "us-east-2"        # required
+        #   kmsKeyArn: ""                 # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
+        #   kmsKeyId: ""
+        #   sshKeyName: ""
+        #   tempCredentialsRole: ""
+        #   backupDuration: 20
+        #   omicsServiceRole: ""
+        #   omicsEcrUrl: ""
+        #   corsRules: ""
+        #   fileShareMounts: []
 
-  restartApiSrv: true  # run restart-cp-api-srv.sh
+    - name: StorageLifecycleRegionsConfiguration
+      enable: true
+      data:
+        CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX: "storage-lifecycle-service/tagging-job-reports"
+        # Per-region overrides. Inline list or path to a JSON file.
+        # Each entry: awsRegionId (required), slsRoleArn or full slsProperties object.
+        CP_POST_DEPLOY_SLS_REGIONS_SPEC: []
+        # - awsRegionId: "us-east-1"          # use slsRoleArn to override the S3 Batch Operations role
+        #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+        # - awsRegionId: "eu-west-1"          # use slsProperties to set all properties explicitly
+        #   slsProperties:
+        #     properties:
+        #       batch_operation_job_aws_account_id: "<account-id>"
+        #       batch_operation_job_role_arn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+        #       batch_operation_job_report_bucket: "my-bucket"
+        #       batch_operation_job_report_bucket_prefix: "storage-lifecycle-service/tagging-job-reports"
+        #       batch_operation_job_poll_status_retry_count: "30"
+        #       batch_operation_job_poll_status_sleep_sec: "5"
+        #       storage_skip_archiving_tag: "disable_storage_lifecycle"
+        # or: CP_POST_DEPLOY_SLS_REGIONS_SPEC: "./path/to/sls-regions.json"
+
+    - name: RegisterDemoPipelines
+      enable: true
+
+    - name: RegisterEmailTemplates
+      enable: true
+      data:
+        CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC:
+          # If non-empty, only these types are enabled; all others get enabled=false.
+          enableOnly: []
+          # enableOnly:
+          #   - IDLE_RUN
+          #   - LONG_RUNNING
+
+    - name: RestartApiServer
+      enable: true
 

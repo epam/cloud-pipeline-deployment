@@ -64,17 +64,17 @@ DEPLOYMENT_NAME="${CP_PREF_UI_PIPELINE_DEPLOYMENT_NAME:-Cloud Pipeline}"
 
 # Optional enableOnly list from helmfile postDeploy.emailNotifications (base64 JSON).
 EMAIL_NOTIF_SPEC_JSON='{}'
-if [ -n "${CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64:-}" ]; then
+if [ -n "${CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC:-}" ]; then
   decoded_email_notif_spec=""
-  if decoded_email_notif_spec=$(printf '%s' "$CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64" | base64 -d 2>/dev/null); then
+  if decoded_email_notif_spec=$(printf '%s' "$CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC" | base64 -d 2>/dev/null); then
     if echo "$decoded_email_notif_spec" | jq -e 'type == "object"' >/dev/null 2>&1; then
       EMAIL_NOTIF_SPEC_JSON="$decoded_email_notif_spec"
       echo "Loaded postDeploy.emailNotifications from Helmfile."
     else
-      echo "WARNING: CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64 decoded to non-object JSON; ignoring."
+      echo "WARNING: CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC decoded to non-object JSON; ignoring."
     fi
   else
-    echo "WARNING: CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC_B64 is not valid base64."
+    echo "WARNING: CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC is not valid base64."
   fi
   unset decoded_email_notif_spec
 fi

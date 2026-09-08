@@ -1,0 +1,30 @@
+# Post-deploy hook registry.
+# Maps hook name to script path. Execution order is controlled by postDeploy.hooks in values.yaml.
+
+hooks:
+  WaitForApi:
+    script: hooks/post-deploy/wait-for-api.sh
+
+  RegisterDockerTools:
+    script: hooks/post-deploy/register-docker-tools.sh
+
+  ApplyPreferences:
+    script: hooks/post-deploy/apply-preferences.sh
+
+  ApplyClusterNetworksConfig:
+    script: hooks/post-deploy/apply-cluster-networks-config.sh
+
+  RegisterAdditionalCloudRegions:
+    script: hooks/post-deploy/register-additional-cloud-regions.sh
+
+  StorageLifecycleRegionsConfiguration:
+    script: hooks/post-deploy/configure-storage-lifecycle-regions.sh
+
+  RegisterDemoPipelines:
+    script: hooks/post-deploy/register-demo-pipelines.sh
+
+  RegisterEmailTemplates:
+    script: hooks/post-deploy/register-email-templates.sh
+
+  RestartApiServer:
+    script: hooks/post-deploy/restart-cp-api-srv.sh
