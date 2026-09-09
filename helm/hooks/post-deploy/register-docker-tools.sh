@@ -90,6 +90,32 @@ echo "API (curl): $API_URL"
 REGISTRY_ID=$(curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" "${API_URL}/entities?identifier=${REGISTRY_IDENTIFIER}&aclClass=DOCKER_REGISTRY" | jq -r '.payload.id // empty')
 [ -z "$REGISTRY_ID" ] || [ "$REGISTRY_ID" = "null" ] && { echo "Docker registry $REGISTRY_PATH not registered in API"; exit 1; }
 
+# Probe whether this is a fresh install or an upgrade (tools already present in the registry).
+# Result is written to a state file for downstream hooks (e.g. register-demo-pipelines.sh).
+CP_DEPLOY_STATE_FILE="${CP_DEPLOY_STATE_FILE:-/tmp/cp-post-deploy-state.env}"
+CP_DEPLOY_TOOLS_EXIST=false
+_probe_tool_groups() {
+  local reg="$1"
+  curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" \
+    "${API_URL}/toolGroup/list?registry=$(printf '%s' "$reg" | jq -sRr @uri)" 2>/dev/null \
+    | jq -r '(.payload // []) | length' 2>/dev/null || echo "0"
+}
+_grp_count=$(_probe_tool_groups "$REGISTRY_IDENTIFIER")
+if [ "${_grp_count:-0}" -eq 0 ] && [ "$REGISTRY_PATH" != "$REGISTRY_IDENTIFIER" ]; then
+  _grp_count=$(_probe_tool_groups "$REGISTRY_PATH")
+fi
+if [ "${_grp_count:-0}" -gt 0 ]; then
+  CP_DEPLOY_TOOLS_EXIST=true
+  echo "Upgrade mode: ${_grp_count} tool group(s) already registered — will push fresh images and update metadata for all manifest entries."
+else
+  echo "Fresh install: no tool groups found — registering tools for the first time."
+fi
+# Merge into state file (create or update CP_DEPLOY_TOOLS_EXIST key only).
+if [ -f "$CP_DEPLOY_STATE_FILE" ]; then
+  grep -v '^CP_DEPLOY_TOOLS_EXIST=' "$CP_DEPLOY_STATE_FILE" > "${CP_DEPLOY_STATE_FILE}.tmp" && mv "${CP_DEPLOY_STATE_FILE}.tmp" "$CP_DEPLOY_STATE_FILE"
+fi
+echo "CP_DEPLOY_TOOLS_EXIST=${CP_DEPLOY_TOOLS_EXIST}" >> "$CP_DEPLOY_STATE_FILE"
+
 CP_DOCKERS_TO_INIT=()
 if [ "$TOOLS_FILTER_JSON" != "[]" ] && [ -n "$TOOLS_FILTER_JSON" ]; then
   if ! echo "$TOOLS_FILTER_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
@@ -271,12 +297,6 @@ while IFS=, read -r docker_name docker_pretty_name; do
     echo "Skipping docker $docker_pretty_name (not in filter)"
     continue
   fi
-  image_name_without_tag="${docker_pretty_name%%:*}"
-  if api_find_docker_image "$image_name_without_tag" "$REGISTRY_IDENTIFIER" >/dev/null 2>&1; then
-    echo "Tool $docker_pretty_name already exists in Cloud Pipeline — skipping."
-    continue
-  fi
-
   if [ -d "$MANIFEST_DIR/$docker_name" ]; then
     docker_tool_manifest_path="$MANIFEST_DIR/$docker_name"
   else

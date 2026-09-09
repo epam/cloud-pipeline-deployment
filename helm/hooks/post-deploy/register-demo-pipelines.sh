@@ -60,6 +60,23 @@ if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-true}" = "false" ] && [ "${CP_REGISTE
   exit 0
 fi
 
+# Check whether demo pipelines are already registered (upgrade vs fresh install).
+# Uses the "Pipelines" folder as a proxy — it is the parent for all NGS demo pipelines.
+CP_DEPLOY_STATE_FILE="${CP_DEPLOY_STATE_FILE:-/tmp/cp-post-deploy-state.env}"
+CP_DEPLOY_DEMO_PIPELINES_EXIST=false
+_demo_folder_id=$(api_get_entity_id "Pipelines" "folder" 2>/dev/null || true)
+if [ -n "${_demo_folder_id:-}" ] && [ "$_demo_folder_id" != "null" ]; then
+  CP_DEPLOY_DEMO_PIPELINES_EXIST=true
+  echo "Upgrade mode: folder 'Pipelines' already exists (id=${_demo_folder_id}) — demo pipeline upload will be skipped."
+else
+  echo "Fresh install: folder 'Pipelines' not found — demo pipelines will be registered."
+fi
+# Merge into state file.
+if [ -f "$CP_DEPLOY_STATE_FILE" ]; then
+  grep -v '^CP_DEPLOY_DEMO_PIPELINES_EXIST=' "$CP_DEPLOY_STATE_FILE" > "${CP_DEPLOY_STATE_FILE}.tmp" && mv "${CP_DEPLOY_STATE_FILE}.tmp" "$CP_DEPLOY_STATE_FILE"
+fi
+echo "CP_DEPLOY_DEMO_PIPELINES_EXIST=${CP_DEPLOY_DEMO_PIPELINES_EXIST}" >> "$CP_DEPLOY_STATE_FILE"
+
 for _var in GITLAB_ROOT_PASSWORD GITLAB_ROOT_USER CP_GITLAB_INTERNAL_PORT; do
   eval "_val=\${${_var}:-}"
   [ -z "$_val" ] && { echo "ERROR: Required variable $_var is not set in cp-config-global"; exit 1; }
@@ -500,8 +517,12 @@ if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-true}" = "true" ]; then
 fi
 
 if [ "${CP_REGISTER_HOOK_DEMO_PIPELINES:-true}" != "false" ]; then
-  echo "Uploading demo pipelines from assets/pipe-demo (set CP_REGISTER_HOOK_DEMO_PIPELINES=false to skip)..."
-  set +e
-  api_upload_demo_pipelines "$ASSET_ROOT_DIR/pipe-demo"
-  set -e
+  if [ "$CP_DEPLOY_DEMO_PIPELINES_EXIST" = "true" ]; then
+    echo "Upgrade mode: demo pipeline upload skipped (already registered)."
+  else
+    echo "Uploading demo pipelines from assets/pipe-demo (set CP_REGISTER_HOOK_DEMO_PIPELINES=false to skip)..."
+    set +e
+    api_upload_demo_pipelines "$ASSET_ROOT_DIR/pipe-demo"
+    set -e
+  fi
 fi

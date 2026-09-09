@@ -63,6 +63,8 @@ spec:
         {{- end }}
     spec:
       {{- include "lib.imagePullSecret" . | nindent 6 }}
+      nodeSelector:
+        cloud-pipeline/cp-idp: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
