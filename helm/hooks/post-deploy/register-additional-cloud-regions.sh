@@ -2,65 +2,9 @@
 # Helmfile cleanup hook: register additional (non-default) AWS cloud regions. Args: NAMESPACE
 set -euo pipefail
 
-NAMESPACE="${1:-}"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=utils/cloud-pipeline-utils.sh
-source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
-
-[ -z "$NAMESPACE" ] && usage
-
-for cmd in kubectl curl jq base64; do
-  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
-done
-
-if [ -z "${CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC:-}" ]; then
-  echo "CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC is not set; no additional regions to register."
-  exit 0
-fi
-if ! printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC" | base64 -d >/dev/null 2>&1; then
-  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC is not valid base64"
-  exit 1
-fi
-REGIONS_JSON=$(printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC" | base64 -d)
-if [ -z "$REGIONS_JSON" ] || [ "$REGIONS_JSON" = "null" ]; then
-  echo "No additional cloud regions configured; skipping."
-  exit 0
-fi
-if ! echo "$REGIONS_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
-  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC decodes to a non-array JSON value"
-  exit 1
-fi
-if [ "$(echo "$REGIONS_JSON" | jq 'length')" -eq 0 ]; then
-  echo "No additional cloud regions configured; skipping."
-  exit 0
-fi
-
-echo "Loading config from cp-config-global..."
-CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
-# key filter ensures only valid bash identifiers reach eval; non-conforming keys are skipped
-# (e.g. "my.key", "my-key", or "FOO=$(rm -rf /)" would be silently ignored)
-eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r '.data | to_entries[] | select(.value != null and .value != "") | select(.key | test("^[A-Za-z_][A-Za-z0-9_]*$")) | "export \(.key)=\(.value | @sh)"')"
-
-export CP_API_JWT_ADMIN
-CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
-[ -z "$CP_API_JWT_ADMIN" ] && { echo "ERROR: CP_API_JWT_ADMIN not found in cp-api-token"; exit 1; }
-
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
-  echo "ERROR: Missing API endpoint (internal or external host/port)"
-  exit 1
-fi
-validate_api_port "$API_CONNECT_PORT" || exit 1
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
-echo "API: $API_URL"
+##########
+# Functions
+##########
 
 function id_from_arn {
   echo "$1" | cut -d/ -f2
@@ -71,7 +15,9 @@ function register_fileshares {
   local region_name="$2"
   local fileshares_json="$3"
   local existing_mounts="${4:-[]}"
-  [ -z "$fileshares_json" ] || [ "$fileshares_json" = "[]" ] || [ "$fileshares_json" = "null" ] && return 0
+  if [ -z "$fileshares_json" ] || [ "$fileshares_json" = "[]" ] || [ "$fileshares_json" = "null" ]; then
+    return 0
+  fi
   while IFS= read -r fs_entry; do
     local fs_mount fs_type fs_options
     fs_mount=$(printf '%s' "$fs_entry" | jq -r '.mountRoot // ""')
@@ -241,6 +187,100 @@ function register_region {
   register_fileshares "$region_id" "$region_name" "$fileshares_json"
 }
 
+##########
+# Arguments
+##########
+
+NAMESPACE="${1:-}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=utils/cloud-pipeline-utils.sh
+source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
+
+##########
+# Preflight
+##########
+
+if [ -z "$NAMESPACE" ]; then
+  usage
+fi
+
+for cmd in kubectl curl jq base64; do
+  if ! command -v "$cmd" >/dev/null; then
+    echo "ERROR: $cmd required but not installed"
+    exit 1
+  fi
+done
+
+##########
+# Decode regions spec
+##########
+
+if [ -z "${CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC:-}" ]; then
+  echo "CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC is not set; no additional regions to register."
+  exit 0
+fi
+if ! printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC" | base64 -d >/dev/null 2>&1; then
+  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC is not valid base64"
+  exit 1
+fi
+REGIONS_JSON=$(printf '%s' "$CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC" | base64 -d)
+if [ -z "$REGIONS_JSON" ] || [ "$REGIONS_JSON" = "null" ]; then
+  echo "No additional cloud regions configured; skipping."
+  exit 0
+fi
+if ! echo "$REGIONS_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
+  echo "ERROR: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC decodes to a non-array JSON value"
+  exit 1
+fi
+if [ "$(echo "$REGIONS_JSON" | jq 'length')" -eq 0 ]; then
+  echo "No additional cloud regions configured; skipping."
+  exit 0
+fi
+
+##########
+# Load configuration
+##########
+
+echo "Loading config from cp-config-global..."
+CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
+# key filter ensures only valid bash identifiers reach eval; non-conforming keys are skipped
+# (e.g. "my.key", "my-key", or "FOO=$(rm -rf /)" would be silently ignored)
+eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r '.data | to_entries[] | select(.value != null and .value != "") | select(.key | test("^[A-Za-z_][A-Za-z0-9_]*$")) | "export \(.key)=\(.value | @sh)"')"
+
+export CP_API_JWT_ADMIN
+CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
+if [ -z "$CP_API_JWT_ADMIN" ]; then
+  echo "ERROR: CP_API_JWT_ADMIN not found in cp-api-token"
+  exit 1
+fi
+
+##########
+# Resolve API endpoint
+##########
+
+if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
+  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
+  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
+else
+  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
+  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
+fi
+if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
+  echo "ERROR: Missing API endpoint (internal or external host/port)"
+  exit 1
+fi
+if ! validate_api_port "$API_CONNECT_PORT"; then
+  exit 1
+fi
+
+API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+echo "API: $API_URL"
+
+##########
+# Register regions
+##########
+
 region_count=$(printf '%s' "$REGIONS_JSON" | jq 'length')
 duplicate_regions=$(printf '%s' "$REGIONS_JSON" | jq -r '[.[].regionId] | group_by(.) | map(select(length > 1)) | .[][] | .' 2>/dev/null || true)
 if [ -n "$duplicate_regions" ]; then
@@ -250,7 +290,9 @@ echo "Registering $region_count additional cloud region(s)..."
 
 errors=0
 while IFS= read -r region_entry; do
-  register_region "$region_entry" || errors=$((errors + 1))
+  if ! register_region "$region_entry"; then
+    errors=$((errors + 1))
+  fi
 done < <(printf '%s' "$REGIONS_JSON" | jq -c '.[]')
 
 if [ "$errors" -gt 0 ]; then

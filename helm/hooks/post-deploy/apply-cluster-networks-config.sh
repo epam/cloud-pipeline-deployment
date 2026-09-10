@@ -2,117 +2,27 @@
 # Helmfile cleanup hook: register cluster.networks.config API preference. Args: NAMESPACE
 set -euo pipefail
 
-NAMESPACE="${1:-}"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=utils/cloud-pipeline-utils.sh
-source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
-
-[ -z "$NAMESPACE" ] && usage
-
-[ "${CP_SKIP_CLUSTER_NETWORKS_CONFIG:-}" = "true" ] && { echo "Skipped (CP_SKIP_CLUSTER_NETWORKS_CONFIG=true)"; exit 0; }
-
-for cmd in kubectl curl jq base64 envsubst; do
-  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
-done
-
-# ---------------------------------------------------------------------------
-# Load configuration
-# ---------------------------------------------------------------------------
-
-echo "Loading config from cp-config-global..."
-CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
-eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r \
-  '.data | to_entries[] | select(.value != null and .value != "") | "export \(.key)=\(.value | @sh)"')"
-
-# Decode cluster networks config: { regions: [...], tags: {...} }  (tags optional)
-if [ -n "${CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC:-}" ]; then
-  _decoded_cluster_networks_spec=""
-  if _decoded_cluster_networks_spec=$(printf '%s' "$CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC" | base64 -d 2>/dev/null); then
-    if printf '%s' "$_decoded_cluster_networks_spec" | jq -e 'type == "object"' >/dev/null 2>&1; then
-      export CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC
-      CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC=$(printf '%s' "$_decoded_cluster_networks_spec" | jq '.regions // []')
-      _tags=$(printf '%s' "$_decoded_cluster_networks_spec" | jq 'if (.tags | type) == "object" then .tags else null end')
-      [ "$_tags" != "null" ] && export CP_POST_DEPLOY_CLUSTER_NETWORKS_TAGS="$_tags"
-      unset _tags
-      echo "Loaded clusterNetworksConfig from Helmfile."
-    else
-      echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC decoded to non-object JSON; ignoring."
-    fi
-  else
-    echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC is not valid base64."
-  fi
-  unset _decoded_cluster_networks_spec
-fi
-
-# DNS resolver used by worker nodes after launch; defaults to the in-cluster CoreDNS address.
-fallback_dns_resolver="${CP_EDGE_CLUSTER_RESOLVER:-10.96.0.10}"
-[ -z "${CP_PREF_CLUSTER_PROXIES_DNS_POST:-}" ] && export CP_PREF_CLUSTER_PROXIES_DNS_POST="$fallback_dns_resolver"
-unset fallback_dns_resolver
-
-# ---------------------------------------------------------------------------
-# API credentials and endpoint
-# ---------------------------------------------------------------------------
-
-export CP_API_JWT_ADMIN
-CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" \
-  -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
-[ -z "$CP_API_JWT_ADMIN" ] && { echo "ERROR: CP_API_JWT_ADMIN not found in cp-api-token secret"; exit 1; }
-
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
-  echo "ERROR: Missing API endpoint — set CP_API_SRV_INTERNAL_HOST/PORT or CP_API_SRV_EXTERNAL_HOST/PORT"
-  exit 1
-fi
-validate_api_port "$API_CONNECT_PORT" || exit 1
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
-echo "API: $API_URL"
-
-# ---------------------------------------------------------------------------
-# API helpers
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Proxy list assembly
-# Builds CP_PREF_CLUSTER_PROXIES — a JSON array fragment used only as an
-# envsubst variable when rendering a cluster.networks template file.
-# ---------------------------------------------------------------------------
-
-proxy_json_entries=""
+##########
+# Functions
+##########
 
 function add_proxy_entry {
   local proxy_name="$1"
   local proxy_path="$2"
   local entry
   entry=$(jq -nc --arg name "$proxy_name" --arg path "$proxy_path" '{name: $name, path: $path}')
-  [ -n "$proxy_json_entries" ] && proxy_json_entries="${proxy_json_entries},"
+  if [ -n "$proxy_json_entries" ]; then
+    proxy_json_entries="${proxy_json_entries},"
+  fi
   proxy_json_entries="${proxy_json_entries}${entry}"
 }
-
-[ -n "${CP_PREF_CLUSTER_PROXIES_DNS:-}" ]      && add_proxy_entry "dns_proxy"      "$CP_PREF_CLUSTER_PROXIES_DNS"
-[ -n "${CP_PREF_CLUSTER_PROXIES_DNS_POST:-}" ] && add_proxy_entry "dns_proxy_post" "$CP_PREF_CLUSTER_PROXIES_DNS_POST"
-[ -n "${CP_PREF_CLUSTER_PROXIES_HTTP:-}" ]     && add_proxy_entry "http_proxy"     "$CP_PREF_CLUSTER_PROXIES_HTTP"
-[ -n "${CP_PREF_CLUSTER_PROXIES_HTTPS:-}" ]    && add_proxy_entry "https_proxy"    "$CP_PREF_CLUSTER_PROXIES_HTTPS"
-[ -n "${CP_PREF_CLUSTER_PROXIES_NO:-}" ]       && add_proxy_entry "no_proxy"       "$CP_PREF_CLUSTER_PROXIES_NO"
-
-export CP_PREF_CLUSTER_PROXIES="$proxy_json_entries"
-unset proxy_json_entries
-
-# ---------------------------------------------------------------------------
-# Cluster network document building
-# ---------------------------------------------------------------------------
 
 # Verify that exactly one region has default=true and all region names are unique.
 function validate_regions {
   local networks_file="$1"
-  [ -f "$networks_file" ] || return 0
+  if [ ! -f "$networks_file" ]; then
+    return 0
+  fi
 
   local string_default_count
   if ! string_default_count=$(jq '[.regions[]? | select((.default | type) == "string")] | length' "$networks_file" 2>/dev/null); then
@@ -151,7 +61,9 @@ function validate_regions {
 function validate_no_placeholder_amis {
   local networks_file="$1"
   local placeholder_ami_count
-  [ -f "$networks_file" ] || return 0
+  if [ ! -f "$networks_file" ]; then
+    return 0
+  fi
   if ! placeholder_ami_count=$(jq \
       '[.regions[]?.amis[]? | select(.ami == null or .ami == "" or .ami == "auto")] | length' \
       "$networks_file" 2>/dev/null); then
@@ -171,10 +83,14 @@ function validate_no_placeholder_amis {
 # the list is absent or empty.
 function build_networks_document_from_spec {
   local spec_list="${CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC:-}"
-  [ -n "$spec_list" ] || return 1
+  if [ -z "$spec_list" ]; then
+    return 1
+  fi
   local region_count
   region_count=$(echo "$spec_list" | jq 'if type == "array" then length else 0 end' 2>/dev/null || echo "0")
-  [ "$region_count" -gt 0 ] || return 1
+  if [ "$region_count" -le 0 ]; then
+    return 1
+  fi
 
   local spec_errors
   if ! spec_errors=$(echo "$spec_list" | jq -r '
@@ -263,6 +179,133 @@ function build_networks_document_from_spec {
   echo "$output_file"
 }
 
+##########
+# Arguments
+##########
+
+NAMESPACE="${1:-}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=utils/cloud-pipeline-utils.sh
+source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
+
+##########
+# Preflight
+##########
+
+if [ -z "$NAMESPACE" ]; then
+  usage
+fi
+
+if [ "${CP_SKIP_CLUSTER_NETWORKS_CONFIG:-}" = "true" ]; then
+  echo "Skipped (CP_SKIP_CLUSTER_NETWORKS_CONFIG=true)"
+  exit 0
+fi
+
+for cmd in kubectl curl jq base64 envsubst; do
+  if ! command -v "$cmd" >/dev/null; then
+    echo "ERROR: $cmd required but not installed"
+    exit 1
+  fi
+done
+
+##########
+# Load configuration
+##########
+
+echo "Loading config from cp-config-global..."
+CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
+eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r \
+  '.data | to_entries[] | select(.value != null and .value != "") | "export \(.key)=\(.value | @sh)"')"
+
+# Decode cluster networks config: { regions: [...], tags: {...} }  (tags optional)
+if [ -n "${CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC:-}" ]; then
+  _decoded_cluster_networks_spec=""
+  if _decoded_cluster_networks_spec=$(printf '%s' "$CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC" | base64 -d 2>/dev/null); then
+    if printf '%s' "$_decoded_cluster_networks_spec" | jq -e 'type == "object"' >/dev/null 2>&1; then
+      export CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC
+      CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC=$(printf '%s' "$_decoded_cluster_networks_spec" | jq '.regions // []')
+      _tags=$(printf '%s' "$_decoded_cluster_networks_spec" | jq 'if (.tags | type) == "object" then .tags else null end')
+      [ "$_tags" != "null" ] && export CP_POST_DEPLOY_CLUSTER_NETWORKS_TAGS="$_tags"
+      unset _tags
+      echo "Loaded clusterNetworksConfig from Helmfile."
+    else
+      echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC decoded to non-object JSON; ignoring."
+    fi
+  else
+    echo "WARNING: CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC is not valid base64."
+  fi
+  unset _decoded_cluster_networks_spec
+fi
+
+# DNS resolver used by worker nodes after launch; defaults to the in-cluster CoreDNS address.
+fallback_dns_resolver="${CP_EDGE_CLUSTER_RESOLVER:-10.96.0.10}"
+if [ -z "${CP_PREF_CLUSTER_PROXIES_DNS_POST:-}" ]; then
+  export CP_PREF_CLUSTER_PROXIES_DNS_POST="$fallback_dns_resolver"
+fi
+unset fallback_dns_resolver
+
+##########
+# Resolve API endpoint
+##########
+
+export CP_API_JWT_ADMIN
+CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" \
+  -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
+if [ -z "$CP_API_JWT_ADMIN" ]; then
+  echo "ERROR: CP_API_JWT_ADMIN not found in cp-api-token secret"
+  exit 1
+fi
+
+if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
+  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
+  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
+else
+  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
+  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
+fi
+if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
+  echo "ERROR: Missing API endpoint — set CP_API_SRV_INTERNAL_HOST/PORT or CP_API_SRV_EXTERNAL_HOST/PORT"
+  exit 1
+fi
+if ! validate_api_port "$API_CONNECT_PORT"; then
+  exit 1
+fi
+
+API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+echo "API: $API_URL"
+
+##########
+# Build proxy list
+##########
+
+# Builds CP_PREF_CLUSTER_PROXIES — a JSON array fragment used only as an
+# envsubst variable when rendering a cluster.networks template file.
+proxy_json_entries=""
+
+if [ -n "${CP_PREF_CLUSTER_PROXIES_DNS:-}" ]; then
+  add_proxy_entry "dns_proxy" "$CP_PREF_CLUSTER_PROXIES_DNS"
+fi
+if [ -n "${CP_PREF_CLUSTER_PROXIES_DNS_POST:-}" ]; then
+  add_proxy_entry "dns_proxy_post" "$CP_PREF_CLUSTER_PROXIES_DNS_POST"
+fi
+if [ -n "${CP_PREF_CLUSTER_PROXIES_HTTP:-}" ]; then
+  add_proxy_entry "http_proxy" "$CP_PREF_CLUSTER_PROXIES_HTTP"
+fi
+if [ -n "${CP_PREF_CLUSTER_PROXIES_HTTPS:-}" ]; then
+  add_proxy_entry "https_proxy" "$CP_PREF_CLUSTER_PROXIES_HTTPS"
+fi
+if [ -n "${CP_PREF_CLUSTER_PROXIES_NO:-}" ]; then
+  add_proxy_entry "no_proxy" "$CP_PREF_CLUSTER_PROXIES_NO"
+fi
+
+export CP_PREF_CLUSTER_PROXIES="$proxy_json_entries"
+unset proxy_json_entries
+
+##########
+# Register cluster networks config
+##########
+
 echo "Registering cluster.networks.config preference..."
 
 # Variables substituted when rendering a template file.
@@ -288,8 +331,9 @@ if [ -z "$networks_source_file" ] || [ ! -f "$networks_source_file" ]; then
   elif [ -f "$SCRIPT_DIR/assets/cluster.networks.config.json" ]; then
     networks_source_file="$SCRIPT_DIR/assets/cluster.networks.config.json"
   fi
-  [ -n "$networks_source_file" ] && [ -f "$networks_source_file" ] && \
+  if [ -n "$networks_source_file" ] && [ -f "$networks_source_file" ]; then
     echo "cluster.networks.config: applying variable substitution on $networks_source_file..."
+  fi
 fi
 
 if [ -n "$networks_source_file" ] && [ -f "$networks_source_file" ]; then
