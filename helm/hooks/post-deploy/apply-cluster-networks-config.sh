@@ -216,7 +216,7 @@ done
 echo "Loading config from cp-config-global..."
 CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
 eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r \
-  '.data | to_entries[] | select(.value != null and .value != "") | "export \(.key)=\(.value | @sh)"')"
+  '.data | to_entries[] | select(.value != null and .value != "") | select(.key | test("^[A-Za-z_][A-Za-z0-9_]*$")) | "export \(.key)=\(.value | @sh)"')"
 
 # Decode cluster networks config: { regions: [...], tags: {...} }  (tags optional)
 if [ -n "${CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC:-}" ]; then

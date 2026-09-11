@@ -215,7 +215,7 @@ function docker_register_image {
   if ! [[ "$disk_size" =~ ^[0-9]+$ ]] || [ "$disk_size" -lt 1 ]; then
     disk_size=50
   fi
-  if ! [[ "$endpoints" =~ ^\[.*\]$ ]]; then
+  if ! echo "$endpoints" | jq -e 'type == "array"' >/dev/null 2>&1; then
     endpoints="[]"
   fi
   if ! api_register_docker_image "$docker_registry_id" "$docker_registry_path" "$docker_image_name" "$disk_size" "$instance_type" "$default_command" "$short_description" "${full_description:-NA}" "$endpoints"; then
@@ -374,7 +374,7 @@ if ! (mkdir -p "$REGISTRY_CERTS_DIR" 2>/dev/null && echo "$CERTS_CONTENT" > "$RE
   fi
 fi
 
-if ! docker login -u "$CP_DEFAULT_ADMIN_NAME" -p "$CP_API_JWT_ADMIN" "$REGISTRY_PATH"; then
+if ! echo "$CP_API_JWT_ADMIN" | docker login -u "$CP_DEFAULT_ADMIN_NAME" --password-stdin "$REGISTRY_PATH"; then
   echo "docker login failed"
   exit 1
 fi
