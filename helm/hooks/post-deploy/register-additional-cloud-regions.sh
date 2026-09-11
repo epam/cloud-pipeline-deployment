@@ -15,6 +15,7 @@ function register_fileshares {
   local region_name="$2"
   local fileshares_json="$3"
   local existing_mounts="${4:-[]}"
+  local fs_errors=0
   if [ -z "$fileshares_json" ] || [ "$fileshares_json" = "[]" ] || [ "$fileshares_json" = "null" ]; then
     return 0
   fi
@@ -31,9 +32,12 @@ function register_fileshares {
     if [ -n "$fs_type" ] && [ "$fs_type" != "NFS" ] && [ "$fs_type" != "SMB" ]; then
       echo "WARNING: fileshare '$fs_mount' has unknown mountType '$fs_type' (expected NFS or SMB)."
     fi
-    api_register_fileshare "$region_id" "$fs_mount" "$fs_type" "$fs_options" \
-      || echo "WARNING: fileshare '$fs_mount' registration failed for region '$region_name'."
+    if ! api_register_fileshare "$region_id" "$fs_mount" "$fs_type" "$fs_options"; then
+      echo "ERROR: fileshare '$fs_mount' registration failed for region '$region_name'."
+      fs_errors=$((fs_errors + 1))
+    fi
   done < <(printf '%s' "$fileshares_json" | jq -c '.[]')
+  [ "$fs_errors" -eq 0 ]
 }
 
 function register_region {
@@ -132,7 +136,7 @@ function register_region {
     fi
     local existing_mounts
     existing_mounts=$(printf '%s' "$updated_region_json" | jq -r '[.fileShareMounts[]?.mountRoot // empty]' 2>/dev/null || echo "[]")
-    register_fileshares "$existing_id" "$region_name" "$fileshares_json" "$existing_mounts"
+    register_fileshares "$existing_id" "$region_name" "$fileshares_json" "$existing_mounts" || return 1
     return 0
   fi
 
@@ -184,7 +188,7 @@ function register_region {
     echo "WARNING: Region '$region_name' was created but id lookup failed; skipping fileshare registration."
     return 0
   fi
-  register_fileshares "$region_id" "$region_name" "$fileshares_json"
+  register_fileshares "$region_id" "$region_name" "$fileshares_json" || return 1
 }
 
 ##########

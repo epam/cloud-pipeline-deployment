@@ -28,17 +28,42 @@ api_get_entity_id() {
   return 1
 }
 
+# GET /folder/find?id= then GET /folder/{id}/load — FolderController.findFolder / loadFolder.
+# Echoes child pipeline names (one per line).
 api_get_folder_pipeline_names() {
   local folder_name="$1"
-  local folder_id
-  if ! folder_id=$(api_get_entity_id "$folder_name" "folder" 2>/dev/null); then
-    folder_id=""
-  fi
-  if [ -z "$folder_id" ] || [ "$folder_id" = "null" ]; then
+  local folder_id folder_json
+  if ! folder_id=$(api_get_entity_id "$folder_name" "folder"); then
     return 0
   fi
-  curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" "${API_URL}/folder/${folder_id}/load" \
-    | jq -r '(.payload.pipelines // []) | .[].name' 2>/dev/null || true
+  folder_json=$(call_api "/folder/${folder_id}/load" "$CP_API_JWT_ADMIN") || true
+  if ! check_api_response_status "$folder_json"; then
+    return 0
+  fi
+  printf '%s' "$folder_json" | jq -r '(.payload.pipelines // []) | .[].name' 2>/dev/null || true
+}
+
+api_find_pipeline_in_folder() {
+  local folder_name="$1"
+  local pipeline_name="$2"
+  local folder_id folder_json pipeline_id
+  if [ -z "$folder_name" ] || [ -z "$pipeline_name" ]; then
+    return 1
+  fi
+  if ! folder_id=$(api_get_entity_id "$folder_name" "folder"); then
+    return 1
+  fi
+  folder_json=$(call_api "/folder/${folder_id}/load" "$CP_API_JWT_ADMIN") || true
+  if ! check_api_response_status "$folder_json"; then
+    return 1
+  fi
+  pipeline_id=$(printf '%s' "$folder_json" | jq -r --arg n "$pipeline_name" \
+    '(.payload.pipelines // []) | map(select(.name == $n)) | .[0].id // empty')
+  if [ -n "$pipeline_id" ] && [ "$pipeline_id" != "null" ]; then
+    echo "$pipeline_id"
+    return 0
+  fi
+  return 1
 }
 
 api_create_folder() {
@@ -375,7 +400,7 @@ api_upload_demo_pipelines() {
     if [ -z "${_folder_pipelines_cache[$parent_folder]+x}" ]; then
       _folder_pipelines_cache[$parent_folder]=$(api_get_folder_pipeline_names "$parent_folder" || true)
     fi
-    if echo "${_folder_pipelines_cache[$parent_folder]}" | grep -qx "$pipeline_name"; then
+    if echo "${_folder_pipelines_cache[$parent_folder]}" | grep -Fqx "$pipeline_name"; then
       echo "Pipeline \"$pipeline_name\" already exists in folder \"$parent_folder\" — skipping."
       rm -rf "$work_dir"
       continue
@@ -410,6 +435,15 @@ api_register_data_transfer_pipeline() {
   local pipeline_friendly_name="${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_FRIENDLY_NAME:-data-transfer-pipeline}"
   local pipeline_description="${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_DESCRIPTION:-Data transfer pipeline}"
 
+  local pipeline_id=""
+  if pipeline_id=$(api_find_pipeline_in_folder "$system_folder" "$pipeline_friendly_name"); then
+    echo "Pipeline \"$pipeline_friendly_name\" already exists in folder \"$system_folder\" — skipping."
+    api_set_preference "storage.transfer.pipeline.id" "$pipeline_id" "true" || true
+    api_set_preference "storage.transfer.pipeline.version" "$pipeline_version" "true" || true
+    echo "Data transfer pipeline already registered (id=$pipeline_id)."
+    return 0
+  fi
+
   local work_dir
   work_dir=$(mktemp -d)
   cp -a "$source_dir/." "$work_dir/"
@@ -425,7 +459,6 @@ api_register_data_transfer_pipeline() {
     rm -rf "$work_dir"
     return 1
   fi
-  local pipeline_id
   if ! pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline"); then
     rm -rf "$work_dir"
     return 1
@@ -450,6 +483,14 @@ api_register_system_jobs_pipeline() {
   local pipeline_friendly_name="${CP_API_SRV_SYSTEM_JOBS_PIPELINE_FRIENDLY_NAME:-system-jobs-pipeline}"
   local pipeline_description="${CP_API_SRV_SYSTEM_JOBS_PIPELINE_DESCRIPTION:-System jobs pipeline}"
 
+  local pipeline_id=""
+  if pipeline_id=$(api_find_pipeline_in_folder "$system_folder" "$pipeline_friendly_name"); then
+    echo "Pipeline \"$pipeline_friendly_name\" already exists in folder \"$system_folder\" — skipping."
+    api_set_preference "system.jobs.pipeline.id" "$pipeline_id" "true" || true
+    echo "System jobs pipeline already registered (id=$pipeline_id)."
+    return 0
+  fi
+
   local work_dir
   work_dir=$(mktemp -d)
   cp -a "$source_dir/." "$work_dir/"
@@ -465,7 +506,6 @@ api_register_system_jobs_pipeline() {
     rm -rf "$work_dir"
     return 1
   fi
-  local pipeline_id
   if ! pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline"); then
     rm -rf "$work_dir"
     return 1
@@ -549,7 +589,7 @@ echo "API: $API_URL"
 # Validate configuration
 ##########
 
-if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-true}" = "false" ] && [ "${CP_REGISTER_HOOK_DEMO_PIPELINES:-true}" = "false" ]; then
+if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-false}" = "false" ] && [ "${CP_REGISTER_HOOK_DEMO_PIPELINES:-true}" = "false" ]; then
   echo "Registration of demo and system pipelines is disabled. Exiting."
   exit 0
 fi
@@ -571,7 +611,7 @@ fi
 # Register pipelines
 ##########
 
-if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-true}" = "true" ]; then
+if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-false}" = "true" ]; then
   echo "CP_REGISTER_HOOK_SYSTEM_PIPELINES=true — registering system pipelines..."
   set +e
   api_register_data_transfer_pipeline
