@@ -104,6 +104,11 @@ spec:
                   name: cp-idp-secret
               - secret:
                   name: cp-pki-secret
+                  items:
+                    - key: idp-ssl-public-cert.pem
+                      path: ssl-public-cert.pem
+                    - key: idp-ssl-private-key.pem
+                      path: ssl-private-key.pem
         - name: idp-profile-db
           hostPath:
             path: {{ .Values.profileDb.hostPath }}

@@ -134,6 +134,11 @@ spec:
             sources:
               - secret:
                   name: cp-pki-secret
+                  items:
+                    - key: git-public-cert.pem
+                      path: ssl-public-cert.pem
+                    - key: git-private-key.pem
+                      path: ssl-private-key.pem
               - secret:
                   name: cp-jwt-pki-secret
         - name: idp-pki

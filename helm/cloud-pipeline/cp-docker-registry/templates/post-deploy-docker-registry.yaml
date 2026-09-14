@@ -67,9 +67,9 @@ spec:
           secret:
             secretName: cp-pki-secret
             items:
-              - key: ssl-public-cert.pem
+              - key: docker-public-cert.pem
                 path: docker-public-cert.pem
-              - key: ssl-private-key.pem
+              - key: docker-private-key.pem
                 path: docker-private-key.pem
         - name: api-cert
           secret:

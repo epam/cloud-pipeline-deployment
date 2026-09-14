@@ -92,6 +92,11 @@ spec:
       {{- if hasKey $gitCfg "enabled" }}
       {{- $gitOn = index $gitCfg "enabled" }}
       {{- end }}
+      {{- $shareSrvCfg := .Values.shareSrv | default dict }}
+      {{- $shareSrvOn := false }}
+      {{- if hasKey $shareSrvCfg "enabled" }}
+      {{- $shareSrvOn = index $shareSrvCfg "enabled" }}
+      {{- end }}
       nodeSelector:
         cloud-pipeline/cp-edge: "true"
         cloud-pipeline/region: {{ .Values.region }}
@@ -130,14 +135,14 @@ spec:
               name: cp-api-secret
               readOnly: true
             - mountPath: /opt/idp/pki
-              name: cp-api-secret
+              name: cp-idp-pki
               readOnly: true
             - mountPath: /opt/edge/pki
-              name: cp-api-secret
+              name: cp-edge-pki
               readOnly: true
             {{- if $gitOn }}
             - mountPath: /etc/gitlab/pki
-              name: cp-api-secret
+              name: cp-git-pki
               readOnly: true
             {{- end }}
             - mountPath: /etc/docker-registry/pki
@@ -151,9 +156,11 @@ spec:
             - mountPath: /etc/nginx/ext/external-locs
               name: edge-external-locs
               readOnly: true
+            {{- if $shareSrvOn }}
             - mountPath: /opt/share-srv/pki
-              name: cp-api-secret
+              name: cp-share-srv-pki
               readOnly: true
+            {{- end }}
       dnsConfig:
         options:
           - name: ndots
@@ -166,13 +173,49 @@ spec:
                   name: cp-pki-secret
               - secret:
                   name: cp-jwt-pki-secret
+        - name: cp-edge-pki
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: edge-public-cert.pem
+                path: ssl-public-cert.pem
+              - key: edge-private-key.pem
+                path: ssl-private-key.pem
+        - name: cp-idp-pki
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: idp-ssl-public-cert.pem
+                path: ssl-public-cert.pem
+              - key: idp-ssl-private-key.pem
+                path: ssl-private-key.pem
+        {{- if $gitOn }}
+        - name: cp-git-pki
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: git-public-cert.pem
+                path: ssl-public-cert.pem
+              - key: git-private-key.pem
+                path: ssl-private-key.pem
+        {{- end }}
+        {{- if $shareSrvOn }}
+        - name: cp-share-srv-pki
+          secret:
+            secretName: cp-pki-secret
+            items:
+              - key: share-srv-public-cert.pem
+                path: ssl-public-cert.pem
+              - key: share-srv-private-key.pem
+                path: ssl-private-key.pem
+        {{- end }}
         - name: cp-docker-registry-pki
           secret:
             secretName: cp-pki-secret
             items:
-              - key: ssl-public-cert.pem
+              - key: docker-public-cert.pem
                 path: docker-public-cert.pem
-              - key: ssl-private-key.pem
+              - key: docker-private-key.pem
                 path: docker-private-key.pem
         - name: edge-logs
           hostPath:

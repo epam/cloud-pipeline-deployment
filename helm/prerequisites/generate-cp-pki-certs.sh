@@ -2,7 +2,12 @@
 #
 # Generate files for Kubernetes secret cp-pki-secret:
 #   ca-private-key.pem, ca-public-cert.pem
-#   ssl-private-key.pem, ssl-public-cert.pem
+#   ssl-private-key.pem, ssl-public-cert.pem              (cp-api-srv TLS)
+#   edge-private-key.pem, edge-public-cert.pem            (cp-edge TLS)
+#   docker-private-key.pem, docker-public-cert.pem        (cp-docker-registry TLS)
+#   git-private-key.pem, git-public-cert.pem              (cp-git / GitLab TLS)
+#   idp-ssl-private-key.pem, idp-ssl-public-cert.pem      (cp-idp HTTPS TLS)
+#   share-srv-private-key.pem, share-srv-public-cert.pem  (cp-share-srv TLS)
 #   sso-private-key.pem, sso-public-cert.pem
 #   cp-api-srv-ssl.p12, cp-api-srv-sso.p12
 #
@@ -19,12 +24,31 @@
 #   when omitted. EC keys (e.g. Let's Encrypt P-256) are supported — RSA SSO
 #   material is auto-generated since cp-idp requires RSA for SAML signing.
 #
+# Per-service certificates (optional import mode):
+#   Set service-specific TLS_CERT/TLS_KEY pairs to use separate certificates
+#   for each service. When unset, each service falls back to ssl-*.pem.
+#   DOCKER_TLS_CERT / DOCKER_TLS_KEY       — cp-docker-registry certificate
+#   EDGE_TLS_CERT / EDGE_TLS_KEY           — cp-edge certificate
+#   GIT_TLS_CERT / GIT_TLS_KEY             — cp-git / GitLab certificate
+#   IDP_TLS_CERT / IDP_TLS_KEY             — cp-idp HTTPS certificate
+#   SHARE_SRV_TLS_CERT / SHARE_SRV_TLS_KEY — cp-share-srv certificate
+#
 # Environment:
-#   TLS_CERT          Path to fullchain.pem (enables import mode)
-#   TLS_KEY           Path to privkey.pem   (enables import mode)
-#   CERT_DURATION     Validity in days for generated certs (default: 7300)
-#   OUTPUT_DIR        Output directory (default: ./certificates)
-#   PKCS12_PASSWORD   Password for .p12 files (default: changeit)
+#   TLS_CERT              Path to fullchain.pem (enables import mode)
+#   TLS_KEY               Path to privkey.pem   (enables import mode)
+#   DOCKER_TLS_CERT       Path to docker-registry fullchain.pem (optional)
+#   DOCKER_TLS_KEY        Path to docker-registry privkey.pem   (optional)
+#   EDGE_TLS_CERT         Path to cp-edge fullchain.pem (optional)
+#   EDGE_TLS_KEY          Path to cp-edge privkey.pem   (optional)
+#   GIT_TLS_CERT          Path to git/GitLab fullchain.pem (optional)
+#   GIT_TLS_KEY           Path to git/GitLab privkey.pem   (optional)
+#   IDP_TLS_CERT          Path to cp-idp HTTPS fullchain.pem (optional)
+#   IDP_TLS_KEY           Path to cp-idp HTTPS privkey.pem   (optional)
+#   SHARE_SRV_TLS_CERT    Path to share-srv fullchain.pem (optional)
+#   SHARE_SRV_TLS_KEY     Path to share-srv privkey.pem   (optional)
+#   CERT_DURATION         Validity in days for generated certs (default: 7300)
+#   OUTPUT_DIR            Output directory (default: ./certificates)
+#   PKCS12_PASSWORD       Password for .p12 files (default: changeit)
 #
 
 set -euo pipefail
@@ -110,6 +134,11 @@ cert_common_prepare_output_dir "$OUTPUT_DIR"
 rm -f \
   ca-private-key.pem ca-public-cert.pem ca-public-cert.srl ca-public-cert.pem.srl \
   ssl-private-key.pem ssl-public-cert.pem ssl-public-cert.csr \
+  docker-private-key.pem docker-public-cert.pem \
+  edge-private-key.pem edge-public-cert.pem \
+  git-private-key.pem git-public-cert.pem \
+  idp-ssl-private-key.pem idp-ssl-public-cert.pem \
+  share-srv-private-key.pem share-srv-public-cert.pem \
   sso-private-key.pem sso-public-cert.pem \
   cp-api-srv-ssl.p12 cp-api-srv-sso.p12 \
   cp-share-srv-ssl.p12 cp-share-srv-sso.p12 \
@@ -156,8 +185,35 @@ EOF
   rm -f ssl-public-cert.csr san.cnf
 fi
 
-# ── Step 3: ssl.p12 ───────────────────────────────────────────────────────────
-echo "Step 3/5: build cp-api-srv-ssl.p12 and cp-share-srv-ssl.p12..."
+# ── Step 3: per-service certificate copies ────────────────────────────────────
+echo "Step 3/6: create per-service certificate files (docker, git, share-srv)..."
+
+_copy_service_cert() {
+  local name="$1" pub="$2" priv="$3" src_cert="${4:-}" src_key="${5:-}"
+  if [[ -n "$src_cert" && -n "$src_key" ]]; then
+    echo "  ${name}: importing separate certificate"
+    cp -f "$src_cert" "$pub"; chmod 644 "$pub"
+    cp -f "$src_key"  "$priv"; chmod 600 "$priv"
+  else
+    echo "  ${name}: copying from ssl-*.pem (wildcard fallback)"
+    cp ssl-public-cert.pem "$pub"; chmod 644 "$pub"
+    cp ssl-private-key.pem "$priv"; chmod 600 "$priv"
+  fi
+}
+
+_copy_service_cert "docker-registry" docker-public-cert.pem docker-private-key.pem \
+  "${DOCKER_TLS_CERT:-}" "${DOCKER_TLS_KEY:-}"
+_copy_service_cert "edge" edge-public-cert.pem edge-private-key.pem \
+  "${EDGE_TLS_CERT:-}" "${EDGE_TLS_KEY:-}"
+_copy_service_cert "git" git-public-cert.pem git-private-key.pem \
+  "${GIT_TLS_CERT:-}" "${GIT_TLS_KEY:-}"
+_copy_service_cert "idp" idp-ssl-public-cert.pem idp-ssl-private-key.pem \
+  "${IDP_TLS_CERT:-}" "${IDP_TLS_KEY:-}"
+_copy_service_cert "share-srv" share-srv-public-cert.pem share-srv-private-key.pem \
+  "${SHARE_SRV_TLS_CERT:-}" "${SHARE_SRV_TLS_KEY:-}"
+
+# ── Step 4: ssl.p12 ───────────────────────────────────────────────────────────
+echo "Step 4/6: build cp-api-srv-ssl.p12 and cp-share-srv-ssl.p12..."
 openssl pkcs12 -export \
   -inkey ssl-private-key.pem \
   -in ssl-public-cert.pem \
@@ -166,15 +222,15 @@ openssl pkcs12 -export \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-api-srv-ssl.p12
 openssl pkcs12 -export \
-  -inkey ssl-private-key.pem \
-  -in ssl-public-cert.pem \
+  -inkey share-srv-private-key.pem \
+  -in share-srv-public-cert.pem \
   -out cp-share-srv-ssl.p12 \
   -name ssl \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-share-srv-ssl.p12
 
-# ── Step 4: SSO certificate ───────────────────────────────────────────────────
-echo "Step 4/5: prepare SSO certificate (RSA required for SAML)..."
+# ── Step 5: SSO certificate ───────────────────────────────────────────────────
+echo "Step 5/6: prepare SSO certificate (RSA required for SAML)..."
 if [[ "$IMPORT_MODE" == "true" && "$KEY_ALG" == "rsa" ]]; then
   echo "  TLS key is RSA: reusing for SSO"
   cp ssl-public-cert.pem sso-public-cert.pem; chmod 644 sso-public-cert.pem
@@ -224,8 +280,8 @@ EOF
   chmod 644 sso-public-cert.pem
 fi
 
-# ── Step 5: sso.p12 ───────────────────────────────────────────────────────────
-echo "Step 5/5: build cp-api-srv-sso.p12 and cp-share-srv-sso.p12..."
+# ── Step 6: sso.p12 ───────────────────────────────────────────────────────────
+echo "Step 6/6: build cp-api-srv-sso.p12 and cp-share-srv-sso.p12..."
 openssl pkcs12 -export \
   -inkey sso-private-key.pem \
   -in sso-public-cert.pem \

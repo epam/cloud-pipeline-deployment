@@ -151,18 +151,30 @@ chmod +x *.sh lib/*.sh
 
 ### Required files per secret
 
-**`cp-pki-secret`** — API TLS, SSO, and CA material:
+**`cp-pki-secret`** — all per-service TLS, SSO, and CA material:
 
-| File                  | Content                                                                                                                                                                             |
-|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `ca-private-key.pem`  | CA private key                                                                                                                                                                      |
-| `ca-public-cert.pem`  | CA certificate (PEM)                                                                                                                                                                |
-| `ssl-private-key.pem` | API/TLS private key (RSA)                                                                                                                                                           |
-| `ssl-public-cert.pem` | API/TLS certificate chain (cert + CA cert concatenated). SANs must cover `DNS:<api-domain>`, `DNS:*.<api-domain>`, and `DNS:docker.<api-domain>` (Docker registry reuses this cert) |
-| `sso-private-key.pem` | SSO signing private key                                                                                                                                                             |
-| `sso-public-cert.pem` | SSO signing certificate                                                                                                                                                             |
-| `cp-api-srv-ssl.p12`  | PKCS#12 of `ssl-private-key.pem` + `ssl-public-cert.pem`, alias `ssl`, password `changeit` (override with `PKCS12_PASSWORD`)                                                        |
-| `cp-api-srv-sso.p12`  | PKCS#12 of `sso-private-key.pem` + `sso-public-cert.pem`, alias `sso`, same password                                                                                                |
+| File                         | Content                                                                                                                                                          |
+|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ca-private-key.pem`         | CA private key                                                                                                                                                   |
+| `ca-public-cert.pem`         | CA certificate (PEM)                                                                                                                                             |
+| `ssl-private-key.pem`         | cp-api-srv TLS private key (default / fallback for all services)                                                                                                 |
+| `ssl-public-cert.pem`         | cp-api-srv TLS certificate chain (cert + CA cert concatenated). SANs must cover `DNS:<api-domain>`, `DNS:*.<api-domain>`                                         |
+| `docker-private-key.pem`      | cp-docker-registry TLS private key. Falls back to `ssl-private-key.pem` when no separate cert is provided.                                                      |
+| `docker-public-cert.pem`      | cp-docker-registry TLS certificate chain. Falls back to `ssl-public-cert.pem` when no separate cert is provided.                                                |
+| `edge-private-key.pem`        | cp-edge TLS private key. Falls back to `ssl-private-key.pem` when no separate cert is provided.                                                                 |
+| `edge-public-cert.pem`        | cp-edge TLS certificate chain. Falls back to `ssl-public-cert.pem` when no separate cert is provided.                                                           |
+| `git-private-key.pem`         | cp-git / GitLab TLS private key. Falls back to `ssl-private-key.pem` when no separate cert is provided.                                                         |
+| `git-public-cert.pem`         | cp-git / GitLab TLS certificate chain. Falls back to `ssl-public-cert.pem` when no separate cert is provided.                                                   |
+| `idp-ssl-private-key.pem`     | cp-idp HTTPS TLS private key. Falls back to `ssl-private-key.pem` when no separate cert is provided. (Distinct from `idp-private-key.pem` in `cp-idp-secret` which is for SAML signing.) |
+| `idp-ssl-public-cert.pem`     | cp-idp HTTPS TLS certificate chain. Falls back to `ssl-public-cert.pem` when no separate cert is provided.                                                      |
+| `share-srv-private-key.pem`   | cp-share-srv TLS private key. Falls back to `ssl-private-key.pem` when no separate cert is provided.                                                            |
+| `share-srv-public-cert.pem`   | cp-share-srv TLS certificate chain. Falls back to `ssl-public-cert.pem` when no separate cert is provided.                                                      |
+| `sso-private-key.pem`        | SSO signing private key                                                                                                                                          |
+| `sso-public-cert.pem`        | SSO signing certificate                                                                                                                                          |
+| `cp-api-srv-ssl.p12`         | PKCS#12 of `ssl-private-key.pem` + `ssl-public-cert.pem`, alias `ssl`, password `changeit` (override with `PKCS12_PASSWORD`)                                    |
+| `cp-api-srv-sso.p12`         | PKCS#12 of `sso-private-key.pem` + `sso-public-cert.pem`, alias `sso`, same password                                                                            |
+
+To supply separate per-service certificates, set `DOCKER_TLS_CERT`/`DOCKER_TLS_KEY`, `GIT_TLS_CERT`/`GIT_TLS_KEY`, or `SHARE_SRV_TLS_CERT`/`SHARE_SRV_TLS_KEY` when running `generate-cp-pki-certs.sh`. Without these, all service pairs are copies of `ssl-*.pem` (wildcard cert fallback).
 
 **`cp-jwt-pki-secret`** — internal JWT signing keys (no external PKI equivalent; generate with the script):
 
@@ -248,7 +260,7 @@ Four Kubernetes secrets are required before deployment (see `helm/prerequisites/
 
 | Secret                             | Source                                                                                                                          |
 |------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| `cp-pki-secret`                    | Org-provided or `generate-cp-pki-certs.sh` → `create-cp-secrets.sh`                                                            |
+| `cp-pki-secret`                    | Org-provided or `generate-cp-pki-certs.sh` → `create-cp-secrets.sh`. Contains per-service TLS pairs: `ssl-*.pem`, `docker-*.pem`, `edge-*.pem`, `git-*.pem`, `idp-ssl-*.pem`, `share-srv-*.pem`. |
 | `cp-jwt-pki-secret`                | `generate-cp-jwt-pki-certs.sh` → `create-cp-secrets.sh` (internal; no org PKI equivalent)                                      |
 | `cp-api-srv-fed-metadata-secret`   | `idp.enabled: true`: seeded empty by cp-idp pre-install hook, patched with IdP metadata by `hook-register-api-srv-in-idp`. `idp.enabled: false`: create manually before deploy. |
 | `cp-share-srv-fed-metadata-secret` | `shareSrv.enabled: true` + `idp.enabled: true`: seeded and patched by `hook-register-share-srv-in-idp`. Otherwise: create manually. |
