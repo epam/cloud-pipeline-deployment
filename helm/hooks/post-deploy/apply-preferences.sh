@@ -2,63 +2,9 @@
 # Helmfile postsync: set system API preferences. Args: NAMESPACE
 set -euo pipefail
 
-NAMESPACE="${1:-}"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=utils/cloud-pipeline-utils.sh
-source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
-
-[ -z "$NAMESPACE" ] && usage
-
-for cmd in kubectl curl jq base64 find; do
-  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd required but not installed"; exit 1; }
-done
-
-echo "Loading config from cp-config-global..."
-CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
-# key filter ensures only valid bash identifiers reach eval; non-conforming keys are skipped
-# (e.g. "my.key", "my-key", or "FOO=$(rm -rf /)" would be silently ignored)
-eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r '.data | to_entries[] | select(.value != null and .value != "") | select(.key | test("^[A-Za-z_][A-Za-z0-9_]*$")) | "export \(.key)=\(.value | @sh)"')"
-
-# Browser-friendly external API HTTPS origin for preference text (omit default :443).
-external_api_port="${CP_API_SRV_EXTERNAL_PORT:-443}"
-if [ -n "${CP_API_SRV_EXTERNAL_HOST:-}" ]; then
-  if [ "$external_api_port" = "443" ]; then
-    export CP_API_SRV_EXTERNAL_HTTPS_BASE="https://${CP_API_SRV_EXTERNAL_HOST}"
-  else
-    export CP_API_SRV_EXTERNAL_HTTPS_BASE="https://${CP_API_SRV_EXTERNAL_HOST}:${external_api_port}"
-  fi
-else
-  export CP_API_SRV_EXTERNAL_HTTPS_BASE=""
-fi
-unset external_api_port
-
-# Preserve literal $ in templates (e.g. $PATH) when running envsubst on preference JSON.
-export CP_DOLLAR='$'
-
-export CP_API_JWT_ADMIN
-CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
-[ -z "$CP_API_JWT_ADMIN" ] && { echo "CP_API_JWT_ADMIN not found in cp-api-token"; exit 1; }
-
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
-  echo "Missing API endpoint (internal or external host/port)"
-  exit 1
-fi
-validate_api_port "$API_CONNECT_PORT" || exit 1
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
-echo "API: $API_URL"
-
-# Global preference registry: JSON object {pref_name: extended_format_entry}.
-# Populated in phases by api_setup_base_preferences, then flushed once by prefs_registry_apply.
-__PREF_REGISTRY__='{}'
+##########
+# Functions
+##########
 
 function prefs_registry_reset {
   __PREF_REGISTRY__='{}'
@@ -75,7 +21,11 @@ function prefs_registry_merge_json {
 function prefs_registry_set {
   local name="$1" value_str="$2" visible="$3"
   local vis_bool
-  [ "$visible" = "true" ] && vis_bool=true || vis_bool=false
+  if [ "$visible" = "true" ]; then
+    vis_bool=true
+  else
+    vis_bool=false
+  fi
   __PREF_REGISTRY__=$(printf '%s' "$__PREF_REGISTRY__" | \
     jq -c --arg n "$name" --arg v "$value_str" --argjson vis "$vis_bool" \
     '.[$n] = {value: $v, visible: $vis}')
@@ -84,7 +34,6 @@ function prefs_registry_set {
 function cp_pref_var_to_preference_name {
   local var_name="$1"
   local pref_suffix
-
   # Generic conversion:
   #   CP_PREF_UI_PIPELINE_DEPLOYMENT_NAME -> ui.pipeline.deployment.name
   pref_suffix="${var_name#CP_PREF_}"
@@ -111,7 +60,6 @@ function queue_preference_override {
 function queue_cp_pref_variable {
   local var_name="$1" pref_value="$2"
   local pref_name
-
   pref_name=$(cp_pref_var_to_preference_name "$var_name")
   echo "Queueing preference from cp-config-global: $var_name -> $pref_name"
   queue_preference_override "$pref_name" "$pref_value"
@@ -309,6 +257,92 @@ function api_setup_base_preferences {
   # Phase 5: apply the complete accumulated registry to the API
   prefs_registry_apply || return 1
 }
+
+##########
+# Arguments
+##########
+
+NAMESPACE="${1:-}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=utils/cloud-pipeline-utils.sh
+source "$SCRIPT_DIR/utils/cloud-pipeline-utils.sh"
+
+##########
+# Preflight
+##########
+
+if [ -z "$NAMESPACE" ]; then
+  usage
+fi
+
+for cmd in kubectl curl jq base64 find; do
+  if ! command -v "$cmd" >/dev/null; then
+    echo "ERROR: $cmd required but not installed"
+    exit 1
+  fi
+done
+
+##########
+# Load configuration
+##########
+
+echo "Loading config from cp-config-global..."
+CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
+# key filter ensures only valid bash identifiers reach eval; non-conforming keys are skipped
+# (e.g. "my.key", "my-key", or "FOO=$(rm -rf /)" would be silently ignored)
+eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r '.data | to_entries[] | select(.value != null and .value != "") | select(.key | test("^[A-Za-z_][A-Za-z0-9_]*$")) | "export \(.key)=\(.value | @sh)"')"
+
+# Browser-friendly external API HTTPS origin for preference text (omit default :443).
+external_api_port="${CP_API_SRV_EXTERNAL_PORT:-443}"
+if [ -n "${CP_API_SRV_EXTERNAL_HOST:-}" ]; then
+  if [ "$external_api_port" = "443" ]; then
+    export CP_API_SRV_EXTERNAL_HTTPS_BASE="https://${CP_API_SRV_EXTERNAL_HOST}"
+  else
+    export CP_API_SRV_EXTERNAL_HTTPS_BASE="https://${CP_API_SRV_EXTERNAL_HOST}:${external_api_port}"
+  fi
+else
+  export CP_API_SRV_EXTERNAL_HTTPS_BASE=""
+fi
+unset external_api_port
+
+# Preserve literal $ in templates (e.g. $PATH) when running envsubst on preference JSON.
+export CP_DOLLAR='$'
+
+export CP_API_JWT_ADMIN
+CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
+if [ -z "$CP_API_JWT_ADMIN" ]; then
+  echo "CP_API_JWT_ADMIN not found in cp-api-token"
+  exit 1
+fi
+
+##########
+# Resolve API endpoint
+##########
+
+if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
+  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
+  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
+else
+  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
+  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
+fi
+if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
+  echo "Missing API endpoint (internal or external host/port)"
+  exit 1
+fi
+validate_api_port "$API_CONNECT_PORT" || exit 1
+
+API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+echo "API: $API_URL"
+
+##########
+# Apply preferences
+##########
+
+# Global preference registry: JSON object {pref_name: extended_format_entry}.
+# Populated in phases by api_setup_base_preferences, then flushed once by prefs_registry_apply.
+__PREF_REGISTRY__='{}'
 
 echo "Setting system preferences ..."
 api_setup_base_preferences

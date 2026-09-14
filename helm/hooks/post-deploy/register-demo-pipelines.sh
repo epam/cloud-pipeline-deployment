@@ -1,81 +1,21 @@
 #!/usr/bin/env bash
-# Sourced by configure-git.sh after GitLab prefs exist (register-demo-pipelines.sh).
+# Helmfile postsync: register demo and system pipelines via the Cloud Pipeline API.
 # Runner: tar, envsubst; git runs inside cp-git.
 #
 # Demo pipe-demo assets: on by default; opt out with CP_REGISTER_HOOK_DEMO_PIPELINES=false.
 # System (data_loader + system_jobs): default off; opt in with CP_REGISTER_HOOK_SYSTEM_PIPELINES=true.
 set -euo pipefail
 
-NAMESPACE="${1:-}"
-export CP_DOLLAR='$'
+##########
+# Functions
+##########
 
-# shellcheck source=utils/cloud-pipeline-utils.sh
-source "$(dirname "${BASH_SOURCE[0]}")/utils/cloud-pipeline-utils.sh"
-
-if ! kubectl get deployment cp-git -n "$NAMESPACE" &>/dev/null; then
-  echo "cp-git not found in namespace $NAMESPACE, skipping"
-  exit 0
-fi
-
-ASSET_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/assets" && pwd)"
-
-if ! command -v tar >/dev/null 2>&1; then
-  echo "WARNING: tar not found — skipping optional hook pipeline registration."
-  return 1
-fi
-
-if ! command -v envsubst >/dev/null 2>&1; then
-  echo "WARNING: envsubst not found — skipping optional hook pipeline registration (install gettext)."
-  return 1
-fi
-
-echo "Loading config from cp-config-global..."
-CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
-# key filter ensures only valid bash identifiers reach eval; non-conforming keys are skipped
-# (e.g. "my.key", "my-key", or "FOO=$(rm -rf /)" would be silently ignored)
-eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r '.data | to_entries[] | select(.value != null and .value != "") | select(.key | test("^[A-Za-z_][A-Za-z0-9_]*$")) | "export \(.key)=\(.value | @sh)"')"
-
-export CP_API_JWT_ADMIN
-CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
-[ -z "${CP_API_JWT_ADMIN:-}" ] && { echo "ERROR: CP_API_JWT_ADMIN not found in cp-api-token"; exit 1; }
-
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-if [ -z "${API_CONNECT_HOST:-}" ] || [ -z "${API_CONNECT_PORT:-}" ]; then
-  echo "ERROR: Missing API endpoint (set CP_API_SRV_INTERNAL_* or CP_API_SRV_EXTERNAL_* in API configmaps)."
-  exit 1
-fi
-validate_api_port "$API_CONNECT_PORT" || exit 1
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
-echo "API: $API_URL"
-
-if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-true}" = "false" ] && [ "${CP_REGISTER_HOOK_DEMO_PIPELINES:-true}" = "false" ]; then
-  echo "Registration of demo pipelines is disabled. Exiting."
-  exit 0
-fi
-
-for _var in GITLAB_ROOT_PASSWORD GITLAB_ROOT_USER CP_GITLAB_INTERNAL_PORT; do
-  eval "_val=\${${_var}:-}"
-  [ -z "$_val" ] && { echo "ERROR: Required variable $_var is not set in cp-config-global"; exit 1; }
-done
-unset _var _val
-
-if [ -z "${CP_CLOUD_PLATFORM:-}" ]; then
-  echo "WARNING: CP_CLOUD_PLATFORM is not set — demo pipelines will be skipped (no matching instance type)."
-fi
-
-
-# REST helpers (folders, pipelines, grants) for the Pipeline API.
 api_get_entity_id() {
   local entity_name="$1"
   local entity_type="$2"
-  [ -z "$entity_type" ] && return 1
+  if [ -z "$entity_type" ]; then
+    return 1
+  fi
   entity_type="$(echo "$entity_type" | tr '[:upper:]' '[:lower:]')"
   local entity_json
   entity_json=$(call_api "/${entity_type}/find?id=${entity_name}" "$CP_API_JWT_ADMIN")
@@ -83,6 +23,44 @@ api_get_entity_id() {
   entity_id=$(echo "$entity_json" | jq -r ".payload.id")
   if [ "$entity_id" ] && [ "$entity_id" != "null" ]; then
     echo "$entity_id"
+    return 0
+  fi
+  return 1
+}
+
+# GET /folder/find?id= then GET /folder/{id}/load — FolderController.findFolder / loadFolder.
+# Echoes child pipeline names (one per line).
+api_get_folder_pipeline_names() {
+  local folder_name="$1"
+  local folder_id folder_json
+  if ! folder_id=$(api_get_entity_id "$folder_name" "folder"); then
+    return 0
+  fi
+  folder_json=$(call_api "/folder/${folder_id}/load" "$CP_API_JWT_ADMIN") || true
+  if ! check_api_response_status "$folder_json"; then
+    return 0
+  fi
+  printf '%s' "$folder_json" | jq -r '(.payload.pipelines // []) | .[].name' 2>/dev/null || true
+}
+
+api_find_pipeline_in_folder() {
+  local folder_name="$1"
+  local pipeline_name="$2"
+  local folder_id folder_json pipeline_id
+  if [ -z "$folder_name" ] || [ -z "$pipeline_name" ]; then
+    return 1
+  fi
+  if ! folder_id=$(api_get_entity_id "$folder_name" "folder"); then
+    return 1
+  fi
+  folder_json=$(call_api "/folder/${folder_id}/load" "$CP_API_JWT_ADMIN") || true
+  if ! check_api_response_status "$folder_json"; then
+    return 1
+  fi
+  pipeline_id=$(printf '%s' "$folder_json" | jq -r --arg n "$pipeline_name" \
+    '(.payload.pipelines // []) | map(select(.name == $n)) | .[0].id // empty')
+  if [ -n "$pipeline_id" ] && [ "$pipeline_id" != "null" ]; then
+    echo "$pipeline_id"
     return 0
   fi
   return 1
@@ -111,11 +89,15 @@ api_create_folder() {
 
 api_create_folder_path() {
   local folder_path="$1"
-  [ -z "$folder_path" ] && return 1
+  if [ -z "$folder_path" ]; then
+    return 1
+  fi
   local path_segments current_folder_path="" current_folder_id parent_folder_id=""
   IFS="/" read -ra path_segments <<< "$folder_path"
   for path_segment in "${path_segments[@]}"; do
-    [ -z "$path_segment" ] && continue
+    if [ -z "$path_segment" ]; then
+      continue
+    fi
     current_folder_path="${current_folder_path}/${path_segment}"
     current_folder_path=${current_folder_path#/}
     current_folder_id=$(api_get_entity_id "$current_folder_path" "folder" || true)
@@ -219,23 +201,16 @@ api_register_pipeline_with_git_in_pod() {
   local pipeline_role_permissions="${6:-21}"
   local pipeline_version="${7:-v1}"
 
-  if existing_id=$(api_get_entity_id "$pipeline_name" "pipeline" 2>/dev/null); then
-    if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
-      echo "Pipeline \"$pipeline_name\" already exists (id=$existing_id) — skipping."
-      return 0
-    fi
-  fi
-
   local parent_folder_id
-  parent_folder_id=$(api_get_entity_id "$parent_folder_name" "folder") || {
+  if ! parent_folder_id=$(api_get_entity_id "$parent_folder_name" "folder"); then
     echo "ERROR: folder \"$parent_folder_name\" not found"
     return 1
-  }
+  fi
 
-  [ -d "$pipeline_sources_dir" ] || {
+  if [ ! -d "$pipeline_sources_dir" ]; then
     echo "ERROR: sources dir missing: $pipeline_sources_dir"
     return 1
-  }
+  fi
 
   local pipeline_id=""
   if ! api_create_pipeline "$pipeline_name" "$pipeline_description" "$parent_folder_id"; then
@@ -260,17 +235,14 @@ api_register_pipeline_with_git_in_pod() {
     fi
   fi
 
-  api_entity_grant "$pipeline_id" "PIPELINE" "$pipeline_role_permissions" "$pipeline_role_grant" || {
+  if ! api_entity_grant "$pipeline_id" "PIPELINE" "$pipeline_role_permissions" "$pipeline_role_grant"; then
     echo "WARNING: grant failed for $pipeline_name"
-  }
+  fi
 
-  local repo_slug timestamp_suffix work_dir_in_pod
+  local repo_slug timestamp_suffix
   repo_slug=$(echo "$pipeline_name" | sed 's/[^0-9a-zA-Z]//g' | tr '[:upper:]' '[:lower:]')
   timestamp_suffix=$(date +%s%N)
-  work_dir_in_pod="/tmp/cp-hook-src-${timestamp_suffix}"
 
-  # One exec session: tar on stdin + git in the same pod. Two separate execs can target
-  # different cp-git replicas (Deployment) so SRC_DIR from the first exec may not exist on the second.
   local push_attempts push_err_file
   push_attempts="${CP_HOOK_DEMO_PUSH_ATTEMPTS:-5}"
   if ! [[ "$push_attempts" =~ ^[1-9][0-9]*$ ]]; then
@@ -279,7 +251,12 @@ api_register_pipeline_with_git_in_pod() {
   fi
   push_err_file=$(mktemp)
   rm -f "$push_err_file"
+
+  # One exec session: tar on stdin + git in the same pod. Two separate execs can target
+  # different cp-git replicas (Deployment) so SRC_DIR from the first exec may not exist on the second.
   for attempt in $(seq 1 "$push_attempts"); do
+    local work_dir_in_pod clone_dir
+    work_dir_in_pod="/tmp/cp-hook-src-${timestamp_suffix}"
     clone_dir="/tmp/cp-hook-clone-${timestamp_suffix}-try${attempt}"
     if tar czf - -C "$pipeline_sources_dir" . | kubectl -n "$NAMESPACE" exec -i deployment/cp-git -- \
       env \
@@ -319,7 +296,11 @@ api_register_pipeline_with_git_in_pod() {
     fi
     if [ "$attempt" -eq "$push_attempts" ]; then
       echo "ERROR: git push failed for $pipeline_name after $push_attempts attempt(s)."
-      [ -s "$push_err_file" ] && { echo "--- git error ---"; cat "$push_err_file"; echo "-----------------"; }
+      if [ -s "$push_err_file" ]; then
+        echo "--- git error ---"
+        cat "$push_err_file"
+        echo "-----------------"
+      fi
       rm -f "$push_err_file"
       return 1
     fi
@@ -342,13 +323,19 @@ api_register_pipeline_with_git_in_pod() {
     if [ -n "$pipeline_commit_id" ] && [ "$pipeline_commit_id" != "null" ]; then
       break
     fi
-    [ "$attempt" -lt "$load_attempts" ] && sleep 5
+    if [ "$attempt" -lt "$load_attempts" ]; then
+      sleep 5
+    fi
   done
-  [ -n "$pipeline_commit_id" ] && [ "$pipeline_commit_id" != "null" ] || {
+  if [ -z "$pipeline_commit_id" ] || [ "$pipeline_commit_id" = "null" ]; then
     echo "ERROR: missing commitId for $pipeline_name"
-    [ -n "${pipeline_details_json:-}" ] && { echo "--- pipeline/load response ---"; echo "$pipeline_details_json"; echo "------------------------------"; }
+    if [ -n "${pipeline_details_json:-}" ]; then
+      echo "--- pipeline/load response ---"
+      echo "$pipeline_details_json"
+      echo "------------------------------"
+    fi
     return 1
-  }
+  fi
   api_release_pipeline "$pipeline_id" "$pipeline_commit_id" "$pipeline_version" || return 1
   echo "Registered pipeline \"$pipeline_name\" (id=$pipeline_id, version=$pipeline_version)"
   return 0
@@ -356,14 +343,17 @@ api_register_pipeline_with_git_in_pod() {
 
 api_upload_demo_pipelines() {
   local demo_root="${1:-$ASSET_ROOT_DIR/pipe-demo}"
-  [ -d "$demo_root" ] || {
+  if [ ! -d "$demo_root" ]; then
     echo "WARNING: demo root not found: $demo_root"
     return 0
-  }
-  local spec_file
-  local pipeline_spec
-  local parent_folder pipeline_name pipeline_description pipeline_version grant_role grant_permissions instance_type
-  local work_dir
+  fi
+
+  local spec_file pipeline_spec work_dir
+  local parent_folder pipeline_name pipeline_description pipeline_version
+  local grant_role grant_permissions instance_type
+  # Cache of folder pipeline names: key=folder_name, value=newline-separated pipeline names.
+  declare -A _folder_pipelines_cache
+
   while IFS= read -r -d '' spec_file; do
     work_dir=$(mktemp -d)
     cp -a "$(dirname "$spec_file")/." "$work_dir/"
@@ -373,17 +363,18 @@ api_upload_demo_pipelines() {
       continue
     fi
     pipeline_spec=$(cat "$work_dir/spec.json")
-    parent_folder=$(echo "$pipeline_spec"    | jq -r '.parent_folder // "Pipelines"')
-    pipeline_name=$(echo "$pipeline_spec"    | jq -r '.name // "NA"')
+    parent_folder=$(echo "$pipeline_spec"     | jq -r '.parent_folder // "Pipelines"')
+    pipeline_name=$(echo "$pipeline_spec"     | jq -r '.name // "NA"')
     pipeline_description=$(echo "$pipeline_spec" | jq -r '.description // ""')
-    pipeline_version=$(echo "$pipeline_spec" | jq -r '.version // "v1"')
-    grant_role=$(echo "$pipeline_spec"       | jq -r '.grant_role_name // "ROLE_USER"')
+    pipeline_version=$(echo "$pipeline_spec"  | jq -r '.version // "v1"')
+    grant_role=$(echo "$pipeline_spec"        | jq -r '.grant_role_name // "ROLE_USER"')
     grant_permissions=$(echo "$pipeline_spec" | jq -r '.grant_role_permissions // "21"')
     if ! [[ "$grant_permissions" =~ ^[0-9]+$ ]]; then
       echo "WARNING: spec.json grant_role_permissions='$grant_permissions' is not a non-negative integer; using 21."
       grant_permissions="21"
     fi
-    instance_type=$(echo "$pipeline_spec"    | jq -r ".[\"${CP_CLOUD_PLATFORM:-}\"] // \"NA\"")
+    instance_type=$(echo "$pipeline_spec" | jq -r ".[\"${CP_CLOUD_PLATFORM:-}\"] // \"NA\"")
+
     if [ -z "$pipeline_description" ]; then
       echo "WARNING: skip demo (no description): $(dirname "$spec_file")"
       rm -rf "$work_dir"
@@ -394,8 +385,10 @@ api_upload_demo_pipelines() {
       rm -rf "$work_dir"
       continue
     fi
+
     export CP_CONFIG_JSON_INSTANCE_TYPE="$instance_type"
-    envsubst < "$work_dir/config.json" > "$work_dir/config.json.__new" && mv "$work_dir/config.json.__new" "$work_dir/config.json"
+    envsubst < "$work_dir/config.json" > "$work_dir/config.json.__new"
+    mv "$work_dir/config.json.__new" "$work_dir/config.json"
     unset CP_CONFIG_JSON_INSTANCE_TYPE
     if ! jq -e . "$work_dir/config.json" >/dev/null 2>&1; then
       echo "WARNING: config.json is invalid JSON after envsubst for '$pipeline_name'; skipping."
@@ -403,17 +396,27 @@ api_upload_demo_pipelines() {
       continue
     fi
 
+    # Load folder pipeline list once per folder name (cached).
+    if [ -z "${_folder_pipelines_cache[$parent_folder]+x}" ]; then
+      _folder_pipelines_cache[$parent_folder]=$(api_get_folder_pipeline_names "$parent_folder" || true)
+    fi
+    if echo "${_folder_pipelines_cache[$parent_folder]}" | grep -Fqx "$pipeline_name"; then
+      echo "Pipeline \"$pipeline_name\" already exists in folder \"$parent_folder\" — skipping."
+      rm -rf "$work_dir"
+      continue
+    fi
+
     echo "Demo pipeline: $pipeline_name ($(dirname "$spec_file"))"
-    api_create_folder_path "$parent_folder" || {
+    if ! api_create_folder_path "$parent_folder"; then
       echo "WARNING: folder path failed for $pipeline_name"
       rm -rf "$work_dir"
       continue
-    }
-    api_register_pipeline_with_git_in_pod "$parent_folder" "$pipeline_name" "$pipeline_description" "$work_dir" "$grant_role" "$grant_permissions" "$pipeline_version" || {
+    fi
+    if ! api_register_pipeline_with_git_in_pod "$parent_folder" "$pipeline_name" "$pipeline_description" "$work_dir" "$grant_role" "$grant_permissions" "$pipeline_version"; then
       echo "WARNING: demo registration failed: $pipeline_name"
       rm -rf "$work_dir"
       continue
-    }
+    fi
     rm -rf "$work_dir"
   done < <(find "$demo_root" -type f -name spec.json -print0)
 }
@@ -424,31 +427,42 @@ api_register_data_transfer_pipeline() {
   local pipeline_version
   pipeline_version=$(echo "${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_VERSION:-v1}" | tr -d '"')
   local source_dir="$ASSET_ROOT_DIR/data_loader"
-  [ -f "$source_dir/config.json" ] || {
+  if [ ! -f "$source_dir/config.json" ]; then
     echo "WARNING: data_loader assets missing under $source_dir — skip."
     return 0
-  }
+  fi
+  local system_folder="${CP_API_SRV_SYSTEM_FOLDER_NAME:-SYSTEM}"
+  local pipeline_friendly_name="${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_FRIENDLY_NAME:-data-transfer-pipeline}"
+  local pipeline_description="${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_DESCRIPTION:-Data transfer pipeline}"
+
+  local pipeline_id=""
+  if pipeline_id=$(api_find_pipeline_in_folder "$system_folder" "$pipeline_friendly_name"); then
+    echo "Pipeline \"$pipeline_friendly_name\" already exists in folder \"$system_folder\" — skipping."
+    api_set_preference "storage.transfer.pipeline.id" "$pipeline_id" "true" || true
+    api_set_preference "storage.transfer.pipeline.version" "$pipeline_version" "true" || true
+    echo "Data transfer pipeline already registered (id=$pipeline_id)."
+    return 0
+  fi
+
   local work_dir
   work_dir=$(mktemp -d)
   cp -a "$source_dir/." "$work_dir/"
-  envsubst < "$work_dir/config.json" > "$work_dir/config.json.__new" && mv "$work_dir/config.json.__new" "$work_dir/config.json"
+  envsubst < "$work_dir/config.json" > "$work_dir/config.json.__new"
+  mv "$work_dir/config.json.__new" "$work_dir/config.json"
   if ! jq -e . "$work_dir/config.json" >/dev/null 2>&1; then
     echo "ERROR: data_loader config.json is invalid JSON after envsubst"
     rm -rf "$work_dir"
     return 1
   fi
-  local system_folder="${CP_API_SRV_SYSTEM_FOLDER_NAME:-SYSTEM}"
-  local pipeline_friendly_name="${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_FRIENDLY_NAME:-data-transfer-pipeline}"
-  local pipeline_description="${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_DESCRIPTION:-Data transfer pipeline}"
-  api_register_pipeline_with_git_in_pod "$system_folder" "$pipeline_friendly_name" "$pipeline_description" "$work_dir" "$role_grant" "$role_permissions" "$pipeline_version" || {
+
+  if ! api_register_pipeline_with_git_in_pod "$system_folder" "$pipeline_friendly_name" "$pipeline_description" "$work_dir" "$role_grant" "$role_permissions" "$pipeline_version"; then
     rm -rf "$work_dir"
     return 1
-  }
-  local pipeline_id
-  pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline") || {
+  fi
+  if ! pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline"); then
     rm -rf "$work_dir"
     return 1
-  }
+  fi
   api_set_preference "storage.transfer.pipeline.id" "$pipeline_id" "true" || true
   api_set_preference "storage.transfer.pipeline.version" "$pipeline_version" "true" || true
   rm -rf "$work_dir"
@@ -461,37 +475,143 @@ api_register_system_jobs_pipeline() {
   local pipeline_version
   pipeline_version=$(echo "${CP_API_SRV_SYSTEM_JOBS_PIPELINE_VERSION:-v1}" | tr -d '"')
   local source_dir="$ASSET_ROOT_DIR/system_jobs"
-  [ -f "$source_dir/config.json" ] || {
+  if [ ! -f "$source_dir/config.json" ]; then
     echo "WARNING: system_jobs assets missing under $source_dir — skip."
     return 0
-  }
+  fi
+  local system_folder="${CP_API_SRV_SYSTEM_FOLDER_NAME:-SYSTEM}"
+  local pipeline_friendly_name="${CP_API_SRV_SYSTEM_JOBS_PIPELINE_FRIENDLY_NAME:-system-jobs-pipeline}"
+  local pipeline_description="${CP_API_SRV_SYSTEM_JOBS_PIPELINE_DESCRIPTION:-System jobs pipeline}"
+
+  local pipeline_id=""
+  if pipeline_id=$(api_find_pipeline_in_folder "$system_folder" "$pipeline_friendly_name"); then
+    echo "Pipeline \"$pipeline_friendly_name\" already exists in folder \"$system_folder\" — skipping."
+    api_set_preference "system.jobs.pipeline.id" "$pipeline_id" "true" || true
+    echo "System jobs pipeline already registered (id=$pipeline_id)."
+    return 0
+  fi
+
   local work_dir
   work_dir=$(mktemp -d)
   cp -a "$source_dir/." "$work_dir/"
-  envsubst < "$work_dir/config.json" > "$work_dir/config.json.__new" && mv "$work_dir/config.json.__new" "$work_dir/config.json"
+  envsubst < "$work_dir/config.json" > "$work_dir/config.json.__new"
+  mv "$work_dir/config.json.__new" "$work_dir/config.json"
   if ! jq -e . "$work_dir/config.json" >/dev/null 2>&1; then
     echo "ERROR: system_jobs config.json is invalid JSON after envsubst"
     rm -rf "$work_dir"
     return 1
   fi
-  local system_folder="${CP_API_SRV_SYSTEM_FOLDER_NAME:-SYSTEM}"
-  local pipeline_friendly_name="${CP_API_SRV_SYSTEM_JOBS_PIPELINE_FRIENDLY_NAME:-system-jobs-pipeline}"
-  local pipeline_description="${CP_API_SRV_SYSTEM_JOBS_PIPELINE_DESCRIPTION:-System jobs pipeline}"
-  api_register_pipeline_with_git_in_pod "$system_folder" "$pipeline_friendly_name" "$pipeline_description" "$work_dir" "$role_grant" "$role_permissions" "$pipeline_version" || {
+
+  if ! api_register_pipeline_with_git_in_pod "$system_folder" "$pipeline_friendly_name" "$pipeline_description" "$work_dir" "$role_grant" "$role_permissions" "$pipeline_version"; then
     rm -rf "$work_dir"
     return 1
-  }
-  local pipeline_id
-  pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline") || {
+  fi
+  if ! pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline"); then
     rm -rf "$work_dir"
     return 1
-  }
+  fi
   api_set_preference "system.jobs.pipeline.id" "$pipeline_id" "true" || true
   rm -rf "$work_dir"
   echo "System jobs pipeline registered (id=$pipeline_id)."
 }
 
-if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-true}" = "true" ]; then
+##########
+# Arguments
+##########
+
+NAMESPACE="${1:-}"
+export CP_DOLLAR='$'
+
+# shellcheck source=utils/cloud-pipeline-utils.sh
+source "$(dirname "${BASH_SOURCE[0]}")/utils/cloud-pipeline-utils.sh"
+
+##########
+# Preflight
+##########
+
+if ! kubectl get deployment cp-git -n "$NAMESPACE" &>/dev/null; then
+  echo "cp-git not found in namespace $NAMESPACE, skipping"
+  exit 0
+fi
+
+if ! command -v tar >/dev/null 2>&1; then
+  echo "WARNING: tar not found — skipping optional hook pipeline registration."
+  exit 0
+fi
+
+if ! command -v envsubst >/dev/null 2>&1; then
+  echo "WARNING: envsubst not found — skipping optional hook pipeline registration (install gettext)."
+  exit 0
+fi
+
+##########
+# Load configuration
+##########
+
+ASSET_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/assets" && pwd)"
+
+echo "Loading config from cp-config-global..."
+CP_CONFIG_GLOBAL_JSON=$(kubectl get configmap cp-config-global -n "$NAMESPACE" -o json)
+# key filter ensures only valid bash identifiers reach eval; non-conforming keys are skipped
+# (e.g. "my.key", "my-key", or "FOO=$(rm -rf /)" would be silently ignored)
+eval "$(echo "$CP_CONFIG_GLOBAL_JSON" | jq -r '.data | to_entries[] | select(.value != null and .value != "") | select(.key | test("^[A-Za-z_][A-Za-z0-9_]*$")) | "export \(.key)=\(.value | @sh)"')"
+
+export CP_API_JWT_ADMIN
+CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
+if [ -z "${CP_API_JWT_ADMIN:-}" ]; then
+  echo "ERROR: CP_API_JWT_ADMIN not found in cp-api-token"
+  exit 1
+fi
+
+##########
+# Resolve API endpoint
+##########
+
+if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
+  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
+  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
+else
+  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
+  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
+fi
+if [ -z "${API_CONNECT_HOST:-}" ] || [ -z "${API_CONNECT_PORT:-}" ]; then
+  echo "ERROR: Missing API endpoint (set CP_API_SRV_INTERNAL_* or CP_API_SRV_EXTERNAL_* in API configmaps)."
+  exit 1
+fi
+if ! validate_api_port "$API_CONNECT_PORT"; then
+  exit 1
+fi
+
+API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+echo "API: $API_URL"
+
+##########
+# Validate configuration
+##########
+
+if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-false}" = "false" ] && [ "${CP_REGISTER_HOOK_DEMO_PIPELINES:-true}" = "false" ]; then
+  echo "Registration of demo and system pipelines is disabled. Exiting."
+  exit 0
+fi
+
+for _var in GITLAB_ROOT_PASSWORD GITLAB_ROOT_USER CP_GITLAB_INTERNAL_PORT; do
+  eval "_val=\${${_var}:-}"
+  if [ -z "$_val" ]; then
+    echo "ERROR: Required variable $_var is not set in cp-config-global"
+    exit 1
+  fi
+done
+unset _var _val
+
+if [ -z "${CP_CLOUD_PLATFORM:-}" ]; then
+  echo "WARNING: CP_CLOUD_PLATFORM is not set — demo pipelines will be skipped (no matching instance type)."
+fi
+
+##########
+# Register pipelines
+##########
+
+if [ "${CP_REGISTER_HOOK_SYSTEM_PIPELINES:-false}" = "true" ]; then
   echo "CP_REGISTER_HOOK_SYSTEM_PIPELINES=true — registering system pipelines..."
   set +e
   api_register_data_transfer_pipeline

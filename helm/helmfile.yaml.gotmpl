@@ -5,9 +5,7 @@ helmDefaults:
 {{/* ===== Load values file ===== */}}
 {{/* Lookup order: environment helmfileValues → HELMFILE_VALUES env var → $PWD/values.yaml */}}
 {{- $ValuesFilePath := index .Environment.Values "helmfileValues" | default (env "HELMFILE_VALUES") | default (printf "%s/values.yaml" (env "PWD")) }}
-{{/* Merge chart defaults (./values.yaml) with user values — user wins on conflict, same as Helm */}}
-{{- $defaultValues := readFile "./values.yaml" | fromYaml }}
-{{- $deployValues  := mergeOverwrite $defaultValues (readFile $ValuesFilePath | fromYaml) }}
+{{- $deployValues  := readFile $ValuesFilePath | fromYaml }}
 
 {{/* ===== Per-component value slices ===== */}}
 {{- $generalValues          := index $deployValues "general"          | default dict }}

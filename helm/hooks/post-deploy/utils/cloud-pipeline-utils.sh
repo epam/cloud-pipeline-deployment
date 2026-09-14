@@ -187,7 +187,7 @@ function api_register_fileshare {
   local mount_point="$2"
   local mount_type="${3:-}"
   local mount_options="${4:-}"
-  local payload response rc
+  local payload response
   payload=$(jq -nc \
     --argjson rid "$region_id" \
     --arg root "$mount_point" \
@@ -195,11 +195,11 @@ function api_register_fileshare {
     --arg opts "$mount_options" \
     '{"regionId":$rid,"mountRoot":$root,"mountType":$type,"mountOptions":$opts}')
   response=$(call_api "/filesharemount" "$CP_API_JWT_ADMIN" "$payload" || true)
-  rc=$?
-  if [ $rc -ne 0 ]; then
+  if ! check_api_response_status "$response"; then
     echo "ERROR: api_register_fileshare: failed for $mount_point: $response" >&2
+    return 1
   fi
-  return $rc
+  return 0
 }
 
 # GET /entities?identifier=<region_name>&aclClass=CLOUD_REGION → echoes .payload.id; returns 1 if not found.
