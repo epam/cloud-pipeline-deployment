@@ -31,7 +31,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: configmap-to-update-cp-docker-registry
+  name: configmap-to-update-{{ .Values.service.name }}
   namespace: {{ $namespace }}
   annotations:
     "helm.sh/hook": pre-install, pre-upgrade
@@ -42,5 +42,5 @@ data:
   {{ $key }}: {{ $value | quote }}
 {{- end }}
 ---
-{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "jobName" "patch-config-global-docker-registry" "hookWeight" "2" "activeDeadlineSeconds" 900) }}
+{{ include "lib.cpConfigGlobal.patchHookTemplate" (dict "context" . "jobName" (printf "patch-config-global-%s" .Values.service.name) "hookWeight" "2" "activeDeadlineSeconds" 900) }}
 
