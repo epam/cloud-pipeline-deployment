@@ -30,6 +30,8 @@ spec:
   ttlSecondsAfterFinished: 600
   template:
     spec:
+      nodeSelector:
+        cloud-pipeline/cp-docker-registry: "true"
       serviceAccountName: {{ include "lib.hook.serviceaccount" . }}
       restartPolicy: Never
       tolerations:

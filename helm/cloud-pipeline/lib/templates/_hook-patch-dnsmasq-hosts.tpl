@@ -15,6 +15,8 @@ spec:
   activeDeadlineSeconds: 1200
   template:
     spec:
+      nodeSelector:
+        cloud-pipeline/{{ .Values.service.name }}: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -60,6 +62,8 @@ spec:
   activeDeadlineSeconds: 1200
   template:
     spec:
+      nodeSelector:
+        cloud-pipeline/{{ .Values.service.name }}: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists

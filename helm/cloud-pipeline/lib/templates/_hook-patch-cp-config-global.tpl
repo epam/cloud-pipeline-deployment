@@ -21,6 +21,8 @@ spec:
   activeDeadlineSeconds: {{ .activeDeadlineSeconds | default 600 }}
   template:
     spec:
+      nodeSelector:
+        cloud-pipeline/{{ $ctx.Values.service.name }}: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists

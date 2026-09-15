@@ -28,6 +28,8 @@ spec:
   activeDeadlineSeconds: 1800
   template:
     spec:
+      nodeSelector:
+        cloud-pipeline/cp-idp: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists

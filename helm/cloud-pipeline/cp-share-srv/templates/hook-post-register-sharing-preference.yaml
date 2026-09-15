@@ -28,6 +28,8 @@ spec:
   activeDeadlineSeconds: 600
   template:
     spec:
+      nodeSelector:
+        cloud-pipeline/cp-share-srv: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
