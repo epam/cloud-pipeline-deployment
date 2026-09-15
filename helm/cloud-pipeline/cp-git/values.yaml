@@ -23,6 +23,8 @@ image:
 
 gitSync:
   enabled: true
+  nodeSelector:
+    cloud-pipeline/cp-git: "true"
   image:
     repository: quay.io/lifescience/cloud-pipeline
     tag: api-srv
