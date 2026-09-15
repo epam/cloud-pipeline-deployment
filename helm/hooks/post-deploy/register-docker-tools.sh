@@ -386,7 +386,8 @@ fi
 push_result=0
 while IFS=, read -r docker_name docker_pretty_name; do
   docker_pretty_name=$(echo "$docker_pretty_name" | tr -d ' ')
-  if ! array_contains_or_empty "$docker_pretty_name" "${CP_DOCKERS_TO_INIT[@]}"; then
+  # Count first: under `set -u` bash < 4.4 aborts when the caller expands "${arr[@]}" on an empty array
+  if [ ${#CP_DOCKERS_TO_INIT[@]} -gt 0 ] && ! array_contains_or_empty "$docker_pretty_name" "${CP_DOCKERS_TO_INIT[@]}"; then
     echo "Skipping docker $docker_pretty_name (not in filter)"
     continue
   fi
