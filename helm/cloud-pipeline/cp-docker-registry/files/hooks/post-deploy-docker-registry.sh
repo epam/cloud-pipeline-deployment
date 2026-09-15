@@ -53,13 +53,15 @@ EXISTING_REGISTRY_JSON=$(curl "${curl_opts[@]}" -H "Authorization: Bearer ${CP_A
 EXISTING_ID=$(echo "$EXISTING_REGISTRY_JSON" | jq -r '.payload.id // empty' 2>/dev/null)
 if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
   echo "Docker registry $REGISTRY_PATH already registered (id=$EXISTING_ID). Refreshing cert chain via dockerRegistry/update (non-destructive)."
-  UPDATE_PAYLOAD=$(echo "$EXISTING_REGISTRY_JSON" \
+  UPDATE_PAYLOAD_FILE=$(mktemp /tmp/dockerRegistry-update.XXXXXX.json)
+  trap 'rm -f "$UPDATE_PAYLOAD_FILE"' EXIT
+  echo "$EXISTING_REGISTRY_JSON" \
     | jq -c --arg cert "$public_certificate" --arg ext "${CP_DOCKER_EXTERNAL_HOST}:${CP_DOCKER_EXTERNAL_PORT}" '
         .payload
         | .caCert=$cert
         | .externalUrl=$ext
-      ' 2>/dev/null || true)
-  if [ -z "$UPDATE_PAYLOAD" ] || [ "$UPDATE_PAYLOAD" = "null" ]; then
+      ' > "$UPDATE_PAYLOAD_FILE" 2>/dev/null || true
+  if ! jq -e 'type == "object"' "$UPDATE_PAYLOAD_FILE" >/dev/null 2>&1; then
     echo "ERROR: cannot build dockerRegistry/update payload for id=$EXISTING_ID."
     exit 1
   fi
@@ -67,7 +69,7 @@ if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
     -H "Authorization: Bearer ${CP_API_JWT_ADMIN}" \
     -H "Content-Type: application/json" \
     -X POST \
-    -d "$UPDATE_PAYLOAD" \
+    --data-binary "@${UPDATE_PAYLOAD_FILE}" \
     "${API_URL}/dockerRegistry/update")
   echo "$UPDATE_JSON" | jq . 2>/dev/null || echo "$UPDATE_JSON"
   if ! echo "$UPDATE_JSON" | jq -e '.status == "OK"' >/dev/null 2>&1; then
