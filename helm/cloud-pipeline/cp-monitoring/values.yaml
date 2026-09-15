@@ -1,6 +1,6 @@
 # Used by lib.cpConfigGlobal.patchHookTemplate to derive the configmap-to-update-* name
 service:
-  name: cp-monitoring
+  name: cp-monitoring-srv
 
 # Top-level toggle for helmfile installed:
 enabled: true
