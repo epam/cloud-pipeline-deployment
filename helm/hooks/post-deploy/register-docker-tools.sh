@@ -55,7 +55,7 @@ function api_find_docker_image {
     url="/tool/load?image=$(printf '%s' "$image_name" | jq -sRr @uri)"
   fi
   local tool_lookup_response tool_id
-  tool_lookup_response=$(curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" "${API_URL}${url}")
+  tool_lookup_response=$(call_api "$url" "$CP_API_JWT_ADMIN" || true)
   tool_id=$(echo "$tool_lookup_response" | jq -r '.payload.id // empty')
   if [ -n "$tool_id" ] && [ "$tool_id" != "null" ]; then
     echo "$tool_id"
@@ -67,7 +67,7 @@ function api_find_docker_image {
 function api_find_tool_group {
   local registry_path="$1" group_name="$2"
   local response group_id
-  response=$(curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" "${API_URL}/toolGroup/list?registry=$(printf '%s' "$registry_path" | jq -sRr @uri)")
+  response=$(call_api "/toolGroup/list?registry=$(printf '%s' "$registry_path" | jq -sRr @uri)" "$CP_API_JWT_ADMIN" || true)
   group_id=$(echo "$response" | jq -r --arg g "$group_name" '(.payload // []) | .[] | select(.name == $g) | .id // empty')
   if [ -n "$group_id" ] && [ "$group_id" != "null" ]; then
     echo "$group_id"
@@ -79,16 +79,15 @@ function api_find_tool_group {
 function api_get_or_create_tool_group {
   local registry_id="$1" registry_path="$2" group_name="$3"
   local tool_group_list_response group_id
-  tool_group_list_response=$(curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" "${API_URL}/toolGroup/list?registry=$(printf '%s' "$registry_path" | jq -sRr @uri)")
+  tool_group_list_response=$(call_api "/toolGroup/list?registry=$(printf '%s' "$registry_path" | jq -sRr @uri)" "$CP_API_JWT_ADMIN" || true)
   group_id=$(echo "$tool_group_list_response" | jq -r --arg g "$group_name" '(.payload // []) | .[] | select(.name == $g) | .id // empty')
   if [ -n "$group_id" ] && [ "$group_id" != "null" ]; then
     echo "$group_id"
     return 0
   fi
   local tool_group_create_response
-  tool_group_create_response=$(curl -X POST -k -s -H 'Content-Type: application/json' -H "Authorization: Bearer $CP_API_JWT_ADMIN" \
-    -d "$(jq -n --arg n "$group_name" --argjson rid "$registry_id" '{name:$n, registryId:$rid}')" \
-    "${API_URL}/toolGroup")
+  tool_group_create_response=$(call_api "/toolGroup" "$CP_API_JWT_ADMIN" \
+    "$(jq -n --arg n "$group_name" --argjson rid "$registry_id" '{name:$n, registryId:$rid}')" || true)
   if ! check_api_response_status "$tool_group_create_response"; then
     return 1
   fi
@@ -117,7 +116,7 @@ function api_register_tool {
   local payload tool_register_response tool_id
   payload=$(jq -n --arg img "$img_for_tool" --argjson gid "$group_id" --arg reg "$registry_path" \
     '{image:$img, toolGroupId:$gid, registry:$reg, cpu:"0mi", ram:"0Gi"}')
-  tool_register_response=$(curl -X POST -k -s -H 'Content-Type: application/json' -H "Authorization: Bearer $CP_API_JWT_ADMIN" -d "$payload" "${API_URL}/tool/register")
+  tool_register_response=$(call_api "/tool/register" "$CP_API_JWT_ADMIN" "$payload" || true)
   if ! check_api_response_status "$tool_register_response"; then
     return 1
   fi
@@ -332,7 +331,7 @@ fi
 API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
 echo "API (curl): $API_URL"
 
-REGISTRY_ID=$(curl -k -s -H "Authorization: Bearer $CP_API_JWT_ADMIN" "${API_URL}/entities?identifier=${REGISTRY_IDENTIFIER}&aclClass=DOCKER_REGISTRY" | jq -r '.payload.id // empty')
+REGISTRY_ID=$(api_get_docker_registry_id "$REGISTRY_IDENTIFIER" || true)
 if [ -z "$REGISTRY_ID" ] || [ "$REGISTRY_ID" = "null" ]; then
   echo "Docker registry $REGISTRY_PATH not registered in API"
   exit 1
@@ -383,6 +382,12 @@ fi
 # Push and register tools
 ##########
 
+echo "Checking API stability before pushing tools..."
+if ! api_wait_for_stable 180 10 5; then
+  echo "ERROR: API not stable before push, aborting"
+  exit 1
+fi
+
 push_result=0
 while IFS=, read -r docker_name docker_pretty_name; do
   docker_pretty_name=$(echo "$docker_pretty_name" | tr -d ' ')
@@ -413,11 +418,6 @@ while IFS=, read -r docker_name docker_pretty_name; do
     continue
   fi
 
-  echo "Checking API stability before push of $docker_pretty_name..."
-  if ! api_wait_for_stable 180 10 5; then
-    echo "ERROR: API not stable before push, aborting"
-    exit 1
-  fi
   echo "Pushing docker image from \"$docker_name\" to \"$docker_full_pretty_name\""
   if docker pull "$docker_name" && docker tag "$docker_name" "$docker_full_pretty_name" && docker push "$docker_full_pretty_name"; then
     tool_id=""
