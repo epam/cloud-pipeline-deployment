@@ -30,25 +30,41 @@ function call_api {
   local jwt_token="$2"
   local payload="${3:-}"
   local is_file="${4:-}"
-  local response=""
-  if [ -n "$is_file" ]; then
-    response=$(curl -X POST -k -s -H "Authorization: Bearer $jwt_token" -F "file=@$payload" "${API_URL}${api_endpoint}")
-  elif [ -n "$payload" ]; then
-    response=$(curl -X POST -k -s -H 'Content-Type: application/json' -H "Authorization: Bearer $jwt_token" -d "$payload" "${API_URL}${api_endpoint}")
-  else
-    response=$(curl -X GET -k -s -H "Authorization: Bearer $jwt_token" "${API_URL}${api_endpoint}")
-  fi
+  local retry_count="${CP_API_RETRY_COUNT:-3}"
+  local retry_delay="${CP_API_RETRY_DELAY_SEC:-3}"
+  local attempt response curl_rc
+
+  for attempt in $(seq 1 "$retry_count"); do
+    response=""
+    if [ -n "$is_file" ]; then
+      response=$(curl -X POST -k -s -H "Authorization: Bearer $jwt_token" -F "file=@$payload" "${API_URL}${api_endpoint}")
+      curl_rc=$?
+    elif [ -n "$payload" ]; then
+      response=$(curl -X POST -k -s -H 'Content-Type: application/json' -H "Authorization: Bearer $jwt_token" -d "$payload" "${API_URL}${api_endpoint}")
+      curl_rc=$?
+    else
+      response=$(curl -X GET -k -s -H "Authorization: Bearer $jwt_token" "${API_URL}${api_endpoint}")
+      curl_rc=$?
+    fi
+
+    if [ "$curl_rc" -eq 0 ] && [ -n "$response" ] && echo "$response" | jq -e . >/dev/null 2>&1; then
+      echo "$response"
+      check_api_response_status "$response"
+      return $?
+    fi
+
+    if [ "$attempt" -lt "$retry_count" ]; then
+      echo "WARNING: call_api: request to ${api_endpoint} failed (attempt ${attempt}/${retry_count}, curl_rc=${curl_rc}); retrying in ${retry_delay}s..." >&2
+      sleep "$retry_delay"
+    fi
+  done
+
   if [ -z "$response" ]; then
-    echo "ERROR: Empty response from API: ${API_URL}${api_endpoint}" >&2
-    return 1
+    echo "ERROR: Empty response from API after ${retry_count} attempt(s): ${API_URL}${api_endpoint}" >&2
+  else
+    echo "ERROR: Non-JSON response from API after ${retry_count} attempt(s) (${API_URL}${api_endpoint}): ${response:0:200}" >&2
   fi
-  if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-    echo "ERROR: Non-JSON response from API (${API_URL}${api_endpoint}): ${response:0:200}" >&2
-    return 1
-  fi
-  echo "$response"
-  check_api_response_status "$response"
-  return $?
+  return 1
 }
 
 function call_api_put {
