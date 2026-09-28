@@ -14,7 +14,8 @@
 #   ./generate-idp-certs.sh <idp-external-host> [idp-internal-host] [namespace]
 #
 # cp-pki-secret contains per-service certificate pairs:
-#   ssl-*.pem (API / edge / idp / dav), docker-*.pem, git-*.pem, share-srv-*.pem.
+#   ssl-*.pem (cp-api-srv), docker-*.pem, edge-*.pem, git-*.pem,
+#   idp-ssl-*.pem, share-srv-*.pem.
 #
 # Environment:
 #   KUBECTL           kubectl binary (default: kubectl)

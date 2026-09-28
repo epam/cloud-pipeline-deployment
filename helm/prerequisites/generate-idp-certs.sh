@@ -3,8 +3,8 @@
 # Generate files for Kubernetes secret cp-idp-secret:
 #   idp-private-key.pem, idp-public-cert.pem
 #
-# IdP HTTPS also uses ssl-*.pem from cp-pki-secret; generate cp-pki for the same
-# external hostname (or include IdP host in API cert SANs) before deploying IdP.
+# IdP HTTPS uses idp-ssl-*.pem from cp-pki-secret; run generate-cp-pki-certs.sh
+# before deploying IdP so that the correct TLS cert is in place.
 #
 # Keys expected by cp-idp-secret
 #

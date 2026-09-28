@@ -83,4 +83,53 @@ if [ ${#ERRORS[@]} -gt 0 ]; then
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Secret key validation — cp-pki-secret must contain per-service certificate pairs
+# (docker-*, edge-*, git-*, idp-ssl-*, share-srv-*); a secret with only ssl-*.pem
+# is missing these keys and will cause services to mount the wrong certificate.
+# ---------------------------------------------------------------------------
+KUBECTL="${KUBECTL:-kubectl}"
+NAMESPACE=$(printf '%s' "$VALUES_JSON" | jq -r '.general.namespace // "default"')
+
+REQUIRED_PKI_KEYS=(
+  docker-public-cert.pem  docker-private-key.pem
+  edge-public-cert.pem    edge-private-key.pem
+  git-public-cert.pem     git-private-key.pem
+  idp-ssl-public-cert.pem idp-ssl-private-key.pem
+  share-srv-public-cert.pem share-srv-private-key.pem
+)
+
+if ! command -v "$KUBECTL" >/dev/null 2>&1; then
+  echo "(kubectl not in PATH — skipping secret key validation)"
+elif ! "$KUBECTL" get secret cp-pki-secret -n "$NAMESPACE" >/dev/null 2>&1; then
+  echo "WARNING: cp-pki-secret not found in namespace '$NAMESPACE' — deploy will fail without it."
+else
+  SECRET_KEYS=$("$KUBECTL" get secret cp-pki-secret -n "$NAMESPACE" \
+    -o jsonpath='{.data}' 2>/dev/null | jq -r 'keys[]' 2>/dev/null || true)
+
+  MISSING_PKI_KEYS=()
+  for key in "${REQUIRED_PKI_KEYS[@]}"; do
+    printf '%s\n' "$SECRET_KEYS" | grep -qxF "$key" || MISSING_PKI_KEYS+=("$key")
+  done
+
+  if [ ${#MISSING_PKI_KEYS[@]} -gt 0 ]; then
+    echo ""
+    echo "ERROR: cp-pki-secret in namespace '$NAMESPACE' is missing required per-service certificate keys."
+    echo "       The secret must contain separate certificate pairs for each service"
+    echo "       (docker-*, edge-*, git-*, idp-ssl-*, share-srv-*)."
+    echo "       Missing keys:"
+    for k in "${MISSING_PKI_KEYS[@]}"; do
+      echo "         - $k"
+    done
+    echo ""
+    echo "       Recreate the secret before deploying:"
+    echo "         cd helm/prerequisites"
+    echo "         # Option A — re-run generation (self-signed or import mode):"
+    echo "         ./generate-cp-pki-certs.sh <api-domain>"
+    echo "         # Option B — place updated cert files in ./certificates/ then:"
+    echo "         ./create-cp-secrets.sh $NAMESPACE"
+    exit 1
+  fi
+fi
+
 echo "Validation passed."

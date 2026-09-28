@@ -14,13 +14,17 @@
 # Self-signed mode (default):
 #   ./generate-cp-pki-certs.sh <api-domain> [deployment-id]
 #
-# Import mode — set TLS_CERT and TLS_KEY to use an existing certificate
-# (e.g. from Let's Encrypt) instead of generating a self-signed one:
+# Wildcard / import mode — provide one certificate that covers all services
+# (e.g. a wildcard cert *.example.com or a multi-SAN cert from Let's Encrypt):
 #   TLS_CERT=/etc/letsencrypt/live/example.com/fullchain.pem \
 #   TLS_KEY=/etc/letsencrypt/live/example.com/privkey.pem \
 #   ./generate-cp-pki-certs.sh [api-domain] [deployment-id]
 #
-#   In import mode api-domain is optional; derived from the certificate CN
+#   The script copies the provided certificate to all per-service pairs
+#   (ssl, docker, edge, git, idp-ssl, share-srv) and builds all required
+#   .p12 files automatically.
+#
+#   api-domain is optional in import mode; derived from the certificate CN
 #   when omitted. EC keys (e.g. Let's Encrypt P-256) are supported — RSA SSO
 #   material is auto-generated since cp-idp requires RSA for SAML signing.
 #
@@ -113,7 +117,7 @@ DEPLOYMENT_ID="${2:-${CP_DEPLOYMENT_ID:-default}}"
 # ── banner ────────────────────────────────────────────────────────────────────
 if [[ "$IMPORT_MODE" == "true" ]]; then
   echo "=========================================="
-  echo "Generate cp-pki-secret material (import mode)"
+  echo "Generate cp-pki-secret material (wildcard / import mode)"
   echo "  API domain:      ${API_DOMAIN}"
   echo "  key type:        ${KEY_ALG}"
   echo "  deployment id:   ${DEPLOYMENT_ID}"
@@ -148,7 +152,7 @@ rm -f \
 CA_SUBJECT="/CN=Cloud-Pipeline-${DEPLOYMENT_ID}"
 
 # ── Step 1: internal CA ───────────────────────────────────────────────────────
-echo "Step 1/5: create internal CA (${CA_SUBJECT})..."
+echo "Step 1/6: create internal CA (${CA_SUBJECT})..."
 openssl req -x509 -new -newkey rsa:2048 -nodes \
   -subj "$CA_SUBJECT" \
   -keyout ca-private-key.pem \
@@ -159,11 +163,11 @@ chmod 644 ca-public-cert.pem
 
 # ── Step 2: API TLS certificate ───────────────────────────────────────────────
 if [[ "$IMPORT_MODE" == "true" ]]; then
-  echo "Step 2/5: import API TLS certificate..."
+  echo "Step 2/6: import TLS certificate (will be applied to all services)..."
   cp -f "$TLS_CERT" ssl-public-cert.pem; chmod 644 ssl-public-cert.pem
   cp -f "$TLS_KEY"  ssl-private-key.pem; chmod 600 ssl-private-key.pem
 else
-  echo "Step 2/5: create API TLS certificate for ${API_DOMAIN}..."
+  echo "Step 2/6: create API TLS certificate for ${API_DOMAIN}..."
   openssl genrsa -out ssl-private-key.pem 4096
   chmod 600 ssl-private-key.pem
   openssl req -new -key ssl-private-key.pem -out ssl-public-cert.csr -subj "/CN=${API_DOMAIN}"
