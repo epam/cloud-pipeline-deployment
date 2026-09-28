@@ -442,6 +442,7 @@ else
   kubectl label nodes --all cloud-pipeline/cp-notifier=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-clair=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-docker-comp=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-search=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-search-elk-curator=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-search-elk=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-search-srv=true --overwrite

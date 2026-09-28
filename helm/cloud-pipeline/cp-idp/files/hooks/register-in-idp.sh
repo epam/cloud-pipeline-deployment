@@ -11,6 +11,6 @@ NAMESPACE="${NAMESPACE:-default}"
 command -v kubectl >/dev/null || { echo "ERROR: kubectl required but not installed"; exit 1; }
 
 kubectl -n "$NAMESPACE" exec deployment/cp-idp -- sh -c \
-  'saml-idp add-connection "$1" -c /opt/idp/pki/sso-public-cert.pem --profileDatabase "${CP_IDP_PROFILE_DB:-/opt/idp/pdb/saml-idp-profiles.json}"' \
+  'saml-idp add-connection "$1" -c "${CP_IDP_CERT_DIR:-/opt/idp/pki}/sso-public-cert.pem" --profileDatabase "${CP_IDP_PROFILE_DB:-/opt/idp/pdb/saml-idp-profiles.json}"' \
   _ "$ENDPOINT"
 echo "IdP connection for $ENDPOINT added."

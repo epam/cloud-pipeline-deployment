@@ -139,6 +139,10 @@ spec:
                       path: ssl-public-cert.pem
                     - key: git-private-key.pem
                       path: ssl-private-key.pem
+                    - key: sso-public-cert.pem
+                      path: sso-public-cert.pem
+                    - key: sso-private-key.pem
+                      path: sso-private-key.pem
               - secret:
                   name: cp-jwt-pki-secret
         - name: idp-pki

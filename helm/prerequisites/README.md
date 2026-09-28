@@ -14,15 +14,14 @@ kubectl cluster-info
 
 ---
 
-## Before you start
+## Choose your path
 
-You need:
-
-- A TLS certificate and its private key covering your Cloud Pipeline domain
-- Your deployment domain name (e.g. `cloud-pipeline.example.com`)
-- The Kubernetes namespace where Cloud Pipeline will be deployed
-
-If you do not have a certificate yet, see [Getting a certificate](#getting-a-certificate) below.
+| I have... | Go to |
+|---|---|
+| A certificate file and private key | [Step 1 — Set your variables](#step-1--set-your-variables) |
+| Nothing — need a free trusted certificate | [Let's Encrypt](#lets-encrypt) |
+| Nothing — need a temporary self-signed certificate for testing | [Self-signed quick start](#self-signed-quick-start-lab-and-testing-only) |
+| Expired certificates that need to be renewed | [Updating secrets after certificate renewal](#updating-secrets-after-certificate-renewal) |
 
 ---
 
@@ -67,8 +66,8 @@ export DOCKER_TLS_CERT=/path/to/docker-cert.pem
 export DOCKER_TLS_KEY=/path/to/docker-key.pem
 export GIT_TLS_CERT=/path/to/git-cert.pem
 export GIT_TLS_KEY=/path/to/git-key.pem
-# EDGE_TLS_CERT     / EDGE_TLS_KEY
-# IDP_TLS_CERT      / IDP_TLS_KEY
+# EDGE_TLS_CERT      / EDGE_TLS_KEY
+# IDP_TLS_CERT       / IDP_TLS_KEY
 # SHARE_SRV_TLS_CERT / SHARE_SRV_TLS_KEY
 ```
 
@@ -102,13 +101,9 @@ All three should show `TYPE: Opaque`. You are now ready to run `helmfile apply`.
 
 ---
 
-## Getting a certificate
+## Let's Encrypt
 
-Skip this section if you already have a certificate and have completed Steps 1–3.
-
-### Let's Encrypt (free, publicly trusted)
-
-Certificates expire every 90 days and must be renewed manually using this method.
+Free, publicly trusted certificates. Expire every 90 days and must be renewed manually.
 
 **Step 1 — Run certbot in Docker:**
 
@@ -142,7 +137,7 @@ propagation before pressing Enter:
 dig TXT _acme-challenge.<your-cloud-pipeline-domain-name>
 ```
 
-or use the [Google Admin Toolbox](https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.<your-cloud-pipeline-domain-name>).
+Or use the [Google Admin Toolbox](https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.<your-cloud-pipeline-domain-name>).
 Look for both token values in the `;ANSWER` section.
 
 After success, certificates are saved to `/etc/letsencrypt/live/<your-domain>/`:
@@ -150,39 +145,108 @@ After success, certificates are saved to `/etc/letsencrypt/live/<your-domain>/`:
 - `fullchain.pem` — full certificate chain
 - `privkey.pem` — private key
 
-Then continue from [Step 1](#step-1--set-your-variables), setting:
+**Step 3 — Continue from [Step 1](#step-1--set-your-variables) above, setting:**
 
 ```bash
 export TLS_CERT=/etc/letsencrypt/live/$API_DOMAIN/fullchain.pem
 export TLS_KEY=/etc/letsencrypt/live/$API_DOMAIN/privkey.pem
 ```
 
-### Self-signed (lab and testing only)
+---
 
-Generates a local CA and self-signed certificates. Browsers and external clients will show
-certificate warnings. Not suitable for production.
+## Self-signed quick start (lab and testing only)
 
-Skip [Step 2](#step-2--point-to-your-certificate) entirely — do not set `TLS_CERT`/`TLS_KEY`.
-In [Step 3](#step-3--generate-pki-material-and-create-secrets), replace command 1 with:
+Generates a local CA and self-signed certificates in one go. Browsers and external clients
+will show certificate warnings. Not suitable for production.
+
+Fill in your values and run all four commands:
 
 ```bash
+cd cloud-pipeline-deployment/helm/prerequisites
+chmod +x *.sh lib/*.sh
+
+API_DOMAIN="cloud-pipeline.example.com"   # your deployment domain
+IDP_HOST="idp.$API_DOMAIN"
+NAMESPACE="default"                        # Kubernetes namespace for this deployment
+
+# 1) Generate self-signed CA, TLS, and SSO certificates
 ./generate-cp-pki-certs.sh "$API_DOMAIN" "$NAMESPACE"
+
+# 2) JWT signing keys (internal)
+./generate-cp-jwt-pki-certs.sh
+
+# 3) IdP SAML signing certificate
+./generate-idp-certs.sh "$IDP_HOST" "" "$NAMESPACE"
+
+# 4) Create all Kubernetes secrets
+./create-cp-secrets.sh "$NAMESPACE"
 ```
 
-All other commands remain the same.
+Verify the secrets were created:
+
+```bash
+kubectl get secret cp-pki-secret cp-jwt-pki-secret cp-idp-secret -n "$NAMESPACE"
+```
+
+All three should show `TYPE: Opaque`. You are now ready to run `helmfile apply`.
 
 ---
 
 ## Updating secrets after certificate renewal
 
-These steps apply regardless of how your certificate was originally obtained.
+Start by setting your variables:
 
 ```bash
 cd cloud-pipeline-deployment/helm/prerequisites
+chmod +x *.sh lib/*.sh
 
-# 1) Re-generate cert files with the new certificate
-TLS_CERT=/path/to/new-certificate.pem \
-TLS_KEY=/path/to/new-private-key.pem \
+API_DOMAIN="cloud-pipeline.example.com"   # your deployment domain
+IDP_HOST="idp.$API_DOMAIN"
+NAMESPACE="default"                        # Kubernetes namespace for this deployment
+```
+
+**If your certificate came from Let's Encrypt**, re-run certbot first to obtain a fresh
+certificate (same process as the initial setup), then continue below. The renewed certificate
+will be saved to the same path as before:
+
+```bash
+docker run -it --rm --name certbot \
+  -v "/etc/letsencrypt:/etc/letsencrypt" \
+  -v "/var/lib/letsencrypt:/var/lib/letsencrypt" \
+  --entrypoint /bin/sh \
+  certbot/certbot
+```
+
+Inside the container:
+
+```bash
+certbot certonly \
+  --manual \
+  --preferred-challenges dns \
+  --server https://acme-v02.api.letsencrypt.org/directory \
+  --register-unsafely-without-email \
+  -d "<your-cloud-pipeline-domain-name>" \
+  -d "*.<your-cloud-pipeline-domain-name>"
+```
+
+Once certbot completes, set the certificate paths and continue:
+
+```bash
+export TLS_CERT=/etc/letsencrypt/live/$API_DOMAIN/fullchain.pem
+export TLS_KEY=/etc/letsencrypt/live/$API_DOMAIN/privkey.pem
+```
+
+**If your certificate came from an org CA or other source**, point to the new files:
+
+```bash
+export TLS_CERT=/path/to/new-certificate.pem
+export TLS_KEY=/path/to/new-private-key.pem
+```
+
+Then run all renewal steps in order:
+
+```bash
+# 1) Re-generate cert files from the new certificate
 ./generate-cp-pki-certs.sh "$API_DOMAIN"
 
 # 2) Regenerate IdP SAML certificate

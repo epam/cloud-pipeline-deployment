@@ -105,7 +105,7 @@ elif ! "$KUBECTL" get secret cp-pki-secret -n "$NAMESPACE" >/dev/null 2>&1; then
   echo "WARNING: cp-pki-secret not found in namespace '$NAMESPACE' — deploy will fail without it."
 else
   SECRET_KEYS=$("$KUBECTL" get secret cp-pki-secret -n "$NAMESPACE" \
-    -o jsonpath='{.data}' 2>/dev/null | jq -r 'keys[]' 2>/dev/null || true)
+    -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null || true)
 
   MISSING_PKI_KEYS=()
   for key in "${REQUIRED_PKI_KEYS[@]}"; do
