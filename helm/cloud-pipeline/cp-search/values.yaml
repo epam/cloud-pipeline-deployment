@@ -3,7 +3,7 @@ enabled: false
 # buildVersion: ""  # overrides general.buildVersion for this release
 
 service:
-  name: cp-search
+  name: cp-search-srv
 
 # Matches install.sh node labels: cloud-pipeline/cp-search-elk / cloud-pipeline/cp-search-srv
 nodeSelector:

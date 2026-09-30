@@ -8,6 +8,7 @@ VALUES_FILE="${1:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASES_DIR="$SCRIPT_DIR/releases"
+PREREQUISITES_DIR="$SCRIPT_DIR/prerequisites"
 echo "Validating $VALUES_FILE ..."
 
 command -v "jq" >/dev/null || { echo "ERROR: jq required but not installed"; exit 1; }
@@ -65,6 +66,19 @@ for script in "$RELEASES_DIR"/validate-*.sh; do
 done
 
 # ---------------------------------------------------------------------------
+# Run each prerequisite validation script and collect errors/warnings
+# ---------------------------------------------------------------------------
+for script in "$PREREQUISITES_DIR"/validate-*.sh; do
+  [ -f "$script" ] || continue
+  while IFS= read -r line; do
+    case "$line" in
+      "ERROR: "*)   ERRORS+=("${line#ERROR: }") ;;
+      "WARNING: "*) WARNINGS+=("${line#WARNING: }") ;;
+    esac
+  done < <(bash "$script" 2>&1 || true)
+done
+
+# ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
 if [ ${#WARNINGS[@]} -gt 0 ]; then
@@ -81,55 +95,6 @@ if [ ${#ERRORS[@]} -gt 0 ]; then
   done
   echo "Fix the above errors in $VALUES_FILE before deploying."
   exit 1
-fi
-
-# ---------------------------------------------------------------------------
-# Secret key validation — cp-pki-secret must contain per-service certificate pairs
-# (docker-*, edge-*, git-*, idp-ssl-*, share-srv-*); a secret with only ssl-*.pem
-# is missing these keys and will cause services to mount the wrong certificate.
-# ---------------------------------------------------------------------------
-KUBECTL="${KUBECTL:-kubectl}"
-NAMESPACE=$(printf '%s' "$VALUES_JSON" | jq -r '.general.namespace // "default"')
-
-REQUIRED_PKI_KEYS=(
-  docker-public-cert.pem  docker-private-key.pem
-  edge-public-cert.pem    edge-private-key.pem
-  git-public-cert.pem     git-private-key.pem
-  idp-ssl-public-cert.pem idp-ssl-private-key.pem
-  share-srv-public-cert.pem share-srv-private-key.pem
-)
-
-if ! command -v "$KUBECTL" >/dev/null 2>&1; then
-  echo "(kubectl not in PATH — skipping secret key validation)"
-elif ! "$KUBECTL" get secret cp-pki-secret -n "$NAMESPACE" >/dev/null 2>&1; then
-  echo "WARNING: cp-pki-secret not found in namespace '$NAMESPACE' — deploy will fail without it."
-else
-  SECRET_KEYS=$("$KUBECTL" get secret cp-pki-secret -n "$NAMESPACE" \
-    -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null || true)
-
-  MISSING_PKI_KEYS=()
-  for key in "${REQUIRED_PKI_KEYS[@]}"; do
-    printf '%s\n' "$SECRET_KEYS" | grep -qxF "$key" || MISSING_PKI_KEYS+=("$key")
-  done
-
-  if [ ${#MISSING_PKI_KEYS[@]} -gt 0 ]; then
-    echo ""
-    echo "ERROR: cp-pki-secret in namespace '$NAMESPACE' is missing required per-service certificate keys."
-    echo "       The secret must contain separate certificate pairs for each service"
-    echo "       (docker-*, edge-*, git-*, idp-ssl-*, share-srv-*)."
-    echo "       Missing keys:"
-    for k in "${MISSING_PKI_KEYS[@]}"; do
-      echo "         - $k"
-    done
-    echo ""
-    echo "       Recreate the secret before deploying:"
-    echo "         cd helm/prerequisites"
-    echo "         # Option A — re-run generation (self-signed or import mode):"
-    echo "         ./generate-cp-pki-certs.sh <api-domain>"
-    echo "         # Option B — place updated cert files in ./certificates/ then:"
-    echo "         ./create-cp-secrets.sh $NAMESPACE"
-    exit 1
-  fi
 fi
 
 echo "Validation passed."
