@@ -153,7 +153,7 @@ dav:
   enabled: true
 
 # Data sharing service (cp-share-srv). Requires idp.enabled: true or an external IdP configured in cp-api-srv.
-# cp-share-srv-pki-secret must exist before deployment (created by helm/prerequisites/create-cp-secrets.sh).
+# cp-pki-secret must contain cp-share-srv's TLS pair + p12s before deployment (created by helm/prerequisites/create-cp-secrets.sh).
 shareSrv:
   enabled: false
   service:

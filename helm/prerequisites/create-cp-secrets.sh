@@ -15,7 +15,9 @@
 #
 # cp-pki-secret contains per-service certificate pairs:
 #   ssl-*.pem (cp-api-srv), docker-*.pem, edge-*.pem, git-*.pem,
-#   idp-ssl-*.pem, share-srv-*.pem.
+#   share-srv-public-cert.pem, cp-share-srv-ssl.p12, cp-share-srv-sso.p12.
+# cp-share-srv-pki-secret no longer exists as a separate secret — its contents are folded
+# into cp-pki-secret above.
 #
 # Environment:
 #   KUBECTL           kubectl binary (default: kubectl)
@@ -73,9 +75,6 @@ CP_PKI_FILES=(
   edge-public-cert.pem
   git-private-key.pem
   git-public-cert.pem
-  idp-ssl-private-key.pem
-  idp-ssl-public-cert.pem
-  share-srv-private-key.pem
   share-srv-public-cert.pem
   sso-private-key.pem
   sso-public-cert.pem
@@ -98,22 +97,13 @@ cert_common_delete_secret_if_needed cp-pki-secret
   --from-file="${ASSETS_DIR}/edge-public-cert.pem" \
   --from-file="${ASSETS_DIR}/git-private-key.pem" \
   --from-file="${ASSETS_DIR}/git-public-cert.pem" \
-  --from-file="${ASSETS_DIR}/idp-ssl-private-key.pem" \
-  --from-file="${ASSETS_DIR}/idp-ssl-public-cert.pem" \
-  --from-file="${ASSETS_DIR}/share-srv-private-key.pem" \
   --from-file="${ASSETS_DIR}/share-srv-public-cert.pem" \
   --from-file="${ASSETS_DIR}/sso-private-key.pem" \
   --from-file="${ASSETS_DIR}/sso-public-cert.pem" \
   --from-file="${ASSETS_DIR}/cp-api-srv-ssl.p12" \
-  --from-file="${ASSETS_DIR}/cp-api-srv-sso.p12"
-
-# cp-share-srv-pki-secret
-echo "==> cp-share-srv-pki-secret"
-cert_common_delete_secret_if_needed cp-share-srv-pki-secret
-"$KUBECTL" create secret generic cp-share-srv-pki-secret -n "$NAMESPACE" \
+  --from-file="${ASSETS_DIR}/cp-api-srv-sso.p12" \
   --from-file="${ASSETS_DIR}/cp-share-srv-ssl.p12" \
-  --from-file="${ASSETS_DIR}/cp-share-srv-sso.p12" \
-  --from-file=ssl-public-cert.pem="${ASSETS_DIR}/share-srv-public-cert.pem"
+  --from-file="${ASSETS_DIR}/cp-share-srv-sso.p12"
 
 # cp-jwt-pki-secret
 JWT_FILES=(jwt.key.private jwt.key.public jwt.key.x509)
@@ -134,5 +124,5 @@ cert_common_delete_secret_if_needed cp-idp-secret
   --from-file="${ASSETS_DIR}/idp-private-key.pem" \
   --from-file="${ASSETS_DIR}/idp-public-cert.pem"
 
-echo "Done. Secrets cp-pki-secret (with per-service cert pairs: ssl, docker, edge, git, idp-ssl, share-srv),"
-echo "      cp-share-srv-pki-secret, cp-jwt-pki-secret, and cp-idp-secret are ready in namespace ${NAMESPACE}."
+echo "Done. Secrets cp-pki-secret (with per-service cert pairs: ssl, docker, edge, git, share-srv),"
+echo "      cp-jwt-pki-secret, and cp-idp-secret are ready in namespace ${NAMESPACE}."

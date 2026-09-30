@@ -6,10 +6,10 @@
 #   edge-private-key.pem, edge-public-cert.pem            (cp-edge TLS)
 #   docker-private-key.pem, docker-public-cert.pem        (cp-docker-registry TLS)
 #   git-private-key.pem, git-public-cert.pem              (cp-git / GitLab TLS)
-#   idp-ssl-private-key.pem, idp-ssl-public-cert.pem      (cp-idp HTTPS TLS)
-#   share-srv-private-key.pem, share-srv-public-cert.pem  (cp-share-srv TLS)
+#   share-srv-public-cert.pem                              (cp-share-srv TLS; private key is not stored, only used to build the p12 below)
 #   sso-private-key.pem, sso-public-cert.pem
 #   cp-api-srv-ssl.p12, cp-api-srv-sso.p12
+#   cp-share-srv-ssl.p12, cp-share-srv-sso.p12
 #
 # Self-signed mode (default):
 #   ./generate-cp-pki-certs.sh <api-domain> [deployment-id]
@@ -21,8 +21,7 @@
 #   ./generate-cp-pki-certs.sh [api-domain] [deployment-id]
 #
 #   The script copies the provided certificate to all per-service pairs
-#   (ssl, docker, edge, git, idp-ssl, share-srv) and builds all required
-#   .p12 files automatically.
+#   (ssl, docker, edge, git, share-srv) and builds all required .p12 files automatically.
 #
 #   api-domain is optional in import mode; derived from the certificate CN
 #   when omitted. EC keys (e.g. Let's Encrypt P-256) are supported — RSA SSO
@@ -34,7 +33,6 @@
 #   DOCKER_TLS_CERT / DOCKER_TLS_KEY       — cp-docker-registry certificate
 #   EDGE_TLS_CERT / EDGE_TLS_KEY           — cp-edge certificate
 #   GIT_TLS_CERT / GIT_TLS_KEY             — cp-git / GitLab certificate
-#   IDP_TLS_CERT / IDP_TLS_KEY             — cp-idp HTTPS certificate
 #   SHARE_SRV_TLS_CERT / SHARE_SRV_TLS_KEY — cp-share-srv certificate
 #
 # Environment:
@@ -46,8 +44,6 @@
 #   EDGE_TLS_KEY          Path to cp-edge privkey.pem   (optional)
 #   GIT_TLS_CERT          Path to git/GitLab fullchain.pem (optional)
 #   GIT_TLS_KEY           Path to git/GitLab privkey.pem   (optional)
-#   IDP_TLS_CERT          Path to cp-idp HTTPS fullchain.pem (optional)
-#   IDP_TLS_KEY           Path to cp-idp HTTPS privkey.pem   (optional)
 #   SHARE_SRV_TLS_CERT    Path to share-srv fullchain.pem (optional)
 #   SHARE_SRV_TLS_KEY     Path to share-srv privkey.pem   (optional)
 #   CERT_DURATION         Validity in days for generated certs (default: 7300)
@@ -141,7 +137,6 @@ rm -f \
   docker-private-key.pem docker-public-cert.pem \
   edge-private-key.pem edge-public-cert.pem \
   git-private-key.pem git-public-cert.pem \
-  idp-ssl-private-key.pem idp-ssl-public-cert.pem \
   share-srv-private-key.pem share-srv-public-cert.pem \
   sso-private-key.pem sso-public-cert.pem \
   cp-api-srv-ssl.p12 cp-api-srv-sso.p12 \
@@ -190,7 +185,7 @@ EOF
 fi
 
 # ── Step 3: per-service certificate copies ────────────────────────────────────
-echo "Step 3/6: create per-service certificate files (docker, git, share-srv)..."
+echo "Step 3/6: create per-service certificate files (docker, edge, git, share-srv)..."
 
 _copy_service_cert() {
   local name="$1" pub="$2" priv="$3" src_cert="${4:-}" src_key="${5:-}"
@@ -211,8 +206,6 @@ _copy_service_cert "edge" edge-public-cert.pem edge-private-key.pem \
   "${EDGE_TLS_CERT:-}" "${EDGE_TLS_KEY:-}"
 _copy_service_cert "git" git-public-cert.pem git-private-key.pem \
   "${GIT_TLS_CERT:-}" "${GIT_TLS_KEY:-}"
-_copy_service_cert "idp" idp-ssl-public-cert.pem idp-ssl-private-key.pem \
-  "${IDP_TLS_CERT:-}" "${IDP_TLS_KEY:-}"
 _copy_service_cert "share-srv" share-srv-public-cert.pem share-srv-private-key.pem \
   "${SHARE_SRV_TLS_CERT:-}" "${SHARE_SRV_TLS_KEY:-}"
 

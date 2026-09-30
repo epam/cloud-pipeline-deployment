@@ -29,11 +29,10 @@ Releases at order 5 are independent of each other and run in parallel once cp-ap
 
 | Secret                             | When needed                              | Source                                                                                                                                                                                                                        |
 |------------------------------------|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `cp-pki-secret`                    | Always                                   | `prerequisites/generate-cp-pki-certs.sh` + `prerequisites/create-cp-secrets.sh` (see `prerequisites/README.md`)                                                                                                               |
+| `cp-pki-secret`                    | Always                                   | `prerequisites/generate-cp-pki-certs.sh` + `prerequisites/create-cp-secrets.sh` (see `prerequisites/README.md`). Also carries cp-share-srv's TLS pair + p12s when `shareSrv.enabled: true` (`cp-share-srv-pki-secret` was folded into this secret). |
 | `cp-jwt-pki-secret`                | Always                                   | `prerequisites/generate-cp-jwt-pki-certs.sh` + `prerequisites/create-cp-secrets.sh` (see `prerequisites/README.md`)                                                                                                           |
 | `cp-api-srv-fed-metadata-secret`   | Always (API expects volume)              | **`idp.enabled: true`:** seeded empty by cp-idp pre-install hook, patched with IdP metadata by `hook-register-api-srv-in-idp`. **`idp.enabled: false`:** create manually from IdP metadata XML before cp-api-srv.            |
 | `cp-idp-secret`                    | Always (API expects volume)              | **`idp.enabled: true`:** created by cp-idp chart; cert hook fills keys. **`idp.enabled: false`:** create manually.                                                                                                            |
-| `cp-share-srv-pki-secret`          | `shareSrv.enabled: true`                 | `prerequisites/create-cp-secrets.sh` — created automatically alongside `cp-pki-secret` using the same TLS material.                                                                                                           |
 | `cp-share-srv-fed-metadata-secret` | `shareSrv.enabled: true`                 | **`idp.enabled: true`:** seeded empty and patched by `hook-register-share-srv-in-idp`. **`idp.enabled: false`:** create manually.                                                                                             |
 
 ## Configuration
@@ -328,7 +327,7 @@ dav:
 
 Data sharing service (`cp-share-srv`). Shares Cloud Pipeline storages with external users over SAML SSO.
 Requires `idp.enabled: true` or an external IdP configured in cp-api-srv, and
-`cp-share-srv-pki-secret` / `cp-share-srv-fed-metadata-secret` must exist before deployment.
+`cp-pki-secret` (with cp-share-srv's TLS pair + p12s) / `cp-share-srv-fed-metadata-secret` must exist before deployment.
 Requires node label `cloud-pipeline/cp-share-srv=true`.
 
 ```yaml

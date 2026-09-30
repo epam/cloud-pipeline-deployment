@@ -89,9 +89,18 @@ spec:
               readOnly: true
       volumes:
         - name: share-pki
-          secret:
-            secretName: cp-share-srv-pki-secret
+          projected:
             defaultMode: 0400
+            sources:
+              - secret:
+                  name: cp-pki-secret
+                  items:
+                    - key: cp-share-srv-ssl.p12
+                      path: cp-share-srv-ssl.p12
+                    - key: cp-share-srv-sso.p12
+                      path: cp-share-srv-sso.p12
+                    - key: share-srv-public-cert.pem
+                      path: ssl-public-cert.pem
         - name: share-sso
           secret:
             secretName: cp-share-srv-fed-metadata-secret

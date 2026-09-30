@@ -135,7 +135,7 @@ spec:
               name: cp-api-secret
               readOnly: true
             - mountPath: /opt/idp/pki
-              name: cp-idp-pki
+              name: cp-api-secret
               readOnly: true
             - mountPath: /opt/edge/pki
               name: cp-edge-pki
@@ -158,7 +158,7 @@ spec:
               readOnly: true
             {{- if $shareSrvOn }}
             - mountPath: /opt/share-srv/pki
-              name: cp-share-srv-pki
+              name: cp-api-secret
               readOnly: true
             {{- end }}
       dnsConfig:
@@ -181,14 +181,6 @@ spec:
                 path: ssl-public-cert.pem
               - key: edge-private-key.pem
                 path: ssl-private-key.pem
-        - name: cp-idp-pki
-          secret:
-            secretName: cp-pki-secret
-            items:
-              - key: idp-ssl-public-cert.pem
-                path: ssl-public-cert.pem
-              - key: idp-ssl-private-key.pem
-                path: ssl-private-key.pem
         {{- if $gitOn }}
         - name: cp-git-pki
           secret:
@@ -197,16 +189,6 @@ spec:
               - key: git-public-cert.pem
                 path: ssl-public-cert.pem
               - key: git-private-key.pem
-                path: ssl-private-key.pem
-        {{- end }}
-        {{- if $shareSrvOn }}
-        - name: cp-share-srv-pki
-          secret:
-            secretName: cp-pki-secret
-            items:
-              - key: share-srv-public-cert.pem
-                path: ssl-public-cert.pem
-              - key: share-srv-private-key.pem
                 path: ssl-private-key.pem
         {{- end }}
         - name: cp-docker-registry-pki
