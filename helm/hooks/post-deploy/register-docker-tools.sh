@@ -287,7 +287,11 @@ if [ ! -s "$TMP_CERTS_DIR/ssl-public-cert.pem" ]; then
   echo "ERROR: ssl-public-cert.pem from cp-pki-secret is empty or missing"
   exit 1
 fi
-cp "$TMP_CERTS_DIR/ssl-public-cert.pem" "$TMP_CERTS_DIR/docker-public-cert.pem"
+kubectl get secret cp-pki-secret -n "$NAMESPACE" -o jsonpath='{.data.docker-public-cert\.pem}' | base64 -d > "$TMP_CERTS_DIR/docker-public-cert.pem"
+if [ ! -s "$TMP_CERTS_DIR/docker-public-cert.pem" ]; then
+  echo "ERROR: docker-public-cert.pem from cp-pki-secret is empty or missing"
+  exit 1
+fi
 
 export CP_DOCKER_CERT_DIR="$TMP_CERTS_DIR"
 export CP_API_SRV_CERT_DIR="$TMP_CERTS_DIR"

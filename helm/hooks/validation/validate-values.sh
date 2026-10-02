@@ -8,6 +8,7 @@ VALUES_FILE="${1:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASES_DIR="$SCRIPT_DIR/releases"
+PREREQUISITES_DIR="$SCRIPT_DIR/prerequisites"
 echo "Validating $VALUES_FILE ..."
 
 command -v "jq" >/dev/null || { echo "ERROR: jq required but not installed"; exit 1; }
@@ -55,6 +56,19 @@ ERRORS=()
 WARNINGS=()
 
 for script in "$RELEASES_DIR"/validate-*.sh; do
+  [ -f "$script" ] || continue
+  while IFS= read -r line; do
+    case "$line" in
+      "ERROR: "*)   ERRORS+=("${line#ERROR: }") ;;
+      "WARNING: "*) WARNINGS+=("${line#WARNING: }") ;;
+    esac
+  done < <(bash "$script" 2>&1 || true)
+done
+
+# ---------------------------------------------------------------------------
+# Run each prerequisite validation script and collect errors/warnings
+# ---------------------------------------------------------------------------
+for script in "$PREREQUISITES_DIR"/validate-*.sh; do
   [ -f "$script" ] || continue
   while IFS= read -r line; do
     case "$line" in

@@ -15,7 +15,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-install, pre-upgrade
     "helm.sh/hook-weight": {{ .hookWeight | default "-10" | quote }}
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: {{ .activeDeadlineSeconds | default 600 }}

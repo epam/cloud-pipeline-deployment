@@ -271,6 +271,8 @@ releases:
 {{- toYaml $edgeValues | nindent 8 }}
       -
 {{- dict "git" $gitValues | toYaml | nindent 8 }}
+      -
+{{- dict "shareSrv" (dict "enabled" $shareSrvInstalled) | toYaml | nindent 8 }}
     needs:
       - cp-resources
       - cp-idp

@@ -7,7 +7,7 @@ metadata:
   annotations:
     "helm.sh/hook": post-install
     "helm.sh/hook-weight": "109"
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 data:
   post-deploy-docker-registry.sh: |
 {{ .Files.Get "files/hooks/post-deploy-docker-registry.sh" | indent 4 }}
@@ -20,7 +20,7 @@ metadata:
   annotations:
     "helm.sh/hook": post-install
     "helm.sh/hook-weight": "110"
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 1800
@@ -67,9 +67,9 @@ spec:
           secret:
             secretName: cp-pki-secret
             items:
-              - key: ssl-public-cert.pem
+              - key: docker-public-cert.pem
                 path: docker-public-cert.pem
-              - key: ssl-private-key.pem
+              - key: docker-private-key.pem
                 path: docker-private-key.pem
         - name: api-cert
           secret:
