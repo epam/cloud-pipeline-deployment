@@ -60,18 +60,32 @@ helm dependency update helm/cloud-pipeline/cp-idp
 
 ### Packer AMI build
 
-The AMI pre-installs: Docker 20.10.24, Helm v3.3.4, Helmfile v1.4.1, helm-diff v3.4.2, jq,
-amazon-efs-utils, lustre-client, kubeadm/kubelet v1.15.4. Pre-loaded Docker images: Calico v3.14.1,
-Flannel v0.26.4, kube-proxy v1.15.4, pause:3.1. kube-apiserver port range is patched to `80-32767`.
+`packer/aws/` has two independent builds:
 
-```bash
-cd packer/aws
-# Fill in variables.auto.pkrvars.hcl first (vpc_id, subnet_id, instance_type, security_group_id, region), then:
-packer build .
-```
+- **`application_node`** — the cluster-node AMI (what the rest of this doc means by "the AMI"). Pre-installs:
+  Docker 20.10.24, Helm v3.3.4, Helmfile v1.4.1, helm-diff v3.4.2, jq, amazon-efs-utils, lustre-client,
+  kubeadm/kubelet v1.15.4. Pre-loaded Docker images: Calico v3.14.1, Flannel v0.26.4, kube-proxy v1.15.4,
+  pause:3.1. kube-apiserver port range is patched to `80-32767`.
 
-Record the resulting AMI ID — it is needed in `postDeploy.clusterNetworksConfig` in `values.yaml` and in the
-EC2 launch configuration for all cluster nodes.
+  ```bash
+  cd packer/aws/application_node
+  # Fill in variables.auto.pkrvars.hcl first (vpc_id, subnet_id, instance_type, security_group_id, region), then:
+  packer build .
+  ```
+
+  Record the resulting AMI ID — it is needed in the EC2 launch configuration for all cluster nodes.
+
+- **`worker_node`** — separate CPU/GPU AMIs for the compute instances Cloud Pipeline launches dynamically to
+  run pipeline jobs (unrelated to the k8s cluster nodes above).
+
+  ```bash
+  cd packer/aws/worker_node
+  packer init .
+  packer build .                  # or -only='*.cpu' / -only='*.gpu'
+  ```
+
+  Record the resulting AMI ID(s) — needed in `CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC`
+  (`postDeploy.hooks[name=ApplyClusterNetworksConfig].data`) in `values.yaml`.
 
 ---
 
@@ -293,22 +307,30 @@ Four Kubernetes secrets are required before deployment (see `helm/prerequisites/
   (scripts live in `cp-api-srv/files/hooks/` and are mounted into hook Job pods)
 - After `cp-git`: `configure-git.sh`
 
-**Global `cleanup` hooks** (bash, run on the deploying host after all releases complete):
+**Global `cleanup` hooks** (bash, run on the deploying host after all releases complete). Driven by
+`postDeploy.hooks` in `values.yaml` — a list of `{name, enable, data}` entries run in list order. `name` is
+looked up in the `hooks/post-deploy/hooks.yaml` registry to find the script; `data` keys are exported as env
+vars (a string key ending in `_SPEC` is read from a file path and base64-encoded, other values are
+JSON-encoded):
 
-1. `wait-for-api.sh` — polls until the Cloud Pipeline REST API is up
-2. `apply-preferences.sh` — uploads system preferences to the API; loads from
+1. `WaitForApi` → `wait-for-api.sh` — polls until the Cloud Pipeline REST API is up
+2. `RegisterDockerTools` → `register-docker-tools.sh` — pushes/registers Docker images from
+   `hooks/post-deploy/assets/dockers-manifest/`; filtered by `data.CP_TOOLS_JSON`
+3. `ApplyPreferences` → `apply-preferences.sh` — uploads system preferences to the API; loads from
    `hooks/post-deploy/assets/preferences/*.json` (defaults, split by topic: base, cluster, commit, data, etc.),
-   then optionally from `CP_SYSTEM_PREFERENCE_CONFIG` (file or dir, wins on conflict); also sets computed prefs
-   like `base.cloud.data.distribution.url`
-3. `apply-cluster-networks-config.sh` — posts `postDeploy.clusterNetworksConfig` as the `cluster.networks.config`
-   API preference
-4. `register-additional-cloud-regions.sh` — registers any additional AWS regions from
-   `postDeploy.additionalCloudRegions`
-5. `register-docker-tools.sh` — pushes/registers Docker images from `hooks/post-deploy/assets/dockers-manifest/`;
-   image list controlled by `postDeploy.dockers` in `values.yaml`
-6. `register-demo-pipelines.sh` — registers pipelines from `hooks/post-deploy/assets/pipe-demo/` (only when
-   `git.enabled: true`)
-7. `register-email-templates.sh` — registers email templates from `hooks/post-deploy/assets/email-templates/`
+   then optionally from `data.CP_SYSTEM_PREFERENCE_CONFIG` (file or dir, wins on conflict); also sets computed
+   prefs like `base.cloud.data.distribution.url`
+4. `ApplyClusterNetworksConfig` → `apply-cluster-networks-config.sh` — posts `data.CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC`
+   as the `cluster.networks.config` API preference
+5. `RegisterAdditionalCloudRegions` → `register-additional-cloud-regions.sh` — registers any additional AWS
+   regions from `data.CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC`
+6. `StorageLifecycleRegionsConfiguration` → `configure-storage-lifecycle-regions.sh` — registers storage-lifecycle
+   region configs from `data.CP_POST_DEPLOY_SLS_REGIONS_SPEC` (relevant when `storageLifecycle.enabled`)
+7. `RegisterDemoPipelines` → `register-demo-pipelines.sh` — registers pipelines from
+   `hooks/post-deploy/assets/pipe-demo/` (only when `git.enabled: true`)
+8. `RegisterEmailTemplates` → `register-email-templates.sh` — registers email templates from
+   `hooks/post-deploy/assets/email-templates/`; filtered by `data.CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC.enableOnly`
+9. `RestartApiServer` → `restart-cp-api-srv.sh` — restarts cp-api-srv so applied preferences take effect
 
 All scripts source `hooks/post-deploy/utils/cloud-pipeline-utils.sh` for shared API helpers.
 
@@ -349,12 +371,15 @@ the full manifest directory is the superset.
 - `shareSrv.enabled` — Deploy data sharing service (false by default); requires `shareSrv.service.host.external`
 - `runPolicyManager.enabled` — Deploy run policy manager (false by default)
 - `runPolicyManager.pollPeriodSec` — Interval between run policy evaluation cycles in seconds (default: `5`)
-- `postDeploy.systemPreferenceConfig` — Path to a custom preferences JSON file or directory; overrides
-  `hooks/post-deploy/assets/preferences/` defaults. Can also be set via `CP_SYSTEM_PREFERENCE_CONFIG` env var.
-- `postDeploy.clusterNetworksConfig` — AMI IDs, subnets, security groups for worker node pools
-- `postDeploy.additionalCloudRegions` — List of additional AWS regions to register after deployment; each entry
-  uses the same fields as `apiSrv.cloudRegion` with `regionId` and `kmsKeyArn` required
-- `postDeploy.dockers` — List of tool images to register post-deploy
+- `postDeploy.enabled` — Run post-deploy hooks after `helmfile apply` (true) or skip them, e.g. for
+  `helmfile template`/`diff` without a live cluster (false)
+- `postDeploy.hooks` — Ordered list of `{name, enable, data}` post-deploy hooks (see
+  [Hooks overview](#hooks-overview) above); `name` maps to a script via `hooks/post-deploy/hooks.yaml`. Notable
+  `data` keys: `ApplyClusterNetworksConfig.data.CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC` (AMI IDs, subnets,
+  security groups for worker node pools), `RegisterAdditionalCloudRegions.data.CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC`
+  (list of additional AWS regions, same fields as `apiSrv.cloudRegion` plus required `regionId`),
+  `RegisterDockerTools.data.CP_TOOLS_JSON` (list of tool images to register), `ApplyPreferences.data.CP_SYSTEM_PREFERENCE_CONFIG`
+  (path to a custom preferences JSON file or directory, overrides `hooks/post-deploy/assets/preferences/` defaults)
 
 ### Library chart templates (`helm/cloud-pipeline/lib/`)
 

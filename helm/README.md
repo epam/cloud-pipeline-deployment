@@ -52,7 +52,7 @@ keys by the cp-api-srv hook.
 | Value      | Behavior                                                                                                                                                       |
 |------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `external` | No `cp-api-db` release. Point `db.host` / credentials at a managed DB (e.g. RDS).                                                                              |
-| `internal` | Installs `cp-api-db` release first (Postgres on hostPath `/opt/postgresql/data`), then cp-api-srv init job provisions the app role/database before API starts. |
+| `internal` | Installs `cp-api-db` release first (Postgres on hostPath `/opt/postgresql/data`), then the cp-api-srv init job provisions the app role/database before the API starts. |
 
 Optional in-cluster GitLab Postgres (`cp-gitlab-db`) is deployed by the **cp-git** release when
 `git.gitlabDb.enabled` is `true`.
@@ -66,6 +66,18 @@ Helmfile also supports optional top-level keys not shown in the template (used b
 ```yaml
 general:
   namespace: default              # Kubernetes namespace (default: default)
+  # Optional — not needed in most deployments. Cloud Pipeline images come from public quay.io, and tool images
+  # go through the in-cluster cp-docker-registry; set this only to route those pulls through a private mirror.
+  # Set user+password or secret (not both); leave all empty (default) to disable imagePullSecrets entirely.
+  # imagePullCredentials:
+  #   registry: ""
+  #   user: ""
+  #   password: ""
+  #   secret: ""                   # name of a pre-existing docker-registry Secret
+  customDNS:
+    entries: []
+    # - ip: "203.0.113.5"
+    #   host: "external-rds.corp.internal"
 ```
 
 ### `resources`
@@ -135,7 +147,7 @@ apiSrv:
 `apiSrv.cloudRegion.corsRules` controls the CORS policy applied to the primary region's S3 bucket on first deploy
 (POST) and on every subsequent deploy (PUT). Three forms are accepted:
 
-| Form                       | Example                                       | Behaviour                                                                        |
+| Form                       | Example                                       | Behavior                                                                         |
 |----------------------------|-----------------------------------------------|----------------------------------------------------------------------------------|
 | **Absent / commented out** | `#corsRules: ""`                              | Uses `hooks/post-deploy/assets/storage.cors.policy.json` (default open policy)   |
 | **Path to a JSON file**    | `corsRules: "path/to/cors.json"`              | File is read at helmfile render time (relative to the `helm/` directory)         |
@@ -163,7 +175,7 @@ corsRules: "[{\n\"AllowedOrigins\":[\"*\"],\n\"AllowedMethods\":[\"GET\",\"PUT\"
 ```
 
 `postDeploy.additionalCloudRegions[].corsRules` accepts the same inline forms. File-path resolution is not
-supported for additional regions — the value is passed as-is through the env variable.
+supported for additional regions — the value is passed as-is through the environment variable.
 
 ### `dockerRegistry`
 
@@ -192,7 +204,7 @@ edge:
 
 GitLab (`cp-git`). When `enabled: false`, the release and cp-edge dependency on cp-git are skipped.
 Includes an optional GitLab Postgres (`cp-gitlab-db`, on by default) and a GitLab Reader sidecar
-(`cp-gitlab-reader`, on by default) that provides git content browsing API.
+(`cp-gitlab-reader`, on by default) that provides a git content browsing API.
 
 ```yaml
 git:
@@ -356,47 +368,135 @@ runPolicyManager:
 
 ### `postDeploy`
 
-Cleanup hooks run after all releases are deployed. Set `enabled: true` to activate them;
-`false` is safe for template/diff checks without a live cluster.
+Post-deploy cleanup hooks run, in list order, after all releases sync. Set `postDeploy.enabled: true` to
+activate them; `false` is safe for `helmfile template`/`diff` without a live cluster.
+
+Each entry under `postDeploy.hooks` is `{name, enable, data}`: `name` is looked up in the
+`hooks/post-deploy/hooks.yaml` registry to find the script to run (or set `script` directly on the entry to
+bypass the registry), `enable` toggles that one hook, and `data` keys are passed to the script as env vars
+(see each key's own comment below for whether it takes a path or a value directly).
 
 ```yaml
 postDeploy:
   enabled: false                  # true = run post-deploy hooks (register tools, prefs, etc.)
 
-  additionalCloudRegions: [ ]
-  # - regionId: "us-east-2"
-  #   kmsKeyArn: ""
-  #   kmsKeyId: ""
-  #   sshKeyName: ""
-  #   tempCredentialsRole: ""
-  #   backupDuration: 20
-  #   omicsServiceRole: ""
-  #   omicsEcrUrl: ""
-  #   corsRules: ""               # inline JSON or \n-escaped string; absent = storage.cors.policy.json default
-  #   fileShareMounts: []
+  hooks:
+    - name: WaitForApi
+      enable: true
 
-  systemPreferenceConfig: ""      # Path to custom preferences JSON file or directory
-  dockers:
-    - "library/rockylinux:latest"
-    - "library/nextflow:latest"
+    - name: RegisterDockerTools
+      enable: true
+      data:
+        CP_MANIFEST_DIR: "./hooks/post-deploy/assets/dockers-manifest"
+        CP_TOOLS_JSON:                      # Tools to push/register; empty/omitted = push everything in the manifest
+          - "library/rockylinux:latest"
+          - "library/nextflow:latest"
 
-  clusterNetworksConfig: { }       # Worker node pool definition (API preference cluster.networks.config)
-  # tags: {}
-  # regions:
-  #   - name: ""
-  #     networks: {}
-  #     amis:
-  #       - ami: "ami-..."
-  #         platform: linux         # linux | windows
-  #         instance_mask: "*"
-  #     securityGroupIds: []
-  #     proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]
-  #     swap: [{name: "swap_ratio", path: "0.01"}]
+    - name: ApplyPreferences
+      enable: true
+      data:
+        # Path to a custom preferences JSON file or directory; merged after defaults, wins on conflict.
+        # Leave empty to use only the built-in defaults from hooks/post-deploy/assets/preferences/.
+        CP_SYSTEM_PREFERENCE_CONFIG: ""
 
-  emailNotifications:
-    enabled: true                 # false = skip register-email-templates.sh hook
-    enableOnly: [ ]                # If non-empty, only these types are enabled; all others get enabled=false
+    - name: ApplyClusterNetworksConfig
+      enable: true
+      data:
+        # Explicit config — path to a JSON file, or set the values directly inline. You provide the
+        # concrete AMI IDs / security group IDs yourself; nothing is pulled from preferences.
+        CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC: #"/path/to/file/cluster-networks-config.json"
+        # tags: {}                 # optional; instance tags applied to every launched worker
+        # regions:
+        #   - name: ""              # AWS region ID; omit or leave empty to use CP_CLOUD_REGION_ID
+        #     default: true         # exactly one region must have default=true (omit when there's only one region)
+        #     networks: {}          # Map of subnet-id → network-name, e.g. { "subnet-xxx": "my-net" }
+        #     amis:
+        #       - ami: "ami-..."      # Required — e.g. the AMI built from packer/aws/worker_node
+        #         platform: linux     # linux (default) | windows
+        #         instance_mask: "*"  # Instance type glob, e.g. "p*" for GPU
+        #         init_script: ""
+        #     security_group_ids: []
+        #     proxies: [{name: "dns_proxy_post", path: "10.96.0.10"}]
+        #     swap: [{name: "swap_ratio", path: "0.01"}]
+
+        # Alternative to CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC above: leave it unset. The hook then fills in
+        # AMI IDs / security groups from already-registered CP_PREF_CLUSTER_INSTANCE_IMAGE* /
+        # CP_PREF_CLUSTER_INSTANCE_SECURITY_GROUPS preferences, using one of these template files:
+        #   - CP_CLOUD_NETWORK_CONFIG_FILE below, if set
+        #   - otherwise the bundled template at hooks/post-deploy/assets/cluster.networks.config.json
+        # CP_CLOUD_NETWORK_CONFIG_FILE: "/path/to/cluster.networks.config.template.json"
+        #
+        # CP_PREF_CLUSTER_INSTANCE_IMAGE* must already be registered — if it isn't, the AMI is left
+        # unresolved and the hook FAILS (aborting the post-deploy run) rather than applying a
+        # placeholder AMI. (Only the AMI is checked this way — an empty security_group_ids list is
+        # not rejected and will silently register as "no security group".)
+
+    - name: RegisterAdditionalCloudRegions
+      enable: true
+      data:
+        # Inline list, or path to a JSON file containing the same list.
+        CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC: []
+        # - regionId: "us-east-2"        # required
+        #   kmsKeyArn: ""                 # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
+        #   kmsKeyId: ""
+        #   sshKeyName: ""
+        #   tempCredentialsRole: ""
+        #   backupDuration: 20
+        #   omicsServiceRole: ""
+        #   omicsEcrUrl: ""
+        #   corsRules: ""
+        #   fileShareMounts: []
+        # or: CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC: "./path/to/additional-regions.json"
+
+    - name: StorageLifecycleRegionsConfiguration
+      enable: true
+      data:
+        CP_POST_DEPLOY_SLS_REPORT_BUCKET_PREFIX: "storage-lifecycle-service/tagging-job-reports"
+        # Per-region overrides. Inline list or path to a JSON file.
+        # Each entry: awsRegionId (required), slsRoleArn or full slsProperties object.
+        CP_POST_DEPLOY_SLS_REGIONS_SPEC: []
+        # - awsRegionId: "us-east-1"          # use slsRoleArn to override the S3 Batch Operations role
+        #   slsRoleArn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+        # - awsRegionId: "eu-west-1"          # use slsProperties to set all properties explicitly
+        #   slsProperties:
+        #     properties:
+        #       batch_operation_job_aws_account_id: "<account-id>"
+        #       batch_operation_job_role_arn: "arn:aws:iam::<account-id>:role/cp-sls-role"
+        #       batch_operation_job_report_bucket: "my-bucket"
+        #       batch_operation_job_report_bucket_prefix: "storage-lifecycle-service/tagging-job-reports"
+        #       batch_operation_job_poll_status_retry_count: "30"
+        #       batch_operation_job_poll_status_sleep_sec: "5"
+        #       storage_skip_archiving_tag: "disable_storage_lifecycle"
+        # or: CP_POST_DEPLOY_SLS_REGIONS_SPEC: "./path/to/sls-regions.json"
+
+    - name: RegisterDemoPipelines
+      enable: true
+
+    - name: RegisterEmailTemplates
+      enable: true
+      data:
+        CP_POST_DEPLOY_EMAIL_NOTIFICATIONS_SPEC:
+          # If non-empty, only these types are enabled; all others get enabled=false.
+          enableOnly: []
+          # enableOnly:
+          #   - IDLE_RUN
+          #   - LONG_RUNNING
+
+    - name: RestartApiServer
+      enable: true
 ```
+
+| Hook name                              | Script                                    | Purpose                                                                                                         |
+|-----------------------------------------|-------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `WaitForApi`                            | `wait-for-api.sh`                          | Polls until the Cloud Pipeline REST API is up                                                                   |
+| `RegisterDockerTools`                   | `register-docker-tools.sh`                 | Pushes/registers Docker images from `hooks/post-deploy/assets/dockers-manifest/`, filtered by `CP_TOOLS_JSON`   |
+| `ApplyPreferences`                      | `apply-preferences.sh`                     | Uploads system preferences, defaults plus optional `CP_SYSTEM_PREFERENCE_CONFIG` override                       |
+| `ApplyClusterNetworksConfig`             | `apply-cluster-networks-config.sh`         | Posts `CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC` as the `cluster.networks.config` API preference                    |
+| `RegisterAdditionalCloudRegions`        | `register-additional-cloud-regions.sh`     | Registers extra AWS regions from `CP_POST_DEPLOY_ADDITIONAL_CLOUD_REGIONS_SPEC`                                 |
+| `StorageLifecycleRegionsConfiguration`  | `configure-storage-lifecycle-regions.sh`   | Registers storage-lifecycle region configs via the API (relevant when `storageLifecycle.enabled`)               |
+| `RegisterDemoPipelines`                 | `register-demo-pipelines.sh`               | Registers demo pipelines from `hooks/post-deploy/assets/pipe-demo/` (only when `git.enabled: true`)             |
+| `RegisterEmailTemplates`                | `register-email-templates.sh`              | Registers email templates from `hooks/post-deploy/assets/email-templates/`, filtered by `enableOnly`           |
+| `RestartApiServer`                      | `restart-cp-api-srv.sh`                    | Restarts cp-api-srv so applied preferences take effect                                                          |
 
 **Available notification types (21):**
 
@@ -438,4 +538,4 @@ helmfile apply --selector name=cp-api-srv
 ## References
 
 - Prerequisites: `prerequisites/README.md` (certificate generation and secret creation)
-- Chart readme: `cloud-pipeline/readme.md` (manual secret creation details)
+- Chart prerequisites: `cloud-pipeline/prerequisites.md` (manual secret creation details)
