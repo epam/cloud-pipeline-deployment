@@ -15,6 +15,10 @@ Building it is a one-time step that produces an image you can reuse for any new 
 See [packer/README.md](packer/README.md) for variables reference, build instructions, and details on what the AMI
 provisions.
 
+> This is the AMI for the Kubernetes **cluster nodes**. Cloud Pipeline also dynamically launches separate
+> compute instances to run pipeline jobs — if you need custom CPU/GPU AMIs for those, see
+> [packer/aws/worker_node/README.md](packer/aws/worker_node/README.md).
+
 ---
 
 ## Step 2 — Provision Infrastructure
