@@ -1,0 +1,82 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.image.repository .Values.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.image.repository .Values.image.tag $imageVersion -}}
+{{- end -}}
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-storage-async-task-service
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-storage-async-task-service: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-storage-async-task-service: "true"
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
+      labels:
+        cloud-pipeline/cp-storage-async-task-service: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
+      nodeSelector:
+        cloud-pipeline/cp-storage-async-task-service: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-storage-async-task-service
+          image: {{ $imageRef }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/start.sh"]
+          env:
+            - name: CP_API_JWT_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lib.cpApiTokenSecretName" . }}
+                  key: CP_API_JWT_ADMIN
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /liveness.sh
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 4
+          volumeMounts:
+            # These two paths are the service's own built-in defaults (CP_SAS_WORK_DIR,
+            # CP_SAS_NFS_MOUNT_ROOT) - mounted there with no matching env var, so the service
+            # actually uses the volume rather than its container-local filesystem.
+            - mountPath: /tmp/sas
+              name: cp-storage-async-task-service-work
+            - mountPath: /mnt/sas-shares
+              name: cp-storage-async-task-service-nfs-shares
+      volumes:
+        - name: cp-storage-async-task-service-work
+          hostPath:
+            path: {{ .Values.workDirHostPath }}
+            type: DirectoryOrCreate
+        - name: cp-storage-async-task-service-nfs-shares
+          hostPath:
+            path: {{ .Values.nfsMountRootHostPath }}
+            type: DirectoryOrCreate
+{{- end }}

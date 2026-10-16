@@ -216,6 +216,7 @@ cp-resources → cp-idp (if idp.enabled)
                           → cp-dav (if dav.enabled, default true)
                           → cp-share-srv (if shareSrv.enabled, default false)
                           → cp-run-policy-manager (if runPolicyManager.enabled, default false)
+                          → cp-storage-async-task-service (if storageAsyncTaskService.enabled, default false)
                           → cp-edge
 [global cleanup hooks: wait-for-api, apply-preferences, apply-cluster-networks-config,
                        register-additional-cloud-regions, register-docker-tools,
@@ -240,6 +241,7 @@ cp-resources → cp-idp (if idp.enabled)
 | `cp-dav`                       | `cp-dav`                       | WebDAV gateway — provides WebDAV access to Cloud Pipeline data storages. Patches `cp-config-global` with `CP_DAV_*` keys (default on)  |
 | `cp-share-srv`                 | `cp-share-srv`                 | Data sharing service (optional) — shares CP storages with external users over SAML SSO. Requires `shareSrv.service.host.external`      |
 | `cp-run-policy-manager`        | `cp-run-policy-manager`        | Run policy manager (optional) — evaluates and enforces run lifecycle policies (pause, terminate) on a configurable polling interval     |
+| `cp-storage-async-task-service` | `cp-storage-async-task-service` | Storage async task service (optional) — polls `cp-api-srv` for `DOWNLOAD_ARCHIVE` async tasks, builds the requested ZIP archive and uploads it; destination storage and limits come from the `storage.download.archive.config` platform preference |
 | `cp-edge`                      | `cp-edge`                      | Edge proxy/gateway                                                                                                                      |
 
 ### cp-config-global patching pattern
@@ -349,6 +351,9 @@ the full manifest directory is the superset.
 - `shareSrv.enabled` — Deploy data sharing service (false by default); requires `shareSrv.service.host.external`
 - `runPolicyManager.enabled` — Deploy run policy manager (false by default)
 - `runPolicyManager.pollPeriodSec` — Interval between run policy evaluation cycles in seconds (default: `5`)
+- `storageAsyncTaskService.enabled` — Deploy the storage async task service (false by default); requires node
+  label `cloud-pipeline/cp-storage-async-task-service=true` and the `storage.download.archive.config` platform
+  preference set after deploy (`destinationStorageId` at least)
 - `postDeploy.systemPreferenceConfig` — Path to a custom preferences JSON file or directory; overrides
   `hooks/post-deploy/assets/preferences/` defaults. Can also be set via `CP_SYSTEM_PREFERENCE_CONFIG` env var.
 - `postDeploy.clusterNetworksConfig` — AMI IDs, subnets, security groups for worker node pools
