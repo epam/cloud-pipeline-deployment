@@ -10,18 +10,18 @@ image:
   # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: Always  # IfNotPresent | Always | Never
 
-workDirHostPath: /opt/cp-storage-async-task-service/work  # node-local scratch space, one subdirectory per running task
-nfsMountRootHostPath: /opt/cp-storage-async-task-service/nfs-shares  # node-local mount points for NFS storages the service reads from
-
-# The destination storage, size/file-count limits and archive TTL are controlled by the platform's
-# "storage.download.archive.config" preference, not by this chart - set it after deploy.
+# Match the image's own CP_SATS_WORK_DIR/CP_SATS_LOG_DIR defaults.
+workDirHostPath: /opt/cp-sats/work  # scratch space, one subdirectory per running task
+logsHostPath: /opt/cp-sats/logs  # rotated log files, in addition to stdout
 
 # Written into cp-config-global, which the pod reads via envFrom - same pattern as cp-dav's config block.
 config:
   CP_SATS_SLOTS: "2"  # concurrent download-archive tasks this pod runs at once
   CP_SATS_POLL_INTERVAL: "20"  # sleep between rounds when nothing was claimed
+  CP_SATS_CLEANUP_INTERVAL: "300"  # how often to run the cleanups that finish abandoned tasks and expired archives; 0 turns them off
   CP_SATS_STATUS_POLL: "15"  # how often a running task checks whether it was cancelled
   CP_SATS_PART_SIZE_MB: "8"  # multipart upload part size, in mebibytes
   CP_SATS_COMPRESS_LEVEL: "1"  # ZIP deflate level, 0 (none) to 9 (max)
   CP_SATS_NFS_MOUNT_TIMEOUT: "30"  # hard limit on mounting/checking an NFS share
   CP_SATS_LOG_LEVEL: "INFO"  # DEBUG | INFO | WARNING | ERROR
+  CP_SATS_LOG_BACKUP_DAYS: "31"  # rotated log files to keep

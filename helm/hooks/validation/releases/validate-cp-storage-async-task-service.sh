@@ -8,7 +8,8 @@ function jq_val      { printf '%s' "${VALUES_JSON:-}" | jq -r "${1}" 2>/dev/null
 SATS_ENABLED=$(jq_val '.storageAsyncTaskService.enabled // "false"')
 [ "$SATS_ENABLED" != "true" ] && exit 0
 
-for field in CP_SATS_SLOTS CP_SATS_POLL_INTERVAL CP_SATS_STATUS_POLL CP_SATS_PART_SIZE_MB CP_SATS_NFS_MOUNT_TIMEOUT; do
+for field in CP_SATS_SLOTS CP_SATS_POLL_INTERVAL CP_SATS_CLEANUP_INTERVAL CP_SATS_STATUS_POLL \
+             CP_SATS_PART_SIZE_MB CP_SATS_NFS_MOUNT_TIMEOUT CP_SATS_LOG_BACKUP_DAYS; do
   VALUE=$(jq_val ".storageAsyncTaskService.config.${field} // \"\"")
   if [ -n "$VALUE" ] && ! [[ "$VALUE" =~ ^[0-9]+$ ]]; then
     add_error "storageAsyncTaskService.config.${field}='$VALUE' must be a positive integer"
