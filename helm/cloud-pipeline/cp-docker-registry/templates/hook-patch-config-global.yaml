@@ -6,12 +6,13 @@
 {{- $externalHost := index $serviceHost "external" | default "" | toString | trim -}}
 {{- $internalPort := index $servicePort "internal" | default "443" | toString | trim -}}
 {{- $externalPort := index $servicePort "external" | default "443" | toString | trim -}}
-{{- if and (ne $externalHost "") (or (eq $internalHost "") (contains ".svc.cluster.local" $internalHost)) -}}
+{{- if eq $internalHost "" -}}
+{{- if ne $externalHost "" -}}
 {{- $internalHost = $externalHost -}}
 {{- $internalPort = $externalPort -}}
-{{- end -}}
-{{- if eq $internalHost "" -}}
+{{- else -}}
 {{- $internalHost = printf "cp-docker-registry.%s.svc.cluster.local" $namespace -}}
+{{- end -}}
 {{- end -}}
 {{- $data := dict -}}
 {{- range $key, $value := (.Values.config | default dict) -}}

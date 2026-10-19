@@ -24,13 +24,7 @@ export CP_API_JWT_ADMIN
 CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
 [ -z "$CP_API_JWT_ADMIN" ] && { echo "ERROR: CP_API_JWT_ADMIN not found in cp-api-token"; exit 1; }
 
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  validate_api_port "$CP_API_SRV_INTERNAL_PORT" || exit 1
-  API_URL="https://${CP_API_SRV_INTERNAL_HOST}:${CP_API_SRV_INTERNAL_PORT}/pipeline/restapi"
-else
-  validate_api_port "${CP_API_SRV_EXTERNAL_PORT:-}" || exit 1
-  API_URL="https://${CP_API_SRV_EXTERNAL_HOST}:${CP_API_SRV_EXTERNAL_PORT}/pipeline/restapi"
-fi
+resolve_api_endpoint || exit 1
 echo "API: $API_URL"
 
 api_wait_for_ready 120 10

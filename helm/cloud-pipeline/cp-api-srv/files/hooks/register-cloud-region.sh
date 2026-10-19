@@ -186,6 +186,18 @@ function register_region {
     if [ -n "$temp_credentials_role" ]; then
       updated_region_json=$(printf '%s' "$updated_region_json" | jq --arg tempCredentialsRole "$temp_credentials_role" '.tempCredentialsRole = $tempCredentialsRole')
     fi
+    if [ -n "$ssh_key_name" ]; then
+      updated_region_json=$(printf '%s' "$updated_region_json" | jq --arg sshKeyName "$ssh_key_name" '.sshKeyName = $sshKeyName')
+    fi
+    # regionId/regionCode is not updatable in place (it's the lookup key for this region row);
+    # everything else below mergeRegions() server-side accepts.
+    updated_region_json=$(printf '%s' "$updated_region_json" | jq \
+      --arg kmsKeyArn "$kms_arn" \
+      --arg kmsKeyId "${kms_id:-$(id_from_arn "$kms_arn")}" \
+      --argjson backupDuration "$((backup_duration))" \
+      --arg omicsServiceRole "$omics_service_role" \
+      --arg omicsEcrUrl "$omics_ecr_registry" \
+      '.kmsKeyArn = $kmsKeyArn | .kmsKeyId = $kmsKeyId | .backupDuration = $backupDuration | .omicsServiceRole = $omicsServiceRole | .omicsEcrUrl = $omicsEcrUrl')
     # AWSRegionDTO.corsRules is typed String server-side: pass as a JSON-encoded string, not an array.
     updated_region_json=$(printf '%s' "$updated_region_json" | jq \
       --arg corsRules "$cors_compact" \
@@ -196,7 +208,7 @@ function register_region {
     update_region_response=$(call_api_put "/cloud/region/$region_id" "$CP_API_JWT_ADMIN" "$updated_region_json")
     rc=$?
     if [ $rc -ne 0 ]; then
-      echo "WARNING: PUT /cloud/region/$region_id failed (temp role / CORS may be unchanged)."
+      echo "WARNING: PUT /cloud/region/$region_id failed (role/KMS/SSH key/Omics/backup/CORS settings may be unchanged)."
       echo "$update_region_response"
     fi
     local existing_mounts

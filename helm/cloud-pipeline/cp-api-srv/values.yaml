@@ -4,10 +4,10 @@ service:
   name: cp-api-srv
   host:
     external: ""
-    internal: cp-api-srv.default.svc.cluster.local
+    internal: "" # for example cp-api-srv.default.svc.cluster.local
   port:
     external: "443"
-    internal: "443"
+    internal: ""
 
 highAvailability:
   enabled: false

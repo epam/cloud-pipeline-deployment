@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 # Helm post-install/post-upgrade Job: registers the system storage inside the SYSTEM folder.
+# Re-run on every deploy; no state is tracked outside the API itself:
+#   - looks up a storage matching the configured path (CP_PREF_STORAGE_SYSTEM_STORAGE_NAME) or, failing
+#     that, one matching the configured friendly name (CP_API_SRV_SYSTEM_STORAGE_FRIENDLY_NAME) — each a
+#     single indexed /datastorage/find lookup, not a full listing. Matching by path first (rather than
+#     only by name) means a friendly-name-only change is detected as "same storage, just relabel it"
+#     instead of registering a duplicate for the same path.
+#   - no storage matches either: registers a new storage.
+#   - a storage matches the path: that's the system storage; its name is updated if the friendly name
+#     changed, and it's moved back into the SYSTEM folder if it ended up elsewhere (e.g. the folder was
+#     recreated). FSBrowser preferences are re-applied either way.
+#   - no storage matches the path, but one matches the friendly name: the configured path changed. That
+#     storage is renamed to its own path (freeing up the friendly name so it's no longer picked up as the
+#     system storage next run) but is otherwise left registered as-is; a new storage is then registered
+#     under the friendly name with the new path.
+#
 # Config is read from cp-config-global (populated by cp-api-srv chart from apiSrv.config values):
 #   CP_PREF_STORAGE_SYSTEM_STORAGE_NAME  - S3/AZ/GS bucket path (required; skip if empty)
 #   CP_PREF_STORAGE_SCHEMA               - storage backend type (default: S3)
@@ -34,19 +49,10 @@ FOLDER_NAME="${CP_API_SRV_SYSTEM_FOLDER_NAME:-SYSTEM}"
 STORAGE_FRIENDLY="${CP_API_SRV_SYSTEM_STORAGE_FRIENDLY_NAME:-cloud-pipeline-etc}"
 STORAGE_TYPE="${CP_PREF_STORAGE_SCHEMA:-S3}"
 STORAGE_TYPE="${STORAGE_TYPE^^}"
-FSBROWSER_TRANSFER="${CP_PREF_STORAGE_FSBROWSER_TRANSFER:-${CP_PREF_STORAGE_SYSTEM_STORAGE_NAME}/fsbrowser}"
+DESIRED_PATH="$CP_PREF_STORAGE_SYSTEM_STORAGE_NAME"
+FSBROWSER_TRANSFER="${CP_PREF_STORAGE_FSBROWSER_TRANSFER:-${DESIRED_PATH}/fsbrowser}"
 
 api_wait_for_ready 30 10
-
-# Idempotency: skip if storage.system.storage.name is already set
-storage_name_preference_response=$(curl -k -sS --connect-timeout 10 --max-time 30 \
-    -H "Authorization: Bearer ${CP_API_JWT_ADMIN}" \
-    "${API_URL}/preferences/storage.system.storage.name" 2>/dev/null || true)
-existing_storage_name=$(echo "$storage_name_preference_response" | jq -r '.payload.value // ""' 2>/dev/null || true)
-if [ -n "$existing_storage_name" ]; then
-  echo "register-system-storage: storage.system.storage.name already set to '${existing_storage_name}'; skipping."
-  exit 0
-fi
 
 folder_id=$(api_get_entity_id "$FOLDER_NAME" "folder") || {
   echo "ERROR: SYSTEM folder '${FOLDER_NAME}' not found; run register-system-folder.sh first."
@@ -54,15 +60,60 @@ folder_id=$(api_get_entity_id "$FOLDER_NAME" "folder") || {
 }
 echo "register-system-storage: using folder '${FOLDER_NAME}' (id=${folder_id})."
 
-echo "register-system-storage: registering storage '${CP_PREF_STORAGE_SYSTEM_STORAGE_NAME}' (type=${STORAGE_TYPE})..."
-api_register_datastorage "$folder_id" "$STORAGE_FRIENDLY" "$CP_PREF_STORAGE_SYSTEM_STORAGE_NAME" "$STORAGE_TYPE"
-echo "register-system-storage: storage '${CP_PREF_STORAGE_SYSTEM_STORAGE_NAME}' registered."
+storage_by_path_json=$(api_find_datastorage "$DESIRED_PATH" 2>/dev/null || true)
+storage_by_name_json=""
+if [ -z "$storage_by_path_json" ]; then
+  storage_by_name_json=$(api_find_datastorage "$STORAGE_FRIENDLY" 2>/dev/null || true)
+fi
 
-api_set_preference "storage.system.storage.name" "$CP_PREF_STORAGE_SYSTEM_STORAGE_NAME"         "true"
-api_set_preference "storage.fsbrowser.enabled"   "${CP_PREF_STORAGE_FSBROWSER_ENABLED:-true}"   "true"
-api_set_preference "storage.fsbrowser.port"      "${CP_PREF_STORAGE_FSBROWSER_PORT:-8091}"      "true"
-api_set_preference "storage.fsbrowser.wd"        "${CP_PREF_STORAGE_FSBROWSER_WD:-/}"           "true"
-api_set_preference "storage.fsbrowser.tmp"       "${CP_PREF_STORAGE_FSBROWSER_TMP:-/tmp}"       "true"
-api_set_preference "storage.fsbrowser.transfer"  "$FSBROWSER_TRANSFER"                          "true"
+if [ -n "$storage_by_path_json" ]; then
+  # A storage for this exact path already exists — that's the system storage, regardless of its current name.
+  storage_id=$(echo "$storage_by_path_json" | jq -r '.id')
+  current_name=$(echo "$storage_by_path_json" | jq -r '.name // empty')
+  current_parent_id=$(echo "$storage_by_path_json" | jq -r '.parentFolderId // empty')
+
+  if [ "$current_name" != "$STORAGE_FRIENDLY" ]; then
+    echo "register-system-storage: storage (id=${storage_id}, path='${DESIRED_PATH}') is named '${current_name}';" \
+         "renaming it to the configured friendly name '${STORAGE_FRIENDLY}'."
+    renamed_storage_json=$(echo "$storage_by_path_json" | jq --arg n "$STORAGE_FRIENDLY" '.name = $n')
+    api_update_datastorage "$renamed_storage_json" \
+      || echo "WARNING: register-system-storage: failed to rename storage (id=${storage_id}) to '${STORAGE_FRIENDLY}'."
+  fi
+
+  if [ "$current_parent_id" != "$folder_id" ]; then
+    echo "register-system-storage: storage (id=${storage_id}) is not in the SYSTEM folder '${FOLDER_NAME}'" \
+         "(parentFolderId=${current_parent_id:-none}); moving it there."
+    moved_storage_json=$(echo "$storage_by_path_json" | jq --argjson pid "$folder_id" '.parentFolderId = $pid')
+    api_update_datastorage "$moved_storage_json" \
+      || echo "WARNING: register-system-storage: failed to move storage (id=${storage_id}) into folder '${FOLDER_NAME}'."
+  else
+    echo "register-system-storage: storage (id=${storage_id}) already registered for '${DESIRED_PATH}' in folder '${FOLDER_NAME}'."
+  fi
+elif [ -n "$storage_by_name_json" ]; then
+  # The friendly name belongs to a storage with a different path — the configured path changed.
+  storage_id=$(echo "$storage_by_name_json" | jq -r '.id')
+  old_path=$(echo "$storage_by_name_json" | jq -r '.path // empty')
+  echo "register-system-storage: configured path changed ('${old_path}' -> '${DESIRED_PATH}');" \
+       "renaming storage (id=${storage_id}) to its own path '${old_path}' and moving it out of" \
+       "'${FOLDER_NAME}' to free up the friendly name '${STORAGE_FRIENDLY}' (it remains registered," \
+       "just no longer the system storage) and registering a new '${STORAGE_FRIENDLY}' storage for" \
+       "'${DESIRED_PATH}'."
+  retired_storage_json=$(echo "$storage_by_name_json" | jq --arg n "$old_path" '.name = $n | .parentFolderId = null')
+  api_update_datastorage "$retired_storage_json" \
+    || echo "WARNING: register-system-storage: failed to retire old storage (id=${storage_id}); registration of the new one may fail due to a name clash."
+  new_storage_id=$(api_register_datastorage "$folder_id" "$STORAGE_FRIENDLY" "$DESIRED_PATH" "$STORAGE_TYPE")
+  echo "register-system-storage: storage '${DESIRED_PATH}' registered (id=${new_storage_id})."
+else
+  echo "register-system-storage: no existing storage found for path '${DESIRED_PATH}' or name '${STORAGE_FRIENDLY}'; registering it (type=${STORAGE_TYPE})..."
+  new_storage_id=$(api_register_datastorage "$folder_id" "$STORAGE_FRIENDLY" "$DESIRED_PATH" "$STORAGE_TYPE")
+  echo "register-system-storage: storage '${DESIRED_PATH}' registered (id=${new_storage_id})."
+fi
+
+api_set_preference "storage.system.storage.name" "$DESIRED_PATH" "true"
+api_set_preference "storage.fsbrowser.enabled"   "${CP_PREF_STORAGE_FSBROWSER_ENABLED:-true}" "true"
+api_set_preference "storage.fsbrowser.port"      "${CP_PREF_STORAGE_FSBROWSER_PORT:-8091}"    "true"
+api_set_preference "storage.fsbrowser.wd"        "${CP_PREF_STORAGE_FSBROWSER_WD:-/}"         "true"
+api_set_preference "storage.fsbrowser.tmp"       "${CP_PREF_STORAGE_FSBROWSER_TMP:-/tmp}"     "true"
+api_set_preference "storage.fsbrowser.transfer"  "$FSBROWSER_TRANSFER"                        "true"
 
 echo "register-system-storage: done."
