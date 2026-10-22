@@ -73,6 +73,23 @@ if [ -n "$storage_by_path_json" ]; then
   current_parent_id=$(echo "$storage_by_path_json" | jq -r '.parentFolderId // empty')
 
   if [ "$current_name" != "$STORAGE_FRIENDLY" ]; then
+    # Another storage (e.g. a previously-active system storage for a different path) may still be
+    # squatting on the friendly name from an earlier config change; free it first or this rename
+    # fails on a uniqueness conflict.
+    conflicting_storage_json=$(api_find_datastorage "$STORAGE_FRIENDLY" 2>/dev/null || true)
+    if [ -n "$conflicting_storage_json" ]; then
+      conflicting_id=$(echo "$conflicting_storage_json" | jq -r '.id')
+      if [ "$conflicting_id" != "$storage_id" ]; then
+        conflicting_path=$(echo "$conflicting_storage_json" | jq -r '.path // empty')
+        echo "register-system-storage: storage (id=${conflicting_id}) currently holds the friendly name" \
+             "'${STORAGE_FRIENDLY}'; renaming it back to its own path '${conflicting_path}' and moving it" \
+             "out of '${FOLDER_NAME}' to free the name."
+        freed_storage_json=$(echo "$conflicting_storage_json" | jq --arg n "$conflicting_path" '.name = $n | .parentFolderId = null')
+        api_update_datastorage "$freed_storage_json" \
+          || echo "WARNING: register-system-storage: failed to free '${STORAGE_FRIENDLY}' from storage (id=${conflicting_id}); rename below may fail."
+      fi
+    fi
+
     echo "register-system-storage: storage (id=${storage_id}, path='${DESIRED_PATH}') is named '${current_name}';" \
          "renaming it to the configured friendly name '${STORAGE_FRIENDLY}'."
     renamed_storage_json=$(echo "$storage_by_path_json" | jq --arg n "$STORAGE_FRIENDLY" '.name = $n')
