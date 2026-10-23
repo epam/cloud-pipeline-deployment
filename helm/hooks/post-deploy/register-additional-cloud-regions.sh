@@ -42,11 +42,12 @@ function register_fileshares {
 
 function register_region {
   local entry="$1"
-  local region_name kms_arn kms_id ssh_key_name temp_credentials_role backup_duration
+  local region_name display_name kms_arn kms_id ssh_key_name temp_credentials_role backup_duration
   local omics_service_role omics_ecr_registry cors_rules fileshares_json existing_id
   local mount_credentials_rule mount_storage_rule mount_file_storage_rule
 
   region_name=$(printf '%s' "$entry" | jq -r '.regionId')
+  display_name=$(printf '%s' "$entry" | jq -r '.name // ""')
   kms_arn=$(printf '%s' "$entry" | jq -r '.kmsKeyArn // ""')
   kms_id=$(printf '%s' "$entry" | jq -r '.kmsKeyId // ""')
   ssh_key_name=$(printf '%s' "$entry" | jq -r '.sshKeyName // ""')
@@ -77,6 +78,8 @@ function register_region {
     echo "ERROR: region entry is missing regionId; skipping: $entry"
     return 1
   fi
+  # Display name, independent of regionId (fixed once the region exists); defaults to regionId.
+  [ -z "$display_name" ] || [ "$display_name" = "null" ] && display_name="$region_name"
   if [ -z "$kms_arn" ] || [ "$kms_arn" = "null" ]; then
     echo "ERROR: region '$region_name' is missing kmsKeyArn; skipping."
     return 1
@@ -118,9 +121,22 @@ function register_region {
       return 0
     fi
     updated_region_json=$(printf '%s' "$get_response" | jq '.payload')
+    updated_region_json=$(printf '%s' "$updated_region_json" | jq --arg name "$display_name" '.name = $name')
     if [ -n "$temp_credentials_role" ] && [ "$temp_credentials_role" != "null" ]; then
       updated_region_json=$(printf '%s' "$updated_region_json" | jq --arg tempCredentialsRole "$temp_credentials_role" '.tempCredentialsRole = $tempCredentialsRole')
     fi
+    if [ -n "$ssh_key_name" ] && [ "$ssh_key_name" != "null" ]; then
+      updated_region_json=$(printf '%s' "$updated_region_json" | jq --arg sshKeyName "$ssh_key_name" '.sshKeyName = $sshKeyName')
+    fi
+    # regionId/regionCode is not updatable in place (it's the lookup key for this region row);
+    # everything else below mergeRegions() server-side accepts.
+    updated_region_json=$(printf '%s' "$updated_region_json" | jq \
+      --arg kmsKeyArn "$kms_arn" \
+      --arg kmsKeyId "${kms_id:-$(id_from_arn "$kms_arn")}" \
+      --argjson backupDuration "$((backup_duration))" \
+      --arg omicsServiceRole "$omics_service_role" \
+      --arg omicsEcrUrl "$omics_ecr_registry" \
+      '.kmsKeyArn = $kmsKeyArn | .kmsKeyId = $kmsKeyId | .backupDuration = $backupDuration | .omicsServiceRole = $omicsServiceRole | .omicsEcrUrl = $omicsEcrUrl')
     # AWSRegionDTO.corsRules is typed String server-side: pass as a JSON-encoded string, not an array.
     updated_region_json=$(printf '%s' "$updated_region_json" | jq \
       --arg corsRules "$cors_rules" \
@@ -131,7 +147,7 @@ function register_region {
     update_response=$(call_api_put "/cloud/region/$existing_id" "$CP_API_JWT_ADMIN" "$updated_region_json")
     rc=$?
     if [ $rc -ne 0 ]; then
-      echo "WARNING: PUT /cloud/region/$existing_id failed."
+      echo "WARNING: PUT /cloud/region/$existing_id failed (role/KMS/SSH key/Omics/backup/CORS settings may be unchanged)."
       echo "$update_response"
     fi
     local existing_mounts
@@ -143,7 +159,7 @@ function register_region {
   local payload register_response rc
   payload=$(jq -n \
     --arg regionId "$region_name" \
-    --arg name "$region_name" \
+    --arg name "$display_name" \
     --arg sshKeyName "$ssh_key_name" \
     --arg tempCredentialsRole "$temp_credentials_role" \
     --argjson backupDuration "$((backup_duration))" \
@@ -263,22 +279,7 @@ fi
 # Resolve API endpoint
 ##########
 
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
-  echo "ERROR: Missing API endpoint (internal or external host/port)"
-  exit 1
-fi
-if ! validate_api_port "$API_CONNECT_PORT"; then
-  exit 1
-fi
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+resolve_api_endpoint || exit 1
 echo "API: $API_URL"
 
 ##########

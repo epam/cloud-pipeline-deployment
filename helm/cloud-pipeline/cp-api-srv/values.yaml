@@ -4,10 +4,10 @@ service:
   name: cp-api-srv
   host:
     external: ""
-    internal: cp-api-srv.default.svc.cluster.local
+    internal: "" # for example cp-api-srv.default.svc.cluster.local
   port:
     external: "443"
-    internal: "443"
+    internal: ""
 
 highAvailability:
   enabled: false
@@ -44,6 +44,8 @@ db:
   maxConnections: 100
 
 cloudRegion:
+  name: ""                  # Display name shown in the UI; defaults to regionId. Safely editable on
+                             # redeploy, unlike regionId itself (fixed once the region exists).
   kmsKeyArn: ""             # Full ARN: arn:aws:kms:<region>:<account>:key/<id>
   kmsKeyId: ""              # Key ID (UUID portion of the ARN)
   sshKeyName: ""            # AWS EC2 key pair name (not a file path)

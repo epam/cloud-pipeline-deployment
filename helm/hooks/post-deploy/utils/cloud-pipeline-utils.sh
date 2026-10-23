@@ -15,6 +15,28 @@ function validate_api_port {
   fi
 }
 
+# Picks the API endpoint for these host-side cleanup hooks (external takes priority: some deploy
+# hosts, e.g. CI runners, have no cluster DNS, and the TLS cert only covers external names anyway)
+# and builds $API_URL. Sets/exports API_CONNECT_HOST/PORT, API_URL. Returns 1 if no endpoint is
+# configured or the chosen port is invalid.
+function resolve_api_endpoint {
+  if [ -n "${CP_API_SRV_EXTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_EXTERNAL_PORT:-}" ]; then
+    API_CONNECT_HOST="$CP_API_SRV_EXTERNAL_HOST"
+    API_CONNECT_PORT="$CP_API_SRV_EXTERNAL_PORT"
+    echo "resolve_api_endpoint: using external endpoint ${API_CONNECT_HOST}:${API_CONNECT_PORT}"
+  elif [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
+    API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
+    API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
+    echo "resolve_api_endpoint: CP_API_SRV_EXTERNAL_HOST/PORT not set; falling back to internal endpoint ${API_CONNECT_HOST}:${API_CONNECT_PORT} (will not resolve unless this host has cluster DNS)"
+  else
+    echo "ERROR: resolve_api_endpoint: neither CP_API_SRV_EXTERNAL_HOST/PORT nor CP_API_SRV_INTERNAL_HOST/PORT is set"
+    return 1
+  fi
+  validate_api_port "$API_CONNECT_PORT" || return 1
+  API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+  export API_CONNECT_HOST API_CONNECT_PORT API_URL
+}
+
 function check_api_response_status {
   local response_json="$1"
   local response_status

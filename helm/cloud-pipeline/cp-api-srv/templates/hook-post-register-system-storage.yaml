@@ -4,7 +4,7 @@ metadata:
   name: cp-hook-script-register-system-storage
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install
+    helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "30"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 data:
@@ -19,7 +19,7 @@ metadata:
   name: cp-register-system-storage
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install
+    helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "31"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
