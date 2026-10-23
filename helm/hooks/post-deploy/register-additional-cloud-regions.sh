@@ -42,11 +42,12 @@ function register_fileshares {
 
 function register_region {
   local entry="$1"
-  local region_name kms_arn kms_id ssh_key_name temp_credentials_role backup_duration
+  local region_name display_name kms_arn kms_id ssh_key_name temp_credentials_role backup_duration
   local omics_service_role omics_ecr_registry cors_rules fileshares_json existing_id
   local mount_credentials_rule mount_storage_rule mount_file_storage_rule
 
   region_name=$(printf '%s' "$entry" | jq -r '.regionId')
+  display_name=$(printf '%s' "$entry" | jq -r '.name // ""')
   kms_arn=$(printf '%s' "$entry" | jq -r '.kmsKeyArn // ""')
   kms_id=$(printf '%s' "$entry" | jq -r '.kmsKeyId // ""')
   ssh_key_name=$(printf '%s' "$entry" | jq -r '.sshKeyName // ""')
@@ -77,6 +78,8 @@ function register_region {
     echo "ERROR: region entry is missing regionId; skipping: $entry"
     return 1
   fi
+  # Display name, independent of regionId (fixed once the region exists); defaults to regionId.
+  [ -z "$display_name" ] || [ "$display_name" = "null" ] && display_name="$region_name"
   if [ -z "$kms_arn" ] || [ "$kms_arn" = "null" ]; then
     echo "ERROR: region '$region_name' is missing kmsKeyArn; skipping."
     return 1
@@ -118,6 +121,7 @@ function register_region {
       return 0
     fi
     updated_region_json=$(printf '%s' "$get_response" | jq '.payload')
+    updated_region_json=$(printf '%s' "$updated_region_json" | jq --arg name "$display_name" '.name = $name')
     if [ -n "$temp_credentials_role" ] && [ "$temp_credentials_role" != "null" ]; then
       updated_region_json=$(printf '%s' "$updated_region_json" | jq --arg tempCredentialsRole "$temp_credentials_role" '.tempCredentialsRole = $tempCredentialsRole')
     fi
@@ -155,7 +159,7 @@ function register_region {
   local payload register_response rc
   payload=$(jq -n \
     --arg regionId "$region_name" \
-    --arg name "$region_name" \
+    --arg name "$display_name" \
     --arg sshKeyName "$ssh_key_name" \
     --arg tempCredentialsRole "$temp_credentials_role" \
     --argjson backupDuration "$((backup_duration))" \
