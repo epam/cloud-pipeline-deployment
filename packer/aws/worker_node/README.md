@@ -22,7 +22,7 @@ region            = "us-east-1"
 ## Build
 
 ```bash
-cd packer/aws/worker
+cd packer/aws/worker_node
 packer init .
 
 # Build both CPU and GPU AMIs

@@ -1,10 +1,17 @@
 # AMI Build
 
-Packer builds an Amazon Linux 2023 AMI that is used for every node in the cluster — both the master
-and any application nodes. The node role is determined at first boot via EC2 user data, not at build time.
+There are two independent Packer builds under `packer/aws/`:
 
-See [infra.md](../infra/README.md) for infrastructure requirements and how to launch and configure EC2 instances.
-See [helm.md](../helm/README.md) for Phase 2 — PKI secrets, `values.yaml` configuration, and `helmfile apply`.
+| Directory                                              | Produces                                                                          | Used for                                                                                       |
+|---------------------------------------------------------|------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| [`application_node`](aws/application_node)             | One Amazon Linux 2023 AMI, pre-loaded with Kubernetes and the Cloud Pipeline helm files | Every node in the k8s cluster — the one master node and any application nodes. The node role is determined at first boot via EC2 user data, not at build time. |
+| [`worker_node`](aws/worker_node/README.md)              | CPU and GPU Amazon Linux 2023 AMIs                                                | The compute instances Cloud Pipeline launches dynamically to run pipeline jobs — referenced in `postDeploy.clusterNetworksConfig` (`values.yaml`) |
+
+This page covers `application_node` (the cluster AMI you need for Steps 2–3 of the main
+[README](../README.md)). See [worker_node/README.md](aws/worker_node/README.md) for the compute-worker AMI build.
+
+See [infra/README.md](../infra/README.md) for infrastructure requirements and how to launch and configure EC2 instances.
+See [helm/README.md](../helm/README.md) for Phase 2 — PKI secrets, `values.yaml` configuration, and `helmfile apply`.
 
 ---
 
@@ -23,16 +30,18 @@ See [helm.md](../helm/README.md) for Phase 2 — PKI secrets, `values.yaml` conf
 
 ## Fill in Packer variables
 
-Edit `packer/aws/variables.auto.pkrvars.hcl`:
+Edit `packer/aws/application_node/variables.auto.pkrvars.hcl`:
 
 ```hcl
-vpc_id               = "vpc-xxxxxxxxxxxxxxxxx"
-subnet_id            = "subnet-xxxxxxxxxxxxxxxxx"
-instance_type        = "m7i.xlarge"
-security_group_id    = "sg-xxxxxxxxxxxxxxxxx"
-region               = "us-east-1"
-iam_instance_profile = "my-packer-instance-profile"
-ssh_interface        = ""   # "" = SSH direct; "session_manager" = AWS SSM
+vpc_id            = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_id         = "subnet-xxxxxxxxxxxxxxxxx"
+instance_type     = "m7i.xlarge"
+security_group_id = "sg-xxxxxxxxxxxxxxxxx"
+region            = "us-east-1"
+# iam_instance_profile = "my-packer-instance-profile"           # required if ssh_interface = "session_manager"
+# ssh_interface        = ""   # "" = SSH direct; "session_manager" = AWS SSM
+# cloud_pipeline_deployment_commit = "abc123..."                # pin to a specific commit; defaults to "main"
+# docker_data_root     = "/opt/docker"                           # custom Docker data root; leave empty for default
 ```
 
 ---
@@ -40,12 +49,9 @@ ssh_interface        = ""   # "" = SSH direct; "session_manager" = AWS SSM
 ## Run the build
 
 ```bash
-cd packer/aws
+cd packer/aws/application_node
 packer build .
 ```
 
-Record the AMI ID printed at the end. It is needed in two places:
-
-- `postDeploy.clusterNetworksConfig` in `values.yaml` — the AMI Cloud Pipeline uses when launching
-  compute worker nodes
-- The EC2 launch configuration for the cluster nodes themselves (see [infra.md](../infra/README.md))
+Record the AMI ID printed at the end — it is needed in the EC2 launch configuration for the cluster
+nodes themselves (see [infra/README.md](../infra/README.md)).

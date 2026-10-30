@@ -387,7 +387,7 @@ fi
 ##########
 
 echo "Checking API stability before pushing tools..."
-if ! api_wait_for_stable 180 10 5; then
+if ! api_wait_for_stable 180 10 3; then
   echo "ERROR: API not stable before push, aborting"
   exit 1
 fi

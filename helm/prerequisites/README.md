@@ -129,7 +129,7 @@ certbot certonly \
 
 When prompted, agree to the Terms of Service by typing `yes`.
 
-Certbot will provide 2 token values and ask you to add them as DNS TXT records under
+Certbot will provide two token values and ask you to add them as DNS TXT records under
 `_acme-challenge.<your-domain>`. Add both values to your DNS configuration, then verify
 propagation before pressing Enter:
 
@@ -140,7 +140,7 @@ dig TXT _acme-challenge.<your-cloud-pipeline-domain-name>
 Or use the [Google Admin Toolbox](https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.<your-cloud-pipeline-domain-name>).
 Look for both token values in the `;ANSWER` section.
 
-After success, certificates are saved to `/etc/letsencrypt/live/<your-domain>/`:
+Once it succeeds, certificates are saved to `/etc/letsencrypt/live/<your-domain>/`:
 
 - `fullchain.pem` — full certificate chain
 - `privkey.pem` — private key
