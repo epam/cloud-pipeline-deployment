@@ -171,6 +171,13 @@ shareSrv:
 runPolicyManager:
   enabled: false
 
+# Storage async task service (cp-storage-async-task-service). Builds the archives users ask for when
+# downloading several files/folders from a data storage; polls cp-api-srv for DOWNLOAD_ARCHIVE tasks.
+# Requires node label cloud-pipeline/cp-storage-async-task-service=true, and the
+# storage.download.archive.config platform preference set after deploy (destinationStorageId at least).
+storageAsyncTaskService:
+  enabled: false
+
 postDeploy:
   enabled: false  # true = run post-deploy hooks after all releases sync; false = skip
 

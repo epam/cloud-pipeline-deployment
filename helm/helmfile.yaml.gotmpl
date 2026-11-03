@@ -24,6 +24,7 @@ helmDefaults:
 {{- $postDeployValues       := index $deployValues "postDeploy"       | default dict }}
 {{- $shareSrvValues         := index $deployValues "shareSrv"         | default dict }}
 {{- $runPolicyManagerValues := index $deployValues "runPolicyManager" | default dict }}
+{{- $storageAsyncTaskServiceValues := index $deployValues "storageAsyncTaskService" | default dict }}
 
 {{/* Inject build version from CP_BUILD_VERSION.txt when not already set in values */}}
 {{- $fileVersion := exec "sh" (list "-c" (printf "cat '%s/CP_BUILD_VERSION.txt' 2>/dev/null | tr -d '[:space:]'" (env "PWD"))) }}
@@ -44,6 +45,7 @@ helmDefaults:
 {{- $davInstalled              := index $davValues "enabled" | default true }}
 {{- $shareSrvInstalled         := $shareSrvValues.enabled | default false }}
 {{- $runPolicyManagerInstalled := index $runPolicyManagerValues "enabled" | default false }}
+{{- $storageAsyncTaskServiceInstalled := index $storageAsyncTaskServiceValues "enabled" | default false }}
 
 releases:
 
@@ -255,6 +257,21 @@ releases:
 {{- toYaml $generalValues | nindent 8 }}
       -
 {{- toYaml $runPolicyManagerValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
+  # ── cp-storage-async-task-service ────────────────────────────────────────────
+  - name: cp-storage-async-task-service
+    installed: {{ $storageAsyncTaskServiceInstalled }}
+    chart: ./cloud-pipeline/cp-storage-async-task-service
+    values:
+      - cloud-pipeline/cp-storage-async-task-service/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $storageAsyncTaskServiceValues | nindent 8 }}
     needs:
       - cp-resources
       - cp-api-srv
