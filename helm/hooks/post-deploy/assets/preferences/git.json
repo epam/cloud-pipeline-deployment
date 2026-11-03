@@ -7,6 +7,26 @@
         "value": "v4",
         "visible": false
     },
+    "git.gitlab.hashed.repo.support": {
+        "value": "true",
+        "visible": false
+    },
+    "git.token.rotation.enabled": {
+        "value": "true",
+        "visible": false
+    },
+    "git.token.rotation.schedule": {
+        "value": "0 0 3 ? * *",
+        "visible": false
+    },
+    "git.token.rotation.threshold.days": {
+        "value": "30",
+        "visible": false
+    },
+    "git.token.rotation.lifetime.days": {
+        "value": "364",
+        "visible": false
+    },
     "git.fsbrowser.workdir": {
         "value": "/git-workdir",
         "visible": true

@@ -17,7 +17,7 @@ service:
 
 image:
   repository: quay.io/lifescience/cloud-pipeline
-  tag: git-15
+  tag: git-19
   # buildVersion: ""  # overrides general.buildVersion for this image
   pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
@@ -37,7 +37,7 @@ config:
   CP_GITLAB_SSO_TARGET_URL: "" #Sets idp_sso_target_url value of the gitlab.rb
   CP_GITLAB_SSO_TARGET_URL_TRAIL: "" # Allows to add a trailing part to the idp_sso_target_url
   CP_GITLAB_IDP_CERT_PATH: /opt/idp/pki
-  CP_GITLAB_VERSION: "15"         # GitLab major version (must match image)
+  CP_GITLAB_VERSION: "19"         # GitLab major version (must match image)
   CP_GITLAB_API_VERSION: "v4"     # GitLab REST API version (v4 is current)
   GITLAB_ROOT_USER: "root"
   GITLAB_ROOT_PASSWORD: ""
@@ -47,7 +47,7 @@ config:
   GITLAB_DATABASE_DATABASE: gitlabhq_production
   GITLAB_DATABASE_USERNAME: gitlab
   GITLAB_DATABASE_PASSWORD: gitlab
-  GITLAB_DATABASE_VERSION: "12.4"  # Postgres major.minor for cp-gitlab-db image tag
+  GITLAB_DATABASE_VERSION: "17"  # Postgres major version for cp-gitlab-db image tag (GitLab 19 supports PostgreSQL 17 only)
   GITLAB_DATABASE_SHARED_BUFFERS: 256MB  # PostgreSQL shared_buffers; use M/MB/G/GB suffix
   GITLAB_DATABASE_MAX_CONNECTIONS: "200"
   SYNC_GIT_PERIOD: "60"
