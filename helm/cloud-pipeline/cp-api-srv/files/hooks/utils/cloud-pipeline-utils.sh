@@ -164,3 +164,37 @@ function api_register_datastorage {
   return 1
 }
 
+# GET /datastorage/find?id=<name-or-path> → echoes the matching DataStorage DTO (a single indexed
+# lookup by exact name or path, not a full listing); returns 1 if not found.
+function api_find_datastorage {
+  local identifier="$1"
+  local identifier_url_encoded find_response
+  identifier_url_encoded=$(printf '%s' "$identifier" | jq -sRr @uri)
+  find_response=$(call_api "/datastorage/find?id=${identifier_url_encoded}" "$CP_API_JWT_ADMIN" "" || true)
+  if ! check_api_response_status "$find_response"; then
+    return 1
+  fi
+  echo "$find_response" | jq -c '.payload'
+}
+
+# POST /datastorage/update with a full DataStorage DTO (must include "id"); used to move a storage
+# between folders or otherwise edit it in place. Returns 1 on failure.
+#
+# api_find_datastorage's DTO includes "mask" and other fields DataStorageVO rejects on update;
+# whitelist to the accepted fields before sending.
+function api_update_datastorage {
+  local storage_json update_response
+  storage_json=$(echo "$1" | jq -c '{
+    pathPermissionsEnabled, toolsToMount, path, name, storagePolicy, serviceType, fileShareMountId,
+    parentFolderId, mountDisabled, createdDate, mountPoint, type, id, description,
+    tempCredentialsRole, linkingMasks, mountOptions, mountExactPath, regionId, allowedCidrs,
+    sourceStorageId, shared, sensitive, kmsKeyArn, useAssumedCredentials
+  }')
+  update_response=$(call_api "/datastorage/update" "$CP_API_JWT_ADMIN" "$storage_json" || true)
+  if ! check_api_response_status "$update_response"; then
+    echo "ERROR: api_update_datastorage: failed: $update_response" >&2
+    return 1
+  fi
+  return 0
+}
+

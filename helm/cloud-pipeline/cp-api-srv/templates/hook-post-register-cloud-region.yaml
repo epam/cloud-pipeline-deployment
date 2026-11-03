@@ -4,7 +4,7 @@ metadata:
   name: cp-hook-script-register-cloud-region
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install
+    helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 data:
@@ -21,7 +21,7 @@ metadata:
   name: cp-hook-config-register-cloud-region
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install
+    helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 data:
@@ -33,7 +33,7 @@ metadata:
   name: cp-register-cloud-region
   namespace: {{ include "lib.application.namespace" . }}
   annotations:
-    helm.sh/hook: post-install
+    helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "11"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:

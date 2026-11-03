@@ -317,22 +317,7 @@ else
   REGISTRY_PATH="${CP_DOCKER_INTERNAL_HOST}:${CP_DOCKER_INTERNAL_PORT}"
 fi
 
-if [ -n "$CP_API_SRV_INTERNAL_HOST" ] && [ -n "$CP_API_SRV_INTERNAL_PORT" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="$CP_API_SRV_EXTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_EXTERNAL_PORT"
-fi
-if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
-  echo "Missing API endpoint"
-  exit 1
-fi
-if ! validate_api_port "$API_CONNECT_PORT"; then
-  exit 1
-fi
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+resolve_api_endpoint || exit 1
 echo "API (curl): $API_URL"
 
 REGISTRY_ID=$(api_get_docker_registry_id "$REGISTRY_IDENTIFIER" || true)

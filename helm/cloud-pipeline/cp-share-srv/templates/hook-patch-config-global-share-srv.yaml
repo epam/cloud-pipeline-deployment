@@ -3,14 +3,23 @@
 {{- $serviceHost := index $service "host" | default dict -}}
 {{- $servicePort := index $service "port" | default dict -}}
 {{- $config := .Values.config | default dict -}}
-{{- $defaultInternalHost := printf "cp-share-srv.%s.svc.cluster.local" (include "lib.application.namespace" .) -}}
-{{- $internalHost := index $serviceHost "internal" | default $defaultInternalHost | toString -}}
-{{- $externalHost := index $serviceHost "external" | default $internalHost | toString -}}
+{{- $internalHost := index $serviceHost "internal" | default "" | toString -}}
+{{- $externalHost := index $serviceHost "external" | default "" | toString -}}
+{{- $internalPort := index $servicePort "internal" | default "31084" | toString -}}
+{{- $externalPort := index $servicePort "external" | default "31084" | toString -}}
+{{- if eq $internalHost "" -}}
+{{- if ne $externalHost "" -}}
+{{- $internalHost = $externalHost -}}
+{{- $internalPort = $externalPort -}}
+{{- else -}}
+{{- $internalHost = printf "cp-share-srv.%s.svc.cluster.local" (include "lib.application.namespace" .) -}}
+{{- end -}}
+{{- end -}}
 {{- $data := dict -}}
 {{- $_ := set $data "CP_SHARE_SRV_INTERNAL_HOST" $internalHost -}}
-{{- $_ := set $data "CP_SHARE_SRV_INTERNAL_PORT" (index $servicePort "internal" | default "31084" | toString) -}}
+{{- $_ := set $data "CP_SHARE_SRV_INTERNAL_PORT" $internalPort -}}
 {{- $_ := set $data "CP_SHARE_SRV_EXTERNAL_HOST" $externalHost -}}
-{{- $_ := set $data "CP_SHARE_SRV_EXTERNAL_PORT" (index $servicePort "external" | default "31084" | toString) -}}
+{{- $_ := set $data "CP_SHARE_SRV_EXTERNAL_PORT" $externalPort -}}
 {{- range $key, $value := $config -}}
 {{- $_ := set $data $key ($value | toString) -}}
 {{- end -}}

@@ -43,29 +43,6 @@ api_get_folder_pipeline_names() {
   printf '%s' "$folder_json" | jq -r '(.payload.pipelines // []) | .[].name' 2>/dev/null || true
 }
 
-api_find_pipeline_in_folder() {
-  local folder_name="$1"
-  local pipeline_name="$2"
-  local folder_id folder_json pipeline_id
-  if [ -z "$folder_name" ] || [ -z "$pipeline_name" ]; then
-    return 1
-  fi
-  if ! folder_id=$(api_get_entity_id "$folder_name" "folder"); then
-    return 1
-  fi
-  folder_json=$(call_api "/folder/${folder_id}/load" "$CP_API_JWT_ADMIN") || true
-  if ! check_api_response_status "$folder_json"; then
-    return 1
-  fi
-  pipeline_id=$(printf '%s' "$folder_json" | jq -r --arg n "$pipeline_name" \
-    '(.payload.pipelines // []) | map(select(.name == $n)) | .[0].id // empty')
-  if [ -n "$pipeline_id" ] && [ "$pipeline_id" != "null" ]; then
-    echo "$pipeline_id"
-    return 0
-  fi
-  return 1
-}
-
 api_create_folder() {
   local folder_name="$1"
   local folder_parent_id="$2"
@@ -436,8 +413,8 @@ api_register_data_transfer_pipeline() {
   local pipeline_description="${CP_API_SRV_SYSTEM_TRANSFER_PIPELINE_DESCRIPTION:-Data transfer pipeline}"
 
   local pipeline_id=""
-  if pipeline_id=$(api_find_pipeline_in_folder "$system_folder" "$pipeline_friendly_name"); then
-    echo "Pipeline \"$pipeline_friendly_name\" already exists in folder \"$system_folder\" — skipping."
+  if pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline"); then
+    echo "Pipeline \"$pipeline_friendly_name\" already exists (id=$pipeline_id) — skipping."
     api_set_preference "storage.transfer.pipeline.id" "$pipeline_id" "true" || true
     api_set_preference "storage.transfer.pipeline.version" "$pipeline_version" "true" || true
     echo "Data transfer pipeline already registered (id=$pipeline_id)."
@@ -484,8 +461,8 @@ api_register_system_jobs_pipeline() {
   local pipeline_description="${CP_API_SRV_SYSTEM_JOBS_PIPELINE_DESCRIPTION:-System jobs pipeline}"
 
   local pipeline_id=""
-  if pipeline_id=$(api_find_pipeline_in_folder "$system_folder" "$pipeline_friendly_name"); then
-    echo "Pipeline \"$pipeline_friendly_name\" already exists in folder \"$system_folder\" — skipping."
+  if pipeline_id=$(api_get_entity_id "$pipeline_friendly_name" "pipeline"); then
+    echo "Pipeline \"$pipeline_friendly_name\" already exists (id=$pipeline_id) — skipping."
     api_set_preference "system.jobs.pipeline.id" "$pipeline_id" "true" || true
     echo "System jobs pipeline already registered (id=$pipeline_id)."
     return 0
@@ -567,22 +544,7 @@ fi
 # Resolve API endpoint
 ##########
 
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-if [ -z "${API_CONNECT_HOST:-}" ] || [ -z "${API_CONNECT_PORT:-}" ]; then
-  echo "ERROR: Missing API endpoint (set CP_API_SRV_INTERNAL_* or CP_API_SRV_EXTERNAL_* in API configmaps)."
-  exit 1
-fi
-if ! validate_api_port "$API_CONNECT_PORT"; then
-  exit 1
-fi
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+resolve_api_endpoint || exit 1
 echo "API: $API_URL"
 
 ##########

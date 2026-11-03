@@ -216,6 +216,7 @@ openssl pkcs12 -export \
   -in ssl-public-cert.pem \
   -out cp-api-srv-ssl.p12 \
   -name ssl \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg SHA1 \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-api-srv-ssl.p12
 openssl pkcs12 -export \
@@ -223,6 +224,7 @@ openssl pkcs12 -export \
   -in share-srv-public-cert.pem \
   -out cp-share-srv-ssl.p12 \
   -name ssl \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg SHA1 \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-share-srv-ssl.p12
 
@@ -284,6 +286,7 @@ openssl pkcs12 -export \
   -in sso-public-cert.pem \
   -out cp-api-srv-sso.p12 \
   -name sso \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg SHA1 \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-api-srv-sso.p12
 openssl pkcs12 -export \
@@ -291,6 +294,7 @@ openssl pkcs12 -export \
   -in sso-public-cert.pem \
   -out cp-share-srv-sso.p12 \
   -name sso \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg SHA1 \
   -passout "pass:${PKCS12_PASSWORD}"
 chmod 644 cp-share-srv-sso.p12
 

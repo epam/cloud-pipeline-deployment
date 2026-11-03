@@ -4,7 +4,7 @@ service:
   name: cp-docker-registry
   host:
     external: ""
-    internal: cp-docker-registry.default.svc.cluster.local
+    internal: "" # defaults to external, or cp-docker-registry.<namespace>.svc.cluster.local
   port:
     external: "443"
     internal: "443"

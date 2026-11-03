@@ -257,22 +257,7 @@ if [ -z "$CP_API_JWT_ADMIN" ]; then
   exit 1
 fi
 
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-if [ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ]; then
-  echo "ERROR: Missing API endpoint — set CP_API_SRV_INTERNAL_HOST/PORT or CP_API_SRV_EXTERNAL_HOST/PORT"
-  exit 1
-fi
-if ! validate_api_port "$API_CONNECT_PORT"; then
-  exit 1
-fi
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+resolve_api_endpoint || exit 1
 echo "API: $API_URL"
 
 ##########

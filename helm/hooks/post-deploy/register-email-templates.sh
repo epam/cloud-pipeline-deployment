@@ -32,17 +32,7 @@ export CP_API_JWT_ADMIN
 CP_API_JWT_ADMIN=$(kubectl get secret cp-api-token -n "$NAMESPACE" -o jsonpath='{.data.CP_API_JWT_ADMIN}' | base64 -d)
 [ -z "$CP_API_JWT_ADMIN" ] && { echo "CP_API_JWT_ADMIN not found in cp-api-token"; exit 1; }
 
-if [ -n "${CP_API_SRV_INTERNAL_HOST:-}" ] && [ -n "${CP_API_SRV_INTERNAL_PORT:-}" ]; then
-  API_CONNECT_HOST="$CP_API_SRV_INTERNAL_HOST"
-  API_CONNECT_PORT="$CP_API_SRV_INTERNAL_PORT"
-else
-  API_CONNECT_HOST="${CP_API_SRV_EXTERNAL_HOST:-}"
-  API_CONNECT_PORT="${CP_API_SRV_EXTERNAL_PORT:-}"
-fi
-[ -z "$API_CONNECT_HOST" ] || [ -z "$API_CONNECT_PORT" ] && { echo "Missing API endpoint"; exit 1; }
-validate_api_port "$API_CONNECT_PORT" || exit 1
-
-API_URL="https://${API_CONNECT_HOST}:${API_CONNECT_PORT}/pipeline/restapi"
+resolve_api_endpoint || exit 1
 echo "API: $API_URL"
 
 duplicate_templates=$(find "$CONFIGS_DIR" -maxdepth 1 -type f -name '*.json' -exec basename {} .json \; | sort | uniq -d || true)

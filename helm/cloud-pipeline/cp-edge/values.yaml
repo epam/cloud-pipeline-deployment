@@ -4,7 +4,7 @@ service:
   name: cp-edge
   host:
     external: ""
-    internal: cp-edge.default.svc.cluster.local
+    internal: "" # defaults to external, or cp-edge.<namespace>.svc.cluster.local
   port:
     external: "443"
     internal: "443"

@@ -46,6 +46,7 @@ spec:
           args:
             - --shared_buffers={{ .Values.db.sharedBuffers }}
             - --max_connections={{ .Values.db.maxConnections }}
+            - --password_encryption=md5
           ports:
             - containerPort: {{ .Values.db.port }}
           env:
@@ -55,6 +56,12 @@ spec:
               value: "postgres"
             - name: POSTGRES_PASSWORD
               value: "postgres"
+            # The cp-api-srv JDBC driver (postgresql-42.1.4, bundled in the old Cloud Pipeline API
+            # image) predates SCRAM support (added in driver 42.2.0) and only understands md5 auth.
+            # Postgres defaults both pg_hba.conf's auth method and password hashing to scram-sha-256;
+            # without this, the driver can never authenticate against this image's Postgres version.
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "md5"
             - name: PGDATA
               value: /var/lib/postgresql/data
             - name: DB_EXTENSION

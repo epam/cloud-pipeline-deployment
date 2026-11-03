@@ -42,16 +42,17 @@ echo "Waiting for cp-api-srv pod to be Ready..."
   --for=condition=Ready \
   --timeout="${ROLLOUT_TIMEOUT}s"
 
-# Build API URL: prefer internal endpoint, fall back to external.
+# Build API URL: this script runs on the deploying host (postsync), not in a pod, so there is
+# no cluster DNS here — prefer the external endpoint, fall back to internal.
 _api_host=$("$KUBECTL" get configmap cp-config-global -n "$NAMESPACE" \
-  -o jsonpath='{.data.CP_API_SRV_INTERNAL_HOST}' 2>/dev/null || true)
+  -o jsonpath='{.data.CP_API_SRV_EXTERNAL_HOST}' 2>/dev/null || true)
 _api_port=$("$KUBECTL" get configmap cp-config-global -n "$NAMESPACE" \
-  -o jsonpath='{.data.CP_API_SRV_INTERNAL_PORT}' 2>/dev/null || true)
+  -o jsonpath='{.data.CP_API_SRV_EXTERNAL_PORT}' 2>/dev/null || true)
 if [ -z "$_api_host" ] || [ -z "$_api_port" ]; then
   _api_host=$("$KUBECTL" get configmap cp-config-global -n "$NAMESPACE" \
-    -o jsonpath='{.data.CP_API_SRV_EXTERNAL_HOST}' 2>/dev/null || true)
+    -o jsonpath='{.data.CP_API_SRV_INTERNAL_HOST}' 2>/dev/null || true)
   _api_port=$("$KUBECTL" get configmap cp-config-global -n "$NAMESPACE" \
-    -o jsonpath='{.data.CP_API_SRV_EXTERNAL_PORT}' 2>/dev/null || true)
+    -o jsonpath='{.data.CP_API_SRV_INTERNAL_PORT}' 2>/dev/null || true)
 fi
 
 if [ -z "$_api_host" ] || [ -z "$_api_port" ]; then
