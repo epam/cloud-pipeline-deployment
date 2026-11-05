@@ -218,7 +218,7 @@ git:
     internalHttpPort: 443
   image:
     repository: quay.io/lifescience/cloud-pipeline
-    tag: git-15-0.17
+    tag: git-19-0.17
   config:
     CP_GITLAB_SSO_ENDPOINT_ID: ""
     CP_GITLAB_SSO_TARGET_URL: ""

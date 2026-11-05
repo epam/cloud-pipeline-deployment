@@ -24,6 +24,27 @@
 {{- $_ := set $data $key ($value | toString) -}}
 {{- end -}}
 
+{{/* Self-heal a known-weak/placeholder root password, mirroring the legacy install.sh behavior for
+     CP_GITLAB_VERSION >= 17: GitLab's password-strength check rejects "Passw0rd" placeholder outright
+     ("Password must not contain commonly used combinations of words and letters"), so GitLab never
+     seeds a root user when it's left in place. lookup reflects the end of the previous deploy (or an
+     empty dict on first install / on helm template without a live cluster), so an already-generated
+     strong password is kept as-is rather than regenerated on every redeploy. */}}
+{{- $weakRootPasswords := list "" "Passw0rd" -}}
+{{- $desiredRootPassword := index $data "GITLAB_ROOT_PASSWORD" | default "" -}}
+{{- if or (has $desiredRootPassword $weakRootPasswords) (lt (len $desiredRootPassword) 8) -}}
+{{- $existingConfigGlobal := lookup "v1" "ConfigMap" $namespace "cp-config-global" -}}
+{{- $existingRootPassword := "" -}}
+{{- if $existingConfigGlobal -}}
+{{- $existingRootPassword = index ($existingConfigGlobal.data | default dict) "GITLAB_ROOT_PASSWORD" | default "" -}}
+{{- end -}}
+{{- if and (not (has $existingRootPassword $weakRootPasswords)) (ge (len $existingRootPassword) 8) -}}
+{{- $_ := set $data "GITLAB_ROOT_PASSWORD" $existingRootPassword -}}
+{{- else -}}
+{{- $_ := set $data "GITLAB_ROOT_PASSWORD" (randAlphaNum 16) -}}
+{{- end -}}
+{{- end -}}
+
 {{- $_ := set $data "GITLAB_DATABASE_HOST" (printf "cp-gitlab-db.%s.svc.cluster.local" $namespace) -}}
 {{- $_ := set $data "GITLAB_HOST" (printf "cp-git.%s.svc.cluster.local" $namespace) -}}
 {{- $_ := set $data "CP_GITLAB_EXTERNAL_HOST" $externalHost -}}

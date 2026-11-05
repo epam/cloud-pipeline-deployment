@@ -82,15 +82,17 @@ function gitlab_create_impersonation_token {
   warned_missing_expiry=""
   while [ "$attempt" -lt "$max_attempts" ]; do
     attempt=$((attempt + 1))
-    if [ "${CP_GITLAB_VERSION:-}" = "17" ]; then
-      token_expiry_date=$(date -u -d '+1 year' +%Y-%m-%d 2>/dev/null || date -u -v+1y +%Y-%m-%d 2>/dev/null || echo "")
+    # GitLab 17 and later require an expiry date on impersonation tokens.
+    # Capped at 364 days (not 365): the maximum recent GitLab versions accept, minus a day for a time zone gap.
+    if [[ "${CP_GITLAB_VERSION:-}" =~ ^[0-9]+$ ]] && [ "${CP_GITLAB_VERSION}" -ge 17 ]; then
+      token_expiry_date=$(date -u -d '+364 days' +%Y-%m-%d 2>/dev/null || date -u -v+364d +%Y-%m-%d 2>/dev/null || echo "")
       if [ -n "$token_expiry_date" ]; then
         impersonation_token_response=$(curl -k -s -S -X POST -H "PRIVATE-TOKEN: ${GITLAB_ROOT_TOKEN}" \
           -F name=CloudPipeline -F "scopes[]=api" -F "expires_at=${token_expiry_date}" \
           "${GITLAB_REST_BASE}/api/v4/users/1/impersonation_tokens" 2>/dev/null || true)
       else
         if [ -z "$warned_missing_expiry" ]; then
-          echo "WARNING: could not compute expires_at for GitLab 17; creating impersonation token without expiry field." >&2
+          echo "WARNING: could not compute expires_at for GitLab ${CP_GITLAB_VERSION}; creating impersonation token without expiry field." >&2
           warned_missing_expiry=1
         fi
         impersonation_token_response=$(curl -k -s -S -X POST -H "PRIVATE-TOKEN: ${GITLAB_ROOT_TOKEN}" \
