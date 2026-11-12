@@ -1,0 +1,11 @@
+apiVersion: v2
+name: cp-storage-async-task-service
+description: Cloud-Pipeline storage async task service (builds the archives users ask for when downloading several files or folders from a data storage)
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: lib
+    version: "1.0.0"
+    repository: "file://../lib"
