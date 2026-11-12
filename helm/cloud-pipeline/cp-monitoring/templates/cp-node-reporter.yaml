@@ -42,6 +42,11 @@ spec:
         - name: cp-node-reporter
           image: {{ $imageRef }}
           imagePullPolicy: {{ .Values.nodeReporter.image.pullPolicy }}
+          # The OOM reporter reads the kernel log with dmesg. On hosts with kernel.dmesg_restrict=1,
+          # e.g. Amazon Linux 2023, that needs CAP_SYSLOG.
+          securityContext:
+            capabilities:
+              add: ["SYSLOG"]
           resources:
             limits:
               cpu: 200m
