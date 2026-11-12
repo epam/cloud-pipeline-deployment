@@ -63,9 +63,12 @@ helm dependency update helm/cloud-pipeline/cp-idp
 `packer/aws/` has two independent builds:
 
 - **`application_node`** — the cluster-node AMI (what the rest of this doc means by "the AMI"). Pre-installs:
-  Docker 20.10.24, Helm v3.3.4, Helmfile v1.4.1, helm-diff v3.4.2, jq, amazon-efs-utils, lustre-client,
-  kubeadm/kubelet v1.15.4. Pre-loaded Docker images: Calico v3.14.1, Flannel v0.26.4, kube-proxy v1.15.4,
-  pause:3.1. kube-apiserver port range is patched to `80-32767`.
+  Docker 20.10.24 + cri-dockerd (CRI shim so kubelet 1.24+ can keep using Docker as the real engine), Helm v3.3.4,
+  Helmfile v1.4.1, helm-diff v3.4.2, jq, amazon-efs-utils, lustre-client, kubeadm/kubelet/kubectl v1.37.1 (from the
+  public `pkgs.k8s.io` repo). Pre-pulled images: Calico/Flannel (canal v3.33.0), core control-plane images (etcd,
+  coredns, pause, kube-proxy, ...). Cluster DNS is CoreDNS (kubeadm no longer supports kube-dns), still exposed as
+  the `kube-dns` Service for backward compatibility. kube-apiserver's `--service-node-port-range` is set via the
+  kubeadm config file.
 
   ```bash
   cd packer/aws/application_node

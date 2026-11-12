@@ -8,52 +8,28 @@ if [ -z "${CLOUD_PIPELINE_DISTRO_DIR:-}" ]; then
 fi
 
 _CP_BUILD_VERSION=$(tr -d '[:space:]' < "${CLOUD_PIPELINE_DISTRO_DIR}/helm/CP_BUILD_VERSION.txt")
+_K8S_VERSION="1.37.1"
+_K8S_MINOR="1.37"
+_CRI_SOCKET="unix:///run/cri-dockerd.sock"
+
+# kubelet/kubeadm/kubectl/cri-tools from the official public Kubernetes community package repo
+# (replaces the old private S3 bucket, which has no v1.37 artifacts).
+cat > /etc/yum.repos.d/kubernetes.repo <<EOF
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v${_K8S_MINOR}/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v${_K8S_MINOR}/rpm/repodata/repomd.xml.key
+EOF
+yum install -y kubelet-${_K8S_VERSION} kubeadm-${_K8S_VERSION} kubectl-${_K8S_VERSION} cri-tools
 
 systemctl start docker || { journalctl -xeu docker.service --no-pager >&2; journalctl -xeu containerd.service --no-pager >&2; exit 1; }
-mkdir -p "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images" && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-node-v3.14.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-node-v3.14.1.tar" && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-pod2daemon-flexvol-v3.14.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-pod2daemon-flexvol-v3.14.1.tar" && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/calico-cni-v3.14.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-cni-v3.14.1.tar" && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/k8s.gcr.io-kube-proxy-v1.15.4.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-kube-proxy-v1.15.4.tar" && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/ghcr.io-flannel-io-flannel-v0.26.4.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/ghcr.io-flannel-io-flannel-v0.26.4.tar" && \
-wget -q "https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/docker/k8s.gcr.io-pause-3.1.tar" -O "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-pause-3.1.tar"
-
-docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-node-v3.14.1.tar" && \
-docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-pod2daemon-flexvol-v3.14.1.tar" && \
-docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/calico-cni-v3.14.1.tar" && \
-docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-kube-proxy-v1.15.4.tar" && \
-docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/ghcr.io-flannel-io-flannel-v0.26.4.tar" && \
-docker load -i "${CLOUD_PIPELINE_DISTRO_DIR}/docker-system-images/k8s.gcr.io-pause-3.1.tar"
-
-systemctl stop docker
-
-mkdir -p /etc/docker
-if [ -n "${DOCKER_DATA_ROOT:-}" ]; then
-  cat > /etc/docker/daemon.json <<EOT
-{
-  "data-root": "${DOCKER_DATA_ROOT}",
-  "exec-opts": ["native.cgroupdriver=systemd"],
-  "storage-driver": "overlay2"
-}
-EOT
-else
-  cat > /etc/docker/daemon.json <<'EOT'
-{
-  "exec-opts": ["native.cgroupdriver=systemd"],
-  "storage-driver": "overlay2"
-}
-EOT
-fi
-
-wget -q --no-check-certificate https://cloud-pipeline-oss-builds.s3.amazonaws.com/tools/kube/1.15.4/rpm/kube-1.15.4.el7.tgz -O kube.tgz && \
-     tar -xf kube.tgz && \
-     cd kube && yum localinstall -y *kube*.rpm *cri-tools*.rpm && \
-     cd .. && rm -rf kube/ kube.tgz
-
 systemctl daemon-reload
 systemctl enable docker
+systemctl enable cri-docker.socket
 systemctl enable kubelet
-systemctl start docker
+systemctl start cri-docker.socket
 systemctl start kubelet
 
 for _bootstrap in kubeadm-init-config.yaml.raw canal.yaml.raw; do
@@ -68,8 +44,21 @@ export CP_KUBE_KUBELET_PORT="${CP_KUBE_KUBELET_PORT:-10250}"
 envsubst '${CP_KUBE_FLANNEL_CIDR} ${CP_KUBE_KUBELET_PORT} ${CP_KUBE_NODE_CIDR_MASK}' < "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/kubeadm-init-config.yaml.raw" > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/kubeadm-init-config.yaml"
 envsubst '${CP_KUBE_FLANNEL_CIDR}' < "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml.raw" > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml"
 
-sed -i "s|__CP_DNS_HOSTS_SYNC_IMAGE__|${CP_DNS_HOSTS_SYNC_IMAGE}|" "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh"
-chmod +x "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh"
+chmod +x "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-coredns.sh"
+
+# Pre-pull images at build time so first boot has no internet dependency.
+# Core control-plane images (kube-apiserver, kube-controller-manager, kube-scheduler, kube-proxy, etcd, coredns, pause):
+kubeadm config images pull --kubernetes-version "v${_K8S_VERSION}" --cri-socket "${_CRI_SOCKET}"
+
+# CNI images, parsed out of the rendered canal.yaml (Calico + Flannel):
+grep -oE 'image: [^[:space:]]+' "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/canal.yaml" | awk '{print $2}' | sort -u | while read -r _image; do
+  docker pull "$_image" || { echo "ERROR: failed to pull CNI image $_image"; exit 1; }
+done
+
+# cp-dns-hosts-sync sidecar images used by patch-coredns.sh; not fatal at build time since the
+# exact dns-hosts-sync tag is only known once CP_BUILD_VERSION is substituted at first boot.
+docker pull "busybox:1.36" || echo "WARNING: failed to pre-pull busybox:1.36" >&2
+docker pull "quay.io/lifescience/cloud-pipeline:dns-hosts-sync-${_CP_BUILD_VERSION}" || echo "WARNING: failed to pre-pull dns-hosts-sync-${_CP_BUILD_VERSION}" >&2
 
 # Configure the node via EC2 user data by appending to bootstrap.env:
 #
@@ -107,7 +96,7 @@ cat << 'BOOTSTRAPENV' > "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/bootstrap.en
 # When unset, the full default set of service labels is applied.
 # CP_MASTER_NODE_LABELS=cloud-pipeline/cp-api-srv=true,cloud-pipeline/cp-edge=true
 #
-# Node selector label (key=value) used to pin kube-dns pods to a specific node.
+# Node selector label (key=value) used to pin the cluster DNS (coredns) pod to a specific node.
 # Default: node-role.kubernetes.io/master=
 # KUBE_DNS_NODE_SELECTOR_LABEL=node-role.kubernetes.io/master=
 BOOTSTRAPENV
@@ -222,9 +211,11 @@ if [ "${ROLE:-master-node}" = "application-node" ]; then
   kubeadm join "$K8S_JOIN_ENDPOINT" \
     --token "$K8S_JOIN_TOKEN" \
     --discovery-token-ca-cert-hash "$K8S_JOIN_CA_CERT_HASH" \
+    --cri-socket unix:///run/cri-dockerd.sock \
     --ignore-preflight-errors=all
 
-  # Point DNS at kube-dns ClusterIP so in-cluster names resolve on this node.
+  # Point DNS at the cluster DNS (coredns, still exposed as the "kube-dns" Service for
+  # backward compatibility) ClusterIP so in-cluster names resolve on this node.
   KUBE_CLUSTER_DNS="${K8S_DNS_IP:-10.96.0.10}"
   if [ -f /etc/systemd/resolved.conf ] && \
      systemctl list-unit-files 2>/dev/null | grep -q '^systemd-resolved\.service'; then
@@ -359,7 +350,7 @@ _KUBE_DNS_NODE_SELECTOR_KEY="${_KUBE_DNS_NODE_SELECTOR_LABEL%%=*}"
 _KUBE_DNS_NODE_SELECTOR_VALUE="${_KUBE_DNS_NODE_SELECTOR_LABEL#*=}"
 kubectl label nodes --all "${_KUBE_DNS_NODE_SELECTOR_KEY}=${_KUBE_DNS_NODE_SELECTOR_VALUE}" --overwrite
 
-"${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-kube-dns.sh" --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}" --dns-hosts-sync-image-version="__CP_DNS_HOSTS_SYNC_IMAGE_VERSION__"
+"${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap/patch-coredns.sh" --node-selector-label="${_KUBE_DNS_NODE_SELECTOR_LABEL}" --dns-hosts-sync-image-version="__CP_DNS_HOSTS_SYNC_IMAGE_VERSION__"
 
 echo "Wait for kube-dns Service ClusterIP to be available"
 for _i in $(seq 1 60); do
@@ -455,11 +446,10 @@ else
   kubectl label nodes --all cloud-pipeline/cp-dav=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-share-srv=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-run-policy-manager=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-storage-async-task-service=true --overwrite
   kubectl label nodes --all cloud-pipeline/application-node=true --overwrite
-  
-fi
 
-sed -i '/- kube-apiserver/a \    \- --service-node-port-range=80-32767' /etc/kubernetes/manifests/kube-apiserver.yaml
+fi
 K8SBOOT
 
 echo "CP_CLOUD_PIPELINE_NODE_REGION: $CP_CLOUD_PIPELINE_NODE_REGION"
@@ -471,7 +461,7 @@ chmod +x /usr/local/bin/k8s-first-boot.sh
 cat << 'K8SSVC' > /etc/systemd/system/k8s-first-boot.service
 [Unit]
 Description=Kubernetes first-boot init (kubeadm init)
-After=network-online.target docker.service kubelet.service
+After=network-online.target docker.service cri-docker.socket kubelet.service
 Wants=network-online.target
 
 [Service]

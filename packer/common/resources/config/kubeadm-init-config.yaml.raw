@@ -1,25 +1,30 @@
-apiVersion: kubeadm.k8s.io/v1beta2
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
 etcd:
   local:
     dataDir: /var/lib/etcd
-dns:
-  type: kube-dns
-kubernetesVersion: v1.15.4
+kubernetesVersion: v1.37.1
 networking:
   dnsDomain: cluster.local
   serviceSubnet: 10.96.0.0/12
   podSubnet: ${CP_KUBE_FLANNEL_CIDR}
 controllerManager:
   extraArgs:
-    node-cidr-mask-size: "${CP_KUBE_NODE_CIDR_MASK}"
+    - name: node-cidr-mask-size
+      value: "${CP_KUBE_NODE_CIDR_MASK}"
+apiServer:
+  extraArgs:
+    - name: service-node-port-range
+      value: "80-32767"
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 port: ${CP_KUBE_KUBELET_PORT}
 ---
-apiVersion: kubeadm.k8s.io/v1beta2
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: InitConfiguration
+nodeRegistration:
+  criSocket: unix:///run/cri-dockerd.sock
 bootstrapTokens:
   - groups:
     ttl: 0s
