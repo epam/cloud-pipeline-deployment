@@ -455,6 +455,7 @@ else
   kubectl label nodes --all cloud-pipeline/cp-dav=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-share-srv=true --overwrite
   kubectl label nodes --all cloud-pipeline/cp-run-policy-manager=true --overwrite
+  kubectl label nodes --all cloud-pipeline/cp-storage-async-task-service=true --overwrite
   kubectl label nodes --all cloud-pipeline/application-node=true --overwrite
   
 fi
