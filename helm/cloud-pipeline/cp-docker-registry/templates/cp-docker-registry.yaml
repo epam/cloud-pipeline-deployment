@@ -145,6 +145,14 @@ spec:
                     - key: ssl-public-cert.pem
                       path: ssl-public-cert.pem
               - secret:
+                  # Single-block CA cert; ssl-public-cert.pem (leaf+CA) gets skipped by the CA-bundling
+                  # entrypoint. Optional: not every CA (e.g. a public one) provides this separately.
+                  name: cp-pki-secret
+                  optional: true
+                  items:
+                    - key: ca-public-cert.pem
+                      path: ca-public-cert.pem
+              - secret:
                   name: cp-jwt-pki-secret
                   items:
                     - key: jwt.key.x509
