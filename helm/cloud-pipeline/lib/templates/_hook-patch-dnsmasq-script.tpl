@@ -84,17 +84,20 @@ while true; do
   exit 1
 done
 
-echo "Restarting kube-dns in kube-system so dnsmasq remounts cp-dnsmasq-hosts (not deferred to cp-edge postsync)..."
+echo "Restarting cluster DNS in kube-system so it remounts cp-dnsmasq-hosts (not deferred to cp-edge postsync)..."
 if kubectl get pods -n kube-system -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -q .; then
   kubectl delete pods -n kube-system -l k8s-app=kube-dns --ignore-not-found --wait=false
-  if kubectl rollout status deployment/kube-dns -n kube-system --timeout=120s 2>/dev/null; then
-    echo "kube-dns deployment reported ready"
+  # Deployment is "coredns" on CoreDNS-based clusters (kubeadm 1.24+), "kube-dns" on older ones;
+  # try both and fall back to a flat sleep if neither rollout-status call succeeds (RBAC/name).
+  if kubectl rollout status deployment/coredns -n kube-system --timeout=120s 2>/dev/null \
+     || kubectl rollout status deployment/kube-dns -n kube-system --timeout=120s 2>/dev/null; then
+    echo "cluster DNS deployment reported ready"
   else
-    echo "NOTE: rollout status for deployment/kube-dns unavailable or failed (RBAC/name); waiting for replacement kube-dns pod..."
+    echo "NOTE: rollout status for deployment/coredns or deployment/kube-dns unavailable or failed (RBAC/name); waiting for replacement pod..."
     sleep 45
   fi
 else
-  echo "No pods with label k8s-app=kube-dns in kube-system; skipping kube-dns restart."
+  echo "No pods with label k8s-app=kube-dns in kube-system; skipping cluster DNS restart."
 fi
 echo "Waiting 15s for DNS to stabilize..."
 sleep 15
@@ -185,17 +188,20 @@ patch_one_entry() {
 patch_one_entry {{ .ip | quote }} {{ .host | quote }}
 {{ end -}}
 
-echo "Restarting kube-dns in kube-system so dnsmasq remounts cp-dnsmasq-hosts..."
+echo "Restarting cluster DNS in kube-system so it remounts cp-dnsmasq-hosts..."
 if kubectl get pods -n kube-system -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -q .; then
   kubectl delete pods -n kube-system -l k8s-app=kube-dns --ignore-not-found --wait=false
-  if kubectl rollout status deployment/kube-dns -n kube-system --timeout=120s 2>/dev/null; then
-    echo "kube-dns deployment reported ready"
+  # Deployment is "coredns" on CoreDNS-based clusters (kubeadm 1.24+), "kube-dns" on older ones;
+  # try both and fall back to a flat sleep if neither rollout-status call succeeds (RBAC/name).
+  if kubectl rollout status deployment/coredns -n kube-system --timeout=120s 2>/dev/null \
+     || kubectl rollout status deployment/kube-dns -n kube-system --timeout=120s 2>/dev/null; then
+    echo "cluster DNS deployment reported ready"
   else
-    echo "NOTE: rollout status for deployment/kube-dns unavailable or failed (RBAC/name); waiting for replacement kube-dns pod..."
+    echo "NOTE: rollout status for deployment/coredns or deployment/kube-dns unavailable or failed (RBAC/name); waiting for replacement pod..."
     sleep 45
   fi
 else
-  echo "No pods with label k8s-app=kube-dns in kube-system; skipping kube-dns restart."
+  echo "No pods with label k8s-app=kube-dns in kube-system; skipping cluster DNS restart."
 fi
 echo "Waiting 15s for DNS to stabilize..."
 sleep 15

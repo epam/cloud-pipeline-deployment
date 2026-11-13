@@ -13,7 +13,6 @@ _K8S_MINOR="1.37"
 _CRI_SOCKET="unix:///run/cri-dockerd.sock"
 
 # kubelet/kubeadm/kubectl/cri-tools from the official public Kubernetes community package repo
-# (replaces the old private S3 bucket, which has no v1.37 artifacts).
 cat > /etc/yum.repos.d/kubernetes.repo <<EOF
 [kubernetes]
 name=Kubernetes
