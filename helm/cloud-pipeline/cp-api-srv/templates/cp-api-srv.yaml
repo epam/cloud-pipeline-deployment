@@ -73,9 +73,13 @@ spec:
       nodeSelector:
         cloud-pipeline/cp-api-srv: "true"
       tolerations:
-        - key: node-role.kubernetes.io/master
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
           effect: NoSchedule
-      terminationGracePeriodSeconds: 50    
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      terminationGracePeriodSeconds: 50
       containers:
         - name: cp-api-srv-leader-elector
           image: {{ $electorImageRef }}

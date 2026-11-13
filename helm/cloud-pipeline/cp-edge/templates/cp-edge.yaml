@@ -101,7 +101,11 @@ spec:
         cloud-pipeline/cp-edge: "true"
         cloud-pipeline/region: {{ .Values.region }}
       tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
         - key: node-role.kubernetes.io/master
+          operator: Exists
           effect: NoSchedule
       containers:
         - name: cp-edge

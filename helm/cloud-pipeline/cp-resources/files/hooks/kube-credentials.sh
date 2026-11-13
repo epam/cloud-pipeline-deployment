@@ -49,7 +49,11 @@ while IFS= read -r sec; do
 done < <(echo "$SA_JSON" | jq -r '.secrets[]?.name // empty')
 
 if [ -z "$CP_KUBE_NODE_TOKEN" ]; then
-  CP_KUBE_NODE_TOKEN=$(kubectl create token "$CANAL_SA" -n "$KUBE_SYSTEM_NS" --duration=8760h 2>/dev/null || true)
+  CP_KUBE_NODE_TOKEN=$(kubectl create token "$CANAL_SA" -n "$KUBE_SYSTEM_NS" --duration=8760h 2>/tmp/_create_token_err) || true
+  if [ -z "$CP_KUBE_NODE_TOKEN" ] && [ -s /tmp/_create_token_err ]; then
+    echo "kubectl create token $CANAL_SA failed:" >&2
+    cat /tmp/_create_token_err >&2
+  fi
 fi
 if [ -z "$CP_KUBE_NODE_TOKEN" ] || printf '%s' "$CP_KUBE_NODE_TOKEN" | LC_ALL=C grep -q '[^[:print:]]'; then
   echo "Could not read a valid printable token for $KUBE_SYSTEM_NS/$CANAL_SA (check SA secrets or token create RBAC)" >&2
