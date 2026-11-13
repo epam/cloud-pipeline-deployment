@@ -84,8 +84,6 @@ spec:
                 key: CP_API_JWT_ADMIN
           - name: REGISTRY_HTTP_ADDR
             value: "0.0.0.0:80"
-          - name: REGISTRY_LOG_LEVEL
-            value: "debug"
           {{- if .Values.useEc2InstanceRoleForS3 }}
           - name: CP_CLOUD_CREDENTIALS_LOCATION
             value: "/dev/null"
