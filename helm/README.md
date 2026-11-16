@@ -1,7 +1,7 @@
 # Helmfile layout for Cloud Pipeline
 
 This directory uses [Helmfile](https://github.com/helmfile/helmfile) to deploy
-Cloud Pipeline as **fifteen ordered releases** with explicit dependencies.
+Cloud Pipeline as **sixteen ordered releases** with explicit dependencies.
 
 ## Release order and dependencies
 
@@ -21,6 +21,7 @@ Cloud Pipeline as **fifteen ordered releases** with explicit dependencies.
 | 5     | **cp-dav**                         | `dav.enabled: true` (default on)             | —                                                            |
 | 5     | **cp-share-srv**                   | `shareSrv.enabled: true` (default off)       | cp-resources, cp-idp, cp-api-srv                             |
 | 5     | **cp-run-policy-manager**          | `runPolicyManager.enabled: true` (default off)| cp-resources, cp-api-srv                                    |
+| 5     | **cp-tinyproxy**                   | `tinyproxy.enabled: true` (default on)       | cp-resources, cp-api-srv                                     |
 | 6     | **cp-edge**                        | Always                                       | cp-resources, cp-idp, cp-api-srv, cp-docker-registry, cp-git |
 
 Releases at order 5 are independent of each other and run in parallel once cp-api-srv is ready.
@@ -364,6 +365,28 @@ terminate) on a configurable polling interval. Requires node label
 runPolicyManager:
   enabled: false
   pollPeriodSec: "5"        # Interval between run policy evaluation cycles in seconds
+```
+
+### `tinyproxy`
+
+Tinyproxy egress proxy (`cp-tinyproxy`). Optional outbound HTTP/HTTPS (and TCP/UDP/SMTP stream) proxy that
+job containers can opt into. Patches `cp-config-global` with `CP_TP_INTERNAL_HOST`/`CP_TP_INTERNAL_PORT`
+plus any `config` keys set below. Requires node label `cloud-pipeline/cp-tinyproxy=true`.
+
+```yaml
+tinyproxy:
+  enabled: true
+  config:
+    CP_TP_ALLOWED_CIDR: "10.244.0.0/16"   # tinyproxy Allow directive; match the cluster's pod CIDR
+    CP_TP_MAX_CLIENTS: "100"
+    CP_TP_TIMEOUT: "60"
+    CP_TP_LOG_LEVEL: Error
+    CP_TP_HTTP_PROXY_ENABLED: "true"
+    CP_TP_STREAM_PROXY_ENABLED: "true"
+    # CP_TP_UPSTREAM: ""               # upstream proxy chain, e.g. "https+http+proxy.example.com:3128"
+    # CP_TP_ALLOWED_DESTINATION: ""    # comma-separated allowlist (wins over CP_TP_RESTRICTED_DESTINATION)
+    # CP_TP_RESTRICTED_DESTINATION: "" # comma-separated denylist
+    # CP_TP_ALLOWED_PORTS: ""          # CONNECT port whitelist
 ```
 
 ### `postDeploy`

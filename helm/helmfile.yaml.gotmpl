@@ -25,6 +25,7 @@ helmDefaults:
 {{- $shareSrvValues         := index $deployValues "shareSrv"         | default dict }}
 {{- $runPolicyManagerValues := index $deployValues "runPolicyManager" | default dict }}
 {{- $storageAsyncTaskServiceValues := index $deployValues "storageAsyncTaskService" | default dict }}
+{{- $tinyproxyValues         := index $deployValues "tinyproxy"         | default dict }}
 
 {{/* Inject build version from CP_BUILD_VERSION.txt when not already set in values */}}
 {{- $fileVersion := exec "sh" (list "-c" (printf "cat '%s/CP_BUILD_VERSION.txt' 2>/dev/null | tr -d '[:space:]'" (env "PWD"))) }}
@@ -46,6 +47,7 @@ helmDefaults:
 {{- $shareSrvInstalled         := $shareSrvValues.enabled | default false }}
 {{- $runPolicyManagerInstalled := index $runPolicyManagerValues "enabled" | default false }}
 {{- $storageAsyncTaskServiceInstalled := index $storageAsyncTaskServiceValues "enabled" | default false }}
+{{- $tinyproxyInstalled         := index $tinyproxyValues "enabled" | default true }}
 
 releases:
 
@@ -272,6 +274,21 @@ releases:
 {{- toYaml $generalValues | nindent 8 }}
       -
 {{- toYaml $storageAsyncTaskServiceValues | nindent 8 }}
+    needs:
+      - cp-resources
+      - cp-api-srv
+    wait: true
+
+  # ── cp-tinyproxy ──────────────────────────────────────────────────────────────
+  - name: cp-tinyproxy
+    installed: {{ $tinyproxyInstalled }}
+    chart: ./cloud-pipeline/cp-tinyproxy
+    values:
+      - cloud-pipeline/cp-tinyproxy/values.yaml
+      -
+{{- toYaml $generalValues | nindent 8 }}
+      -
+{{- toYaml $tinyproxyValues | nindent 8 }}
     needs:
       - cp-resources
       - cp-api-srv

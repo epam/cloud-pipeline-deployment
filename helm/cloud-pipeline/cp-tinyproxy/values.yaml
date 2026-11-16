@@ -1,0 +1,29 @@
+# Used by lib.cpConfigGlobal.patchHookTemplate to derive the configmap-to-update-* name
+service:
+  name: cp-tinyproxy
+  port:
+    internal: "3128"
+
+enabled: true
+# buildVersion: ""  # overrides general.buildVersion for this release
+
+image:
+  repository: quay.io/lifescience/cloud-pipeline
+  tag: tinyproxy
+  # buildVersion: ""  # overrides general.buildVersion for this image
+  pullPolicy: Always  # IfNotPresent | Always | Never
+
+logsHostPath: /opt/tinyproxy/logs  # Node local path for log files
+
+config:
+  CP_TP_ALLOWED_CIDR: "10.244.0.0/16"
+  CP_TP_MAX_CLIENTS: "100"
+  CP_TP_TIMEOUT: "60"
+  CP_TP_LOG_LEVEL: Error
+  CP_TP_HTTP_PROXY_ENABLED: "true"
+  CP_TP_STREAM_PROXY_ENABLED: "true"
+  # Optional tunables, left unset by default (see deploy/docker/cp-tinyproxy/init in the cloud-pipeline repo):
+  # CP_TP_UPSTREAM: ""               # upstream proxy chain, e.g. "https+http+proxy.example.com:3128"
+  # CP_TP_ALLOWED_DESTINATION: ""    # comma-separated allowlist (wins over CP_TP_RESTRICTED_DESTINATION)
+  # CP_TP_RESTRICTED_DESTINATION: "" # comma-separated denylist
+  # CP_TP_ALLOWED_PORTS: ""          # CONNECT port whitelist
