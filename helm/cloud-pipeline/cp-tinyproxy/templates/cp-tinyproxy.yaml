@@ -1,0 +1,80 @@
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" .Values.image.tag -}}
+{{- $imageRef = printf "%s@%s" .Values.image.repository .Values.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" .Values.image.repository .Values.image.tag $imageVersion -}}
+{{- end -}}
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-tinyproxy: "true"
+    cloud-pipeline/core-component: "Service"
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.service.port.internal | int }}
+      targetPort: {{ .Values.service.port.internal | int }}
+      name: cp-tinyproxy-port
+  selector:
+    cloud-pipeline/cp-tinyproxy: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-tinyproxy
+  namespace: {{ include "lib.application.namespace" . }}
+  labels:
+    cloud-pipeline/cp-tinyproxy: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-tinyproxy: "true"
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
+      labels:
+        cloud-pipeline/cp-tinyproxy: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
+      nodeSelector:
+        cloud-pipeline/cp-tinyproxy: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-tinyproxy
+          image: {{ $imageRef }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/init"]
+          env:
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          envFrom:
+            - configMapRef:
+                name: cp-config-global
+          ports:
+            - containerPort: {{ .Values.service.port.internal | int }}
+          volumeMounts:
+            - mountPath: /opt/tinyproxy/logs
+              name: tinyproxy-logs
+      volumes:
+        - name: tinyproxy-logs
+          hostPath:
+            path: {{ .Values.logsHostPath }}
+            type: DirectoryOrCreate
+{{- end }}
