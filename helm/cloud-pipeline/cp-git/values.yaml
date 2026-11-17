@@ -19,7 +19,7 @@ image:
   repository: quay.io/lifescience/cloud-pipeline
   tag: git-19
   # buildVersion: ""  # overrides general.buildVersion for this image
-  pullPolicy: Always  # IfNotPresent | Always | Never
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 gitSync:
   enabled: true
@@ -29,7 +29,7 @@ gitSync:
     repository: quay.io/lifescience/cloud-pipeline
     tag: api-srv
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: Always  # IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 config:
   CP_GITLAB_CERT_DIR: /opt/gitlab/pki
@@ -59,7 +59,7 @@ backup:
     repository: quay.io/lifescience/cloud-pipeline
     tag: cp-bkp-worker
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: Always  # IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   schedule: "0 8 * * *"  # Cron schedule in server local time
   retention: "10"         # Number of backup archives to keep
   storageList: ""         # Comma-separated S3 paths for backup upload; empty = local only
@@ -67,7 +67,7 @@ backup:
 gitlabDb:
   enabled: true
   image: postgres
-  imagePullPolicy: Always
+  imagePullPolicy: IfNotPresent
   # Container listen port (Postgres default 5432). Service port = config GITLAB_DATABASE_PORT (e.g. 6543).
   port: 5432
   dataHostPath: /opt/gitlab-postgresql/data

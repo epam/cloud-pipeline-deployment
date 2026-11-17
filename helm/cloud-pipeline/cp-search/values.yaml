@@ -20,7 +20,7 @@ elk:
     repository: quay.io/lifescience/cloud-pipeline
     tag: search-elk
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: Always  # IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   heapSize: 4g  # JVM heap for Elasticsearch, e.g. 4g, 8g (use M/G suffix)
   # Extra JVM flags (install-config used CMS; container image may override).
   javaOptsExtra: "-XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"

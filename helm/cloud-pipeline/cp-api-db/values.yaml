@@ -13,7 +13,7 @@ backup:
   image:
     repository: quay.io/lifescience/cloud-pipeline
     tag: cp-bkp-worker-0.17
-    pullPolicy: Always  # IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   schedule: "0 8 * * *"  # Cron schedule in server local time
   retention: "10"         # Number of backup archives to keep
   storageList: ""         # Comma-separated S3 paths for backup upload; empty = local only

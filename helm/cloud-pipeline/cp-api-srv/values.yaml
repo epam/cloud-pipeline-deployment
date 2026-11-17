@@ -23,12 +23,12 @@ image:
     repository: quay.io/lifescience/cloud-pipeline
     tag: leader-elector
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: Always  # IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   apiServer:
     repository: quay.io/lifescience/cloud-pipeline
     tag: api-srv
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: Always  # IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 db:
   # internal (bundled Postgres pod) | external (RDS or managed Postgres)
@@ -119,7 +119,7 @@ backup:
     repository: quay.io/lifescience/cloud-pipeline
     tag: cp-bkp-worker
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: Always  # IfNotPresent | Always | Never
+    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
   schedule: "0 8 * * *"  # Cron schedule in server local time
   retention: "10"         # Number of backup archives to keep
   storageList: ""         # Comma-separated S3 paths for backup upload; empty = local only

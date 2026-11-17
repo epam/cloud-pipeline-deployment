@@ -18,7 +18,7 @@ image:
   repository: quay.io/lifescience/cloud-pipeline
   tag: edge
   # buildVersion: ""  # overrides general.buildVersion for this image
-  pullPolicy: Always  # IfNotPresent | Always | Never
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 config:
   CP_KUBE_SERVICES_TYPE: ingress  # ingress | nodePort
   CP_EDGE_CONNECT_EXTERNAL_PORT: "31092"

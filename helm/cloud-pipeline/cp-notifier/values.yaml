@@ -9,7 +9,7 @@ image:
   repository: quay.io/lifescience/cloud-pipeline
   tag: notifier
   # buildVersion: ""  # overrides general.buildVersion for this image
-  pullPolicy: Always  # IfNotPresent | Always | Never
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
 
 # Structured settings → CP_NOTIFIER_* keys in cp-config-global (via hook ConfigMap + patch Job).
 smtp:

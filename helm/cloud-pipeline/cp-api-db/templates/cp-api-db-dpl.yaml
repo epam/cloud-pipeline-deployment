@@ -42,7 +42,7 @@ spec:
       containers:
         - name: cp-api-db
           image: postgres:{{ .Values.db.version }}
-          imagePullPolicy: "Always"
+          imagePullPolicy: "IfNotPresent"
           args:
             - --shared_buffers={{ .Values.db.sharedBuffers }}
             - --max_connections={{ .Values.db.maxConnections }}
