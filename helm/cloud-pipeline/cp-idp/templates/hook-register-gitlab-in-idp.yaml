@@ -40,7 +40,7 @@ spec:
       containers:
         - name: hook-register-gitlab-in-idp
           image: {{ include "lib.hook.deploymentImage" . | quote }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" . }}
           env:
             - name: NAMESPACE
               value: {{ include "lib.application.namespace" . | quote }}

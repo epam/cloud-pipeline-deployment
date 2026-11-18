@@ -1,6 +1,7 @@
 general:
   # buildVersion: ""  # top-level build version applied to all cloud-pipeline images
   namespace: default
+  # hookImagePullPolicy: ""  # override pull policy for the deployment-helm-hook image; defaults to IfNotPresent.
   # Optional private registry credentials. Set user+password or secret (not both).
   # Leave all fields empty (default) to disable imagePullSecrets on all deployments.
   imagePullCredentials:
