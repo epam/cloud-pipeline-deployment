@@ -65,7 +65,13 @@ helm dependency update helm/cloud-pipeline/cp-idp
 - **`application_node`** — the cluster-node AMI (what the rest of this doc means by "the AMI"). Pre-installs:
   Docker 20.10.24, Helm v3.3.4, Helmfile v1.4.1, helm-diff v3.4.2, jq, amazon-efs-utils, lustre-client,
   kubeadm/kubelet v1.15.4. Pre-loaded Docker images: Calico v3.14.1, Flannel v0.26.4, kube-proxy v1.15.4,
-  pause:3.1. kube-apiserver port range is patched to `80-32767`.
+  pause:3.1. kube-apiserver port range is patched to `80-32767`. Also configures `dnf-automatic`
+  (`common/scripts/install_security_patches.sh`) to unattended-install OS security patches on a schedule,
+  excluding `kube*`, `docker*`, `container*`, `runc*` packages so the pinned k8s/container-runtime stack is
+  never touched. Schedule defaults to weekly (Sunday 03:00 UTC), set at build time via the
+  `security_patch_schedule` packer variable (a systemd `OnCalendar` expression). To change the schedule on an
+  already-running instance without rebuilding the AMI, edit
+  `/etc/systemd/system/dnf-automatic.timer.d/override.conf` and run `systemctl daemon-reload`.
 
   ```bash
   cd packer/aws/application_node
