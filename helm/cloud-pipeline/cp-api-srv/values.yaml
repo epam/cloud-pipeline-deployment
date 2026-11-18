@@ -37,6 +37,7 @@ db:
   host: ""
   port: "5432"  # Postgres TCP port
   version: "16.4"  # Postgres major.minor version (used for container image tag)
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never -- for the init-db hook Job's postgres image
   db: pipeline
   user: pipeline
   pass: ""
