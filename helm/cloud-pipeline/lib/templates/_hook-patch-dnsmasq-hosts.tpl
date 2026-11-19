@@ -29,7 +29,7 @@ spec:
       containers:
         - name: patch-dnsmasq
           image: {{ .Values.patchDNS.image | default (include "lib.hook.deploymentImage" .) }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" . }}
           env:
             - name: NAMESPACE
               value: {{ include "lib.application.namespace" . | quote }}
@@ -76,7 +76,7 @@ spec:
       containers:
         - name: patch-dnsmasq-static
           image: {{ include "lib.hook.deploymentImage" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" . }}
           command: ["/bin/bash", "-c"]
           args:
             - |

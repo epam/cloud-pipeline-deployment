@@ -41,7 +41,7 @@ spec:
       containers:
         - name: register-system-folder
           image: {{ include "lib.hook.deploymentImage" . | quote }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" . }}
           envFrom:
             - configMapRef:
                 name: cp-config-global

@@ -40,7 +40,7 @@ spec:
       containers:
         - name: post-deploy
           image: {{ include "lib.hook.deploymentImage" . }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" . }}
           envFrom:
             - configMapRef:
                 name: cp-config-global

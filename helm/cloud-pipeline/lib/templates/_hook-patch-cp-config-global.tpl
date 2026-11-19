@@ -39,7 +39,7 @@ spec:
       containers:
         - name: patch
           image: {{ include "lib.hook.deploymentImage" $ctx }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" $ctx }}
           env:
             - name: NAMESPACE
               value: {{ include "lib.application.namespace" $ctx | quote }}
