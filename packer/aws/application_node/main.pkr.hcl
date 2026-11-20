@@ -126,5 +126,13 @@ build {
     script          = "${path.root}/../../common/scripts/install_kubernetes.sh"
     pause_before    = "30s"
   }
+
+  provisioner "shell" {
+    environment_vars = [
+      "SECURITY_PATCH_SCHEDULE=${var.security_patch_schedule}",
+    ]
+    execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
+    script          = "${path.root}/../../common/scripts/install_security_patches.sh"
+  }
 }
 
