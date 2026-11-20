@@ -36,7 +36,8 @@ initializes as single-node only (no application nodes can join).
 You can provision the infrastructure in any way that suits your workflow:
 
 - **AWS Console** — launch EC2 instances manually, create an EFS filesystem from the console
-- **Terraform** — define EC2, EFS/FSx, VPC, IAM resources as code; version-controlled and repeatable
+- **Terraform** — a ready-to-use module that provisions all of the resources below (EC2, EFS/FSx,
+  IAM, KMS, S3) and wires up `bootstrap.env` automatically: see [terraform/README.md](terraform/README.md)
 - **AWS CloudFormation** — AWS-native IaC; integrates with Service Catalog and StackSets
 
 Whichever method you use, the result must be:
