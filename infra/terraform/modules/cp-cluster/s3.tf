@@ -9,10 +9,6 @@ module "s3_docker_registry" {
   object_ownership         = "BucketOwnerEnforced"
   force_destroy            = var.s3_force_destroy
 
-  versioning = {
-    enabled = var.s3_versioning_enabled
-  }
-
   lifecycle_rule = [
     {
       id      = "abort-incomplete-multipart-uploads"
@@ -47,10 +43,6 @@ module "s3_system_storage" {
   control_object_ownership = true
   object_ownership         = "BucketOwnerEnforced"
   force_destroy            = var.s3_force_destroy
-
-  versioning = {
-    enabled = var.s3_versioning_enabled
-  }
 
   server_side_encryption_configuration = {
     rule = {

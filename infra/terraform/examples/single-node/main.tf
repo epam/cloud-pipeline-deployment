@@ -6,8 +6,9 @@ module "cp_cluster" {
   deployment_name = var.deployment_name
   deployment_env  = var.deployment_env
 
-  vpc_id     = var.vpc_id
-  subnet_ids = var.subnet_ids
+  vpc_id                             = var.vpc_id
+  subnet_ids                         = var.subnet_ids
+  external_access_security_group_ids = var.external_access_security_group_ids
 
   ami_id   = var.ami_id
   key_name = var.key_name
@@ -27,6 +28,8 @@ module "cp_cluster" {
 
   admin_email    = var.admin_email
   admin_password = var.admin_password
+
+  docker_tools = var.docker_tools
 
   worker_node_amis               = var.worker_node_amis
   worker_node_security_group_ids = var.worker_node_security_group_ids

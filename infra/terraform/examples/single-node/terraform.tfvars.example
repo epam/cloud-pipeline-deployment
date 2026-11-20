@@ -7,6 +7,7 @@ deployment_env  = "prod"
 
 vpc_id     = "vpc-xxxxxxxxxxxxxxxxx"
 subnet_ids = ["subnet-xxxxxxxxxxxxxxxxx"]
+external_access_security_group_ids = []
 
 # Built via packer/aws/application_node -- see ../../../packer/README.md
 ami_id = "ami-xxxxxxxxxxxxxxxxx"
@@ -28,6 +29,7 @@ git_host             = "git.example.com"
 # Leave unset to disable these optional services.
 # idp_host       = "idp.example.com"
 # share_srv_host = "share.example.com"
+# docker_tools = ["library/rockylinux:latest", "library/nextflow:latest"]
 
 # Built via packer/aws/worker_node -- one entry per platform/instance family. Required for
 # Cloud Pipeline to launch pipeline runs; leave unset/empty and runs simply won't be able to

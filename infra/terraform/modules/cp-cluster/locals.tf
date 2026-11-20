@@ -29,21 +29,20 @@ locals {
   cp_storage_dns_name   = var.storage_type == "efs" ? "${aws_efs_file_system.cp_storage[0].id}.efs.${data.aws_region.current.region}.amazonaws.com" : aws_fsx_lustre_file_system.cp_storage[0].dns_name
   cp_storage_mount_name = var.storage_type == "fsx" ? aws_fsx_lustre_file_system.cp_storage[0].mount_name : ""
 
-  # CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC: see helm/hooks/post-deploy/apply-cluster-networks-config.sh
-  # for the actual consumed shape (helm/README.md's and helm/values.yaml's own commented-out
-  # schemas agree with it, except values.yaml's "securityGroupIds" is stale -- the script reads
-  # snake_case "security_group_ids"). Kept as the same "{}" placeholder upstream uses until
-  # worker_node_amis is set, since pipeline runs can't launch without at least one worker AMI
-  # anyway. Once set, also auto-fills networks (every var.subnet_ids entry, named by its AZ) and
-  # security_group_ids (defaulting to this cluster's own security group) -- the parts this module
-  # already knows, rather than requiring a manual values.yaml edit for all of it.
+  cluster_networks_azs = distinct([for s in var.subnet_ids : data.aws_subnet.this[s].availability_zone])
+  cluster_networks_map = {
+    for az in local.cluster_networks_azs :
+    az => [for s in var.subnet_ids : s if data.aws_subnet.this[s].availability_zone == az][0]
+  }
+
   cluster_networks_spec = length(var.worker_node_amis) == 0 ? " {}" : "\n          ${indent(10, yamlencode({
     regions = [
       {
         name               = ""
-        networks           = { for s in var.subnet_ids : s => data.aws_subnet.this[s].availability_zone }
+        default            = true
+        networks           = local.cluster_networks_map
         amis               = var.worker_node_amis
-        security_group_ids = coalesce(var.worker_node_security_group_ids, local.internal_access_sg_ids)
+        security_group_ids = distinct(concat(local.internal_access_sg_ids, var.worker_node_security_group_ids))
       }
     ]
   }))}"
@@ -92,6 +91,7 @@ locals {
     share_srv_host       = var.share_srv_host != null ? var.share_srv_host : ""
 
     cluster_networks_spec = local.cluster_networks_spec
+    docker_tools          = var.docker_tools
 
     enable_search             = var.enable_search
     enable_billing            = var.enable_billing

@@ -92,8 +92,14 @@ variable "worker_node_amis" {
 
 variable "worker_node_security_group_ids" {
   type        = list(string)
-  default     = null
-  description = "Security groups attached to dynamically launched worker/run nodes, as part of CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC. Defaults to the cluster's own internal security group when unset. Only used when worker_node_amis is non-empty."
+  default     = []
+  description = "Additional security groups attached to dynamically launched worker/run nodes, as part of CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC, on top of the cluster's own internal security group (always included). Only used when worker_node_amis is non-empty."
+}
+
+variable "docker_tools" {
+  type        = list(string)
+  default     = ["library/rockylinux:latest", "library/nextflow:latest"]
+  description = "<group>/<tool>:<tag> entries to register via the RegisterDockerTools post-deploy hook (CP_TOOLS_JSON). Each entry must exist as a directory under helm/hooks/post-deploy/assets/dockers-manifest/ with a matching source in manifest.txt -- an entry with no manifest directory (e.g. anything under ngs/) is silently never registered, it isn't an error here or at deploy time."
 }
 
 ###################################################################
@@ -247,12 +253,6 @@ variable "s3_force_destroy" {
   type        = bool
   default     = false
   description = "Allow `terraform destroy` to delete created S3 buckets even when they still contain objects. Leave false in production."
-}
-
-variable "s3_versioning_enabled" {
-  type        = bool
-  default     = false
-  description = "Enable versioning on created S3 buckets."
 }
 
 ###################################################################

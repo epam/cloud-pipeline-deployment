@@ -23,6 +23,12 @@ variable "subnet_ids" {
   description = "Subnet IDs for the master node, application nodes and shared filesystem mount targets."
 }
 
+variable "external_access_security_group_ids" {
+  type        = list(string)
+  default     = []
+  description = "Additional, pre-existing security group IDs to attach to every node (master and application), on top of the module's own internal-access security group (e.g. to allow inbound access from a corporate network or a load balancer)."
+}
+
 variable "ami_id" {
   type        = string
   description = "AMI ID built via packer/aws/application_node."
@@ -98,6 +104,12 @@ variable "admin_password" {
   default     = null
   sensitive   = true
   description = "Default Cloud Pipeline administrator password. When unset, the module generates a random one and returns it via the sensitive admin_password output."
+}
+
+variable "docker_tools" {
+  type        = list(string)
+  default     = ["library/rockylinux:latest", "library/nextflow:latest"]
+  description = "<group>/<tool>:<tag> entries to register via the RegisterDockerTools post-deploy hook."
 }
 
 variable "worker_node_amis" {

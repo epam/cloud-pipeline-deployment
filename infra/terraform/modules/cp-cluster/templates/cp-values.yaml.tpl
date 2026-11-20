@@ -168,8 +168,9 @@ postDeploy:
       data:
         CP_MANIFEST_DIR: "./hooks/post-deploy/assets/dockers-manifest"
         CP_TOOLS_JSON:
-          - "library/rockylinux:latest"
-          - "library/nextflow:latest"
+%{ for tool in docker_tools ~}
+          - "${tool}"
+%{ endfor ~}
 
     - name: ApplyPreferences
       enable: true
