@@ -33,15 +33,12 @@ EOF
 # OnCalendar= (empty) clears the vendor unit's default schedule before adding ours — OnCalendar
 # is additive across drop-ins, so without the reset both schedules would be active at once.
 mkdir -p /etc/systemd/system/dnf-automatic.timer.d
-# RandomizedDelaySec is inherited from the vendor unit (60m) since we don't override it here —
-# the actual run time will be OnCalendar plus up to 60m of jitter (e.g. 03:00 -> ~03:00-04:00).
-# This spreads load across nodes if run fleet-wide; add "RandomizedDelaySec=0" below to pin the
-# exact time instead.
 cat > /etc/systemd/system/dnf-automatic.timer.d/override.conf <<EOF
 [Timer]
 OnCalendar=
 OnCalendar=${SECURITY_PATCH_SCHEDULE}
 Persistent=true
+RandomizedDelaySec=0
 EOF
 
 systemctl daemon-reload
