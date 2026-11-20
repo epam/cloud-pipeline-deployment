@@ -178,6 +178,12 @@ runPolicyManager:
 storageAsyncTaskService:
   enabled: false
 
+# Tinyproxy egress proxy (cp-tinyproxy). Lets job containers opt into an outbound HTTP/HTTPS proxy
+# at http://<CP_TP_INTERNAL_HOST>:<CP_TP_INTERNAL_PORT> (patched into cp-config-global).
+# Requires node label cloud-pipeline/cp-tinyproxy=true.
+tinyproxy:
+  enabled: true
+
 postDeploy:
   enabled: false  # true = run post-deploy hooks after all releases sync; false = skip
 

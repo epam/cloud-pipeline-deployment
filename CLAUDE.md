@@ -234,6 +234,7 @@ cp-resources → cp-idp (if idp.enabled)
                           → cp-share-srv (if shareSrv.enabled, default false)
                           → cp-run-policy-manager (if runPolicyManager.enabled, default false)
                           → cp-storage-async-task-service (if storageAsyncTaskService.enabled, default false)
+                          → cp-tinyproxy (if tinyproxy.enabled, default true)
                           → cp-edge
 [global cleanup hooks: wait-for-api, apply-preferences, apply-cluster-networks-config,
                        register-additional-cloud-regions, register-docker-tools,
@@ -259,6 +260,7 @@ cp-resources → cp-idp (if idp.enabled)
 | `cp-share-srv`                 | `cp-share-srv`                 | Data sharing service (optional) — shares CP storages with external users over SAML SSO. Requires `shareSrv.service.host.external`      |
 | `cp-run-policy-manager`        | `cp-run-policy-manager`        | Run policy manager (optional) — evaluates and enforces run lifecycle policies (pause, terminate) on a configurable polling interval     |
 | `cp-storage-async-task-service` | `cp-storage-async-task-service` | Storage async task service (optional) — polls `cp-api-srv` for `DOWNLOAD_ARCHIVE` async tasks, builds the requested ZIP archive and uploads it; destination storage and limits come from the `storage.download.archive.config` platform preference |
+| `cp-tinyproxy`                 | `cp-tinyproxy`                 | Tinyproxy egress proxy (default on) — optional outbound HTTP/HTTPS proxy for job containers; patches `cp-config-global` with `CP_TP_INTERNAL_HOST`/`CP_TP_INTERNAL_PORT`. Requires node label `cloud-pipeline/cp-tinyproxy=true` |
 | `cp-edge`                      | `cp-edge`                      | Edge proxy/gateway                                                                                                                      |
 
 ### cp-config-global patching pattern
@@ -380,6 +382,9 @@ the full manifest directory is the superset.
   `helmfile template`/`diff` without a live cluster (false)
 - `storageAsyncTaskService.enabled` — Deploy the storage async task service (false by default); requires the
     `storage.download.archive.config` platform preference set after deploy (`destinationStorageId` at least)  
+- `tinyproxy.enabled` — Deploy the tinyproxy egress proxy (true by default); `tinyproxy.config` keys (e.g.
+  `CP_TP_ALLOWED_CIDR`, `CP_TP_MAX_CLIENTS`, `CP_TP_UPSTREAM`, `CP_TP_ALLOWED_DESTINATION`/`CP_TP_RESTRICTED_DESTINATION`)
+  are patched into `cp-config-global` alongside the computed `CP_TP_INTERNAL_HOST`/`CP_TP_INTERNAL_PORT`
 - `postDeploy.hooks` — Ordered list of `{name, enable, data}` post-deploy hooks (see
   [Hooks overview](#hooks-overview) above); `name` maps to a script via `hooks/post-deploy/hooks.yaml`. Notable
   `data` keys: `ApplyClusterNetworksConfig.data.CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC` (AMI IDs, subnets,
