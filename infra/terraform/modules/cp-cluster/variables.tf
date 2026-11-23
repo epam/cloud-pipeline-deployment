@@ -117,6 +117,12 @@ variable "security_patch_schedule" {
   description = "systemd OnCalendar expression (e.g. \"Sun *-*-* 03:00:00\") to apply to the dnf-automatic security-patch timer on every already-running node, via SSM Run Command, in this apply -- without rebuilding the AMI or replacing instances (see packer/common/scripts/install_security_patches.sh for the AMI-build-time default). Left unset by default, which skips this entirely."
 }
 
+variable "db_stop_grace_period_seconds" {
+  type        = number
+  default     = 60
+  description = "Grace period (seconds) given to any Cloud Pipeline database pod (cp-api-db, cp-gitlab-db, etc. -- anything labeled cloud-pipeline/<name>-db=true) on a node to shut down cleanly before that node reboots. Installed on every node via a systemd unit ordered Before=reboot.target, so the reboot waits for this to finish."
+}
+
 variable "master_node_instance_type" {
   type        = string
   default     = "m5.xlarge"
