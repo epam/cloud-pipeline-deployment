@@ -17,6 +17,7 @@ cat > /etc/dnf/automatic.conf <<'EOF'
 upgrade_type = security
 download_updates = yes
 apply_updates = yes
+reboot = when-needed
 
 [emitters]
 emit_via = stdio
