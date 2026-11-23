@@ -7,7 +7,7 @@
 {{- $serviceName := .serviceName -}}
 - name: wait-for-api-token
   image: {{ include "lib.hook.deploymentImage" $ctx }}
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" $ctx }}
   command: ["/bin/bash", "-c"]
   args:
     - |
@@ -22,7 +22,7 @@
       echo "CP_API_JWT_ADMIN is set in $secret, proceeding."
 - name: wait-for-deployment
   image: {{ include "lib.hook.deploymentImage" $ctx }}
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" $ctx }}
   command: ["/bin/bash", "-c"]
   args:
     - |

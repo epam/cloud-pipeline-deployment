@@ -39,7 +39,7 @@ spec:
       containers:
         - name: init
           image: postgres:{{ .Values.db.version }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ .Values.db.pullPolicy | default "IfNotPresent" }}
           env:
             - name: PSG_HOST
               value: {{ $dbHost | quote }}

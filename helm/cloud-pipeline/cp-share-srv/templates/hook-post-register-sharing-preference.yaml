@@ -42,7 +42,7 @@ spec:
       containers:
         - name: register-sharing-preference
           image: {{ include "lib.hook.deploymentImage" . | quote }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ include "lib.hook.deploymentImagePullPolicy" . }}
           env:
             - name: CP_SHARE_SRV_SHARED_STORAGE_NAME
               value: {{ .Values.sharedStorageName | quote }}

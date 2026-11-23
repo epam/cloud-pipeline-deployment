@@ -23,12 +23,12 @@ image:
     repository: quay.io/lifescience/cloud-pipeline
     tag: leader-elector
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+    pullPolicy: Always  # IfNotPresent | Always | Never
   apiServer:
     repository: quay.io/lifescience/cloud-pipeline
     tag: api-srv
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+    pullPolicy: Always  # IfNotPresent | Always | Never
 
 db:
   # internal (bundled Postgres pod) | external (RDS or managed Postgres)
@@ -37,6 +37,7 @@ db:
   host: ""
   port: "5432"  # Postgres TCP port
   version: "16.4"  # Postgres major.minor version (used for container image tag)
+  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never -- for the init-db hook Job's postgres image
   db: pipeline
   user: pipeline
   pass: ""
@@ -119,7 +120,7 @@ backup:
     repository: quay.io/lifescience/cloud-pipeline
     tag: cp-bkp-worker
     # buildVersion: ""  # overrides general.buildVersion for this image
-    pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+    pullPolicy: Always  # IfNotPresent | Always | Never
   schedule: "0 8 * * *"  # Cron schedule in server local time
   retention: "10"         # Number of backup archives to keep
   storageList: ""         # Comma-separated S3 paths for backup upload; empty = local only

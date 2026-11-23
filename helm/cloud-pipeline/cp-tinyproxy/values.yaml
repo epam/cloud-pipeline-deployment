@@ -11,7 +11,7 @@ image:
   repository: quay.io/lifescience/cloud-pipeline
   tag: tinyproxy
   # buildVersion: ""  # overrides general.buildVersion for this image
-  pullPolicy: IfNotPresent  # IfNotPresent | Always | Never
+  pullPolicy: Always  # IfNotPresent | Always | Never
 
 logsHostPath: /opt/tinyproxy/logs  # Node local path for log files
 
