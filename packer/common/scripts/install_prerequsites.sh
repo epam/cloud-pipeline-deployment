@@ -25,6 +25,59 @@ rm -rf /tmp/docker /tmp/docker.tgz
 
 groupadd docker 2>/dev/null || true
 
+# cri-dockerd: CRI shim in front of dockerd, so kubelet (dockershim removed since 1.24)
+# can keep using the real Docker engine — preserves commit/pause/DinD scripts that call
+# dockerd directly.
+_CRI_DOCKERD_VERSION="0.4.10"
+_CRI_DOCKERD_TGZ_URL="https://github.com/Mirantis/cri-dockerd/releases/download/v${_CRI_DOCKERD_VERSION}/cri-dockerd-${_CRI_DOCKERD_VERSION}.amd64.tgz"
+wget -q "$_CRI_DOCKERD_TGZ_URL" -O /tmp/cri-dockerd.tgz || { echo "ERROR: failed to download cri-dockerd from $_CRI_DOCKERD_TGZ_URL"; exit 1; }
+tar -xzf /tmp/cri-dockerd.tgz -C /tmp
+cp /tmp/cri-dockerd/cri-dockerd /usr/bin/
+rm -rf /tmp/cri-dockerd /tmp/cri-dockerd.tgz
+
+cat > /etc/systemd/system/cri-docker.service <<'EOF'
+[Unit]
+Description=CRI Interface for Docker Application Container Engine
+Documentation=https://docs.mirantis.com
+After=network-online.target firewalld.service docker.service
+Wants=network-online.target
+Requires=cri-docker.socket
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/cri-dockerd --container-runtime-endpoint fd://
+ExecReload=/bin/kill -s HUP $MAINPID
+TimeoutSec=0
+RestartSec=2
+Restart=always
+StartLimitBurst=3
+StartLimitInterval=60s
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+Delegate=yes
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /etc/systemd/system/cri-docker.socket <<'EOF'
+[Unit]
+Description=CRI Docker Socket for the API
+PartOf=cri-docker.service
+
+[Socket]
+ListenStream=%t/cri-dockerd.sock
+SocketMode=0660
+SocketUser=root
+SocketGroup=docker
+
+[Install]
+WantedBy=sockets.target
+EOF
+
 cat > /etc/systemd/system/containerd.service <<'EOF'
 [Unit]
 Description=containerd container runtime
@@ -93,6 +146,12 @@ if [ -f /etc/sysconfig/docker ]; then
   sed -i "s/--default-ulimit nofile=1024:4096/--default-ulimit nofile=65535:65535/g" /etc/sysconfig/docker
 fi
 
+# crictl (cp-node-reporter, kubeadm image pulls) talks CRI to cri-dockerd, not containerd directly.
+cat > /etc/crictl.yaml <<'EOF'
+runtime-endpoint: unix:///run/cri-dockerd.sock
+image-endpoint: unix:///run/cri-dockerd.sock
+EOF
+
 # Enable forwarding and make sure iptables are used
 # See https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-kubeadm-kubelet-and-kubectl
 modprobe br_netfilter
@@ -125,7 +184,5 @@ mkdir -p "${CLOUD_PIPELINE_DISTRO_DIR}"
 mkdir -p "${CLOUD_PIPELINE_DISTRO_DIR}/k8s-bootstrap"
 
 curl -L https://github.com/databus23/helm-diff/releases/download/v3.4.2/helm-diff-linux-amd64.tgz | tar -C /root/.local/share/helm/plugins -xzv
-
-grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0 systemd.legacy_systemd_cgroup_controller=1"
 
 reboot

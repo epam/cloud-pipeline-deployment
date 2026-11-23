@@ -76,7 +76,7 @@ build {
     destination = "/cp_temp/"
   }
   provisioner "file" {
-    source      = "${path.root}/../../common/scripts/patch-kube-dns.sh"
+    source      = "${path.root}/../../common/scripts/patch-coredns.sh"
     destination = "/cp_temp/"
   }
   provisioner "file" {
@@ -107,8 +107,8 @@ build {
     inline = [
       "sudo mkdir -p ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap",
       "sudo cp -f /cp_temp/kubeadm-init-config.yaml.raw /cp_temp/canal.yaml.raw ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/",
-      "sudo cp -f /cp_temp/patch-kube-dns.sh ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/patch-kube-dns.sh",
-      "sudo chmod 755 ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/patch-kube-dns.sh",
+      "sudo cp -f /cp_temp/patch-coredns.sh ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/patch-coredns.sh",
+      "sudo chmod 755 ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/patch-coredns.sh",
       "sudo mv /cp_temp/helm ${var.cloud_pipeline_deploy_dir_path}/helm",
       "echo '${var.cloud_pipeline_build_version}' | sudo tee ${var.cloud_pipeline_deploy_dir_path}/helm/CP_BUILD_VERSION.txt",
       "sudo chmod -R 777 ${var.cloud_pipeline_deploy_dir_path}",
