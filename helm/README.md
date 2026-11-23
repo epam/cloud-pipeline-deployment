@@ -286,15 +286,18 @@ notifier:
 
 ### `monitoring`
 
-Heapster, node logger/reporter, and vm-monitor (`cp-monitoring`).
+The metrics collector and its Elasticsearch, node logger/reporter, and vm-monitor (`cp-monitoring`).
 
 ```yaml
 monitoring:
   enabled: true
   heapster:
-    enabled: true
+    enabled: false                # retired; true only to compare it with the collector
     elk:
       dataHostPath: /opt/heapster-elk/data
+  metricsCollector:
+    enabled: true
+    index: ""                     # "" = heapster-*, the indices the platform reads
   nodeLogger:
     enabled: true
   nodeReporter:
@@ -303,6 +306,31 @@ monitoring:
     enabled: true
     logsHostPath: /opt/vm-monitor/logs
 ```
+
+`cp-metrics-collector` replaces heapster: it reads each kubelet's `/stats/summary` and `/metrics/cadvisor` and writes
+heapster's documents into the `heapster-YYYY.MM.dd` indices of `cp-heapster-elk`, for Kubernetes 1.15 and current
+releases. Its image is `metrics-collector-<buildVersion>`. vm-monitor checks whichever of `cp-heapster` and
+`cp-metrics-collector` is enabled (`CP_VM_MONITOR_DEPLOY_NAMES`, from `vmMonitor.deploymentNames` in the chart).
+
+To compare the collector with a running heapster first, deploy both, the collector under another index, and after 30
+minutes or more compare them:
+
+```yaml
+monitoring:
+  heapster:
+    enabled: true
+  metricsCollector:
+    index: cp-metrics-collector   # never heapster-*: the API's index retention cannot parse it
+```
+
+```bash
+kubectl exec deploy/cp-metrics-collector -- python3 -m metrics_collector.compare --right cp-metrics-collector --minutes 30 --threshold 10
+```
+
+Expected: no `node` row, and `pod` rows only for near-idle pods (rounding) and for pod memory, lower by the pause
+container heapster counted. Then set `heapster.enabled: false`, remove `index`, `helmfile apply --selector
+name=cp-monitoring`, and delete the comparison indices: `curl -XDELETE
+http://<cp-heapster-elk>/cp-metrics-collector-*` and `.../_template/cp-metrics-collector-cp-metrics-collector`.
 
 ### `storageLifecycle`
 

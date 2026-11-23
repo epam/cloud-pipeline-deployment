@@ -246,7 +246,7 @@ cp-resources → cp-idp (if idp.enabled)
 | `cp-idp`             | `cp-idp`             | In-cluster SAML IdP (optional).                                                                                                                      |
 | `cp-api-db`          | `cp-api-db`          | Internal Postgres on hostPath `/opt/postgresql/data` (only when `db.type: internal`)                                                                 |
 | `cp-api-srv`         | `cp-api-srv`         | Main API server                                                                                                                                      |
-| `cp-monitoring`      | `cp-monitoring`      | Monitoring stack: heapster + ELK, node-logger (DaemonSet), node-reporter (DaemonSet), vm-monitor; patches `cp-config-global` with heapster endpoints |
+| `cp-monitoring`      | `cp-monitoring`      | Monitoring stack: cp-metrics-collector (heapster's replacement) + heapster ELK, node-logger (DaemonSet), node-reporter (DaemonSet), vm-monitor; patches `cp-config-global` with the ELK endpoint and vm-monitor's deployment list |
 | `cp-docker-registry` | `cp-docker-registry` | Internal Docker registry                                                                                                                             |
 | `cp-search`          | `cp-search`          | Elasticsearch + search-srv (optional). Node labelling required: `cloud-pipeline/cp-search-srv` and `cloud-pipeline/cp-search-elk`                    |
 | `cp-billing-srv`     | `cp-billing-srv`     | Billing report agent; syncs billing data to Elasticsearch. Requires node label `cloud-pipeline/cp-billing-srv=true`                                  |
@@ -364,8 +364,9 @@ the full manifest directory is the superset.
 - `billing.enabled` — Deploy billing agent (true by default)
 - `notifier.enabled` — Deploy email/Azure notifier (false by default)
 - `monitoring.enabled` — Deploy entire monitoring stack (true by default); individual components toggled via
-  `monitoring.heapster.enabled`, `monitoring.nodeLogger.enabled`, `monitoring.nodeReporter.enabled`,
-  `monitoring.vmMonitor.enabled`
+  `monitoring.metricsCollector.enabled` (true), `monitoring.heapster.enabled` (false: retired, only to compare it with
+  the collector, which then needs `monitoring.metricsCollector.index` set), `monitoring.nodeLogger.enabled`,
+  `monitoring.nodeReporter.enabled`, `monitoring.vmMonitor.enabled`
 - `storageLifecycle.enabled` — Deploy storage lifecycle service (true by default)
 - `storageLifecycle.archive.startAt` — Time of day to run the archive job (HH:MM, default `23:00`)
 - `storageLifecycle.restore.startEach` — Interval in minutes between restore checks (default `20`)
