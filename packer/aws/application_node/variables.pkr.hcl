@@ -68,6 +68,6 @@ variable "docker_data_root" {
 
 variable "security_patch_schedule" {
   type        = string
-  default     = "Sun *-*-* 03:00:00"
-  description = "systemd OnCalendar expression controlling when dnf-automatic installs security-only OS patches (default: weekly, Sunday 03:00 UTC). Excludes kube*, docker*, container*, runc* packages. Can be changed on a running instance without rebuilding the AMI by editing /etc/systemd/system/dnf-automatic.timer.d/override.conf and running 'systemctl daemon-reload'."
+  default     = "Sun *-*-* 09:00:00 UTC"
+  description = "systemd OnCalendar expression controlling when dnf-automatic installs security-only OS patches (default: weekly, Sunday 09:00 UTC). Excludes kube*, docker*, container*, runc* packages. Can be changed on a running instance without rebuilding the AMI by editing /etc/systemd/system/dnf-automatic.timer.d/override.conf and running 'systemctl daemon-reload'."
 }

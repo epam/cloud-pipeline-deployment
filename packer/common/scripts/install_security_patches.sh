@@ -6,8 +6,8 @@
 set -e
 
 if [ -z "${SECURITY_PATCH_SCHEDULE:-}" ]; then
-  echo "WARNING: SECURITY_PATCH_SCHEDULE is not set, falling back to weekly (Sun *-*-* 03:00:00)" >&2
-  SECURITY_PATCH_SCHEDULE="Sun *-*-* 03:00:00"
+  echo "WARNING: SECURITY_PATCH_SCHEDULE is not set, falling back to weekly (Sun *-*-* 09:00:00 UTC)" >&2
+  SECURITY_PATCH_SCHEDULE="Sun *-*-* 09:00:00 UTC"
 fi
 
 dnf install -y dnf-automatic
@@ -40,7 +40,7 @@ cat > /etc/systemd/system/dnf-automatic.timer.d/override.conf <<EOF
 OnCalendar=
 OnCalendar=${SECURITY_PATCH_SCHEDULE}
 Persistent=true
-RandomizedDelaySec=0
+RandomizedDelaySec=30min
 EOF
 
 # By default AL2023 use repo version pinning, so the dnf will not get updates
