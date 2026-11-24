@@ -134,5 +134,10 @@ build {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
     script          = "${path.root}/../../common/scripts/install_security_patches.sh"
   }
+
+  provisioner "shell" {
+    execute_command = "chmod +x {{ .Path }}; sudo -E {{.Path}}"
+    script          = "${path.root}/../../common/scripts/install_run_before_reboot_hook.sh"
+  }
 }
 
