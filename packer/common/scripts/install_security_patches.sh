@@ -18,6 +18,7 @@ upgrade_type = security
 download_updates = yes
 apply_updates = yes
 reboot = when-needed
+random_sleep = 0
 
 [emitters]
 emit_via = stdio
@@ -41,6 +42,9 @@ OnCalendar=${SECURITY_PATCH_SCHEDULE}
 Persistent=true
 RandomizedDelaySec=0
 EOF
+
+# By default AL2023 use repo version pinning, so the dnf will not get updates
+echo "latest" > /etc/dnf/vars/releasever
 
 systemctl daemon-reload
 systemctl enable dnf-automatic.timer
