@@ -47,27 +47,23 @@ locals {
     ]
   }))}"
 
-  run_before_reboot_script = templatefile("${path.module}/templates/run-before-reboot.sh.tpl", {
-    db_stop_grace_period_seconds = var.db_stop_grace_period_seconds
-  })
+  run_before_reboot_script = file("${path.module}/templates/run-before-reboot.sh.tpl")
 
   master_node_userdata = templatefile("${path.module}/templates/master_node_userdata.sh.tpl", {
-    storage_type             = var.storage_type
-    storage_id               = local.cp_storage_id
-    storage_dns_name         = local.cp_storage_dns_name
-    storage_mount_name       = local.cp_storage_mount_name
-    application_node_count   = var.application_node_count
-    master_node_labels       = var.master_node_labels != null ? var.master_node_labels : ""
-    run_before_reboot_script = local.run_before_reboot_script
+    storage_type           = var.storage_type
+    storage_id             = local.cp_storage_id
+    storage_dns_name       = local.cp_storage_dns_name
+    storage_mount_name     = local.cp_storage_mount_name
+    application_node_count = var.application_node_count
+    master_node_labels     = var.master_node_labels != null ? var.master_node_labels : ""
   })
 
   application_node_userdata = templatefile("${path.module}/templates/application_node_userdata.sh.tpl", {
-    storage_type             = var.storage_type
-    storage_id               = local.cp_storage_id
-    storage_dns_name         = local.cp_storage_dns_name
-    storage_mount_name       = local.cp_storage_mount_name
-    application_node_labels  = var.application_node_labels
-    run_before_reboot_script = local.run_before_reboot_script
+    storage_type            = var.storage_type
+    storage_id              = local.cp_storage_id
+    storage_dns_name        = local.cp_storage_dns_name
+    storage_mount_name      = local.cp_storage_mount_name
+    application_node_labels = var.application_node_labels
   })
 
   cp_values_yaml = templatefile("${path.module}/templates/cp-values.yaml.tpl", {
