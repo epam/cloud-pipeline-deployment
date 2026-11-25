@@ -128,6 +128,13 @@ if [ -f "$_BOOTSTRAP_ENV" ]; then
   source "$_BOOTSTRAP_ENV"
 fi
 
+# Persist ROLE in /etc/environment so later, independently-launched processes (e.g. the
+# dnf-automatic reboot hook, reboot.sh) can tell this node's role apart without re-reading
+# bootstrap.env.
+if ! grep -q '^ROLE=' /etc/environment 2>/dev/null; then
+  echo "ROLE=${ROLE:-master-node}" >> /etc/environment
+fi
+
 CP_STORAGE_MOUNTED=0
 CP_STORAGE_TYPE="${CP_STORAGE_TYPE:-efs}"
 if mountpoint -q /opt; then

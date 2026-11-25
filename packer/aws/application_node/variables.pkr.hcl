@@ -44,7 +44,7 @@ variable "ssh_interface" {
 
 variable "cloud_pipeline_build_version" {
   type        = string
-  default     = "0.17"
+  default     = "0.25"
   description = "Cloud Pipeline build version used for docker image tags (e.g. api-srv-<version>, dns-hosts-sync-<version>, etc.)."
 }
 

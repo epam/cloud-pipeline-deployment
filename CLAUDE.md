@@ -68,10 +68,15 @@ helm dependency update helm/cloud-pipeline/cp-idp
   pause:3.1. kube-apiserver port range is patched to `80-32767`. Also configures `dnf-automatic`
   (`common/scripts/install_security_patches.sh`) to unattended-install OS security patches on a schedule,
   excluding `kube*`, `docker*`, `container*`, `runc*` packages so the pinned k8s/container-runtime stack is
-  never touched. Schedule defaults to weekly (Sunday 03:00 UTC), set at build time via the
+  never touched. Schedule defaults to weekly (Sunday 09:00 UTC), set at build time via the
   `security_patch_schedule` packer variable (a systemd `OnCalendar` expression). To change the schedule on an
   already-running instance without rebuilding the AMI, edit
   `/etc/systemd/system/dnf-automatic.timer.d/override.conf` and run `systemctl daemon-reload`.
+  AL2023's `dnf-automatic` has no native reboot-after-update support (predates upstream dnf 4.15.0), so
+  `smart-restart` is installed alongside it: it detects whether an applied update actually needs a reboot and
+  (via a `dnf-automatic.service.d` drop-in) hands off to `common/scripts/reboot/reboot.sh`, which runs the
+  node-role-specific scripts under `pre_reboot_scripts/` (symlinked in by terraform; see
+  `infra/terraform/modules/cp-cluster/pre-reboot-scripts-sync.tf`) before rebooting.
 
   ```bash
   cd packer/aws/application_node

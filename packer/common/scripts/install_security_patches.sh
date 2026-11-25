@@ -12,12 +12,20 @@ fi
 
 dnf install -y dnf-automatic
 
+# AL2023's dnf-automatic (currently 4.14.0) predates the upstream dnf 4.15.0 release that added
+# the reboot/reboot_command config options -- they're silently ignored here, not a typo (see
+# https://github.com/amazonlinux/amazon-linux-2023/issues/636). smart-restart is AWS's own
+# supported replacement: it hooks dnf's post-transaction-actions plugin (runs after every dnf
+# transaction, including dnf-automatic's) and writes /run/smart-restart/reboot-hint-marker when a
+# reboot is actually warranted. The systemd drop-in below checks that marker and runs reboot.sh --
+# the only trigger that actually works on this platform.
+dnf install -y smart-restart
+
 cat > /etc/dnf/automatic.conf <<'EOF'
 [commands]
 upgrade_type = security
 download_updates = yes
 apply_updates = yes
-reboot = when-needed
 random_sleep = 0
 
 [emitters]
@@ -27,6 +35,12 @@ emit_via = stdio
 debuglevel = 1
 # Never auto-patch the Kubernetes/container runtime stack managed by the AMI/cluster tooling.
 exclude = kube* docker* container* runc*
+EOF
+
+mkdir -p /etc/systemd/system/dnf-automatic.service.d
+cat > /etc/systemd/system/dnf-automatic.service.d/override.conf <<'EOF'
+[Service]
+ExecStartPost=-/bin/sh -c 'test -f /run/smart-restart/reboot-hint-marker && /var/lib/cloud-pipeline/system-updates/reboot.sh'
 EOF
 
 # Drop-in (rather than editing the vendored unit) so the schedule survives package updates and
