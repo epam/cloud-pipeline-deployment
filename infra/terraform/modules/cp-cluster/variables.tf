@@ -164,6 +164,30 @@ variable "application_node_labels" {
   description = "Comma-separated key=value node labels registered by application nodes at kubelet join time (CP_APPLICATION_NODE_LABELS). cloud-pipeline/application-node=true is always added by the AMI and cannot be overridden."
 }
 
+variable "pre_reboot_scripts" {
+  type = map(map(bool))
+  default = {
+    master = {
+      grace_shutdown_api_db = true
+      grace_shutdown_git_db = true
+    }
+    application = {
+      grace_shutdown_api_db = false
+      grace_shutdown_git_db = false
+    }
+  }
+  description = "Per-role map of which pre-reboot grace-shutdown scripts run on a node before it reboots. Keys are script names under packer/common/scripts/reboot/pre_reboot_scripts/ (without the .sh extension); true symlinks <key>.sh into /var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/<role>/ on every already-running node of that role, false removes the symlink if present. Applied via SSM Run Command -- no AMI rebuild or instance replace needed."
+}
+
+variable "custom_pre_reboot_scripts" {
+  type = map(list(string))
+  default = {
+    master      = []
+    application = []
+  }
+  description = "Additional, user-supplied pre-reboot scripts to run on nodes of each role, on top of the built-in ones in pre_reboot_scripts. Each entry is a local file path read at terraform apply time; because it's read with file() from inside this module, pass an absolute path or one built from path.root (e.g. $${path.root}/scripts/my-hook.sh) in the caller, not a bare relative path -- that is only resolved relative to this module's own directory. Each file is copied onto every already-running node of that role as /var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/<basename of the path>, made executable, and symlinked into pre_reboot_scripts/<role>/ so reboot.sh picks it up. Two paths with the same basename collide -- use distinct filenames. Applied via SSM Run Command -- no AMI rebuild or instance replace needed."
+}
+
 ###################################################################
 #                   Shared filesystem (EFS or FSx Lustre)
 ###################################################################

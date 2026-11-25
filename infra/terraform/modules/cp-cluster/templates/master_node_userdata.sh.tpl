@@ -1,5 +1,6 @@
 #!/bin/bash
 cat >> /var/lib/cloud-pipeline/deploy/k8s-bootstrap/bootstrap.env <<'EOF'
+ROLE=master-node
 CP_STORAGE_TYPE=${storage_type}
 %{ if storage_type == "efs" ~}
 CP_STORAGE_ID=${storage_id}

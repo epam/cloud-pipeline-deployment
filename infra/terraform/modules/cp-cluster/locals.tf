@@ -47,8 +47,6 @@ locals {
     ]
   }))}"
 
-  run_before_reboot_script = file("${path.module}/templates/run-before-reboot.sh.tpl")
-
   master_node_userdata = templatefile("${path.module}/templates/master_node_userdata.sh.tpl", {
     storage_type           = var.storage_type
     storage_id             = local.cp_storage_id

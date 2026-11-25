@@ -134,3 +134,12 @@ variable "security_patch_schedule" {
   default     = null
   description = "systemd OnCalendar expression (e.g. \"Sun *-*-* 03:00:00\") to apply to the dnf-automatic security-patch timer on every already-running node, via SSM Run Command, in this apply -- without rebuilding the AMI or replacing instances (see packer/common/scripts/install_security_patches.sh for the AMI-build-time default). Left unset by default, which skips this entirely."
 }
+
+variable "custom_pre_reboot_scripts" {
+  type = map(list(string))
+  default = {
+    master      = []
+    application = []
+  }
+  description = "Per-role list of script filenames, relative to this directory, to run on a node before it reboots, on top of the module's built-in ones (see ../../modules/cp-cluster/variables.tf: custom_pre_reboot_scripts). main.tf resolves each filename to an absolute path (via path.root) before passing it to the module -- .tfvars files don't support function calls, so that can't be done here."
+}

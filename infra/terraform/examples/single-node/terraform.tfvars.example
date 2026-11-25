@@ -38,3 +38,11 @@ git_host             = "git.example.com"
 #   { ami = "ami-xxxxxxxxxxxxxxxxx" },                                       # CPU, all instance types (default instance_mask = "*")
 #   { ami = "ami-yyyyyyyyyyyyyyyyy", instance_mask = "p*" },                  # GPU, p-family instances
 # ]
+
+# Additional per-role scripts to run on a node before it reboots, on top of the module's built-in
+# ones. Filenames are relative to this directory -- main.tf resolves them to absolute paths (via
+# path.root) before passing them to the module.
+# custom_pre_reboot_scripts = {
+#   master      = ["script1.sh"]
+#   application = ["script1.sh", "script2.sh"]
+# }

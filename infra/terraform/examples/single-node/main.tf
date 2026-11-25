@@ -35,4 +35,13 @@ module "cp_cluster" {
   worker_node_security_group_ids = var.worker_node_security_group_ids
 
   security_patch_schedule = var.security_patch_schedule
+
+  # custom_pre_reboot_scripts entries are read with file() inside the module, so they must be
+  # absolute paths. .tfvars files don't support function calls (not even path-only ones like
+  # abspath()), so var.custom_pre_reboot_scripts holds bare filenames and they're resolved to
+  # absolute paths here instead, where path.root is available.
+  custom_pre_reboot_scripts = {
+    for role, files in var.custom_pre_reboot_scripts :
+    role => [for f in files : "${path.root}/${f}"]
+  }
 }
