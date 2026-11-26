@@ -46,3 +46,9 @@ git_host             = "git.example.com"
 #   master      = ["script1.sh"]
 #   application = ["script1.sh", "script2.sh"]
 # }
+
+# security_patch_schedule / pre_reboot_scripts / custom_pre_reboot_scripts all run via the "aws"
+# CLI (SSM Run Command) during terraform apply. If that CLI isn't installed/authenticated where
+# you run apply, set this to false instead of leaving it at its default -- every other resource
+# (EC2, EFS/FSx, IAM, S3, etc.) is still created normally.
+# enable_ssm_run_commands = false

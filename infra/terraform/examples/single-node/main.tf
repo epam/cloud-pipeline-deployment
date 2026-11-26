@@ -34,7 +34,9 @@ module "cp_cluster" {
   worker_node_amis               = var.worker_node_amis
   worker_node_security_group_ids = var.worker_node_security_group_ids
 
+  enable_ssm_run_commands = var.enable_ssm_run_commands
   security_patch_schedule = var.security_patch_schedule
+  pre_reboot_scripts      = var.pre_reboot_scripts
 
   # custom_pre_reboot_scripts entries are read with file() inside the module, so they must be
   # absolute paths. .tfvars files don't support function calls (not even path-only ones like

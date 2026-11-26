@@ -100,7 +100,8 @@ module "cp_cluster" {
 | `security_group_ids` | `[]` (generates one) | Existing security group IDs to attach to every node and the shared filesystem mount targets, instead of creating one (e.g. one for intra-cluster traffic plus another for corporate VPN access). Leave empty to have the module create its own. `internal_access_cidr_blocks` / `kube_api_access_cidr_blocks` only apply to the module-created security group, so they're ignored when this is set. |
 | `internal_access_cidr_blocks` | `null` (closed) | Extra CIDRs allowed all-protocols ingress, beyond the cluster's own security group members. Leave unset to keep the cluster closed to anything outside itself. |
 | `kube_api_access_cidr_blocks` | `[]` | Extra CIDRs allowed ingress to the Kubernetes API port (6443) only, e.g. for Cloud Pipeline run/worker nodes launched outside this security group. |
-| `security_patch_schedule` | `null` (skipped) | systemd `OnCalendar` expression; when set, applies it to the `dnf-automatic` security-patch timer on every already-running node via SSM Run Command in this same apply (see [below](#security-patch-schedule)). |
+| `enable_ssm_run_commands` | `true` | Master switch for `security_patch_schedule` / `pre_reboot_scripts` / `custom_pre_reboot_scripts` below -- set `false` when the `aws` CLI isn't installed/authenticated wherever `terraform apply` runs; every other resource still gets created (see [below](#security-patches-and-pre-reboot-scripts)). |
+| `security_patch_schedule` | `null` (skipped) | systemd `OnCalendar` expression; when set, applies it to the `dnf-automatic` security-patch timer on every already-running node via SSM Run Command in this same apply (see [below](#security-patches-and-pre-reboot-scripts)). |
 | `api_srv_host`, `docker_registry_host`, `edge_host`, `git_host` | — (required) | External DNS hostnames for the corresponding services. |
 | `idp_host` / `share_srv_host` | unset (disabled) | Supplying a hostname enables the in-cluster IdP / data-sharing service; leaving it unset disables that service. |
 | `admin_name` / `admin_email` / `admin_password` | `pipe_admin` / `""` / generated | Default Cloud Pipeline administrator account. Leave `admin_password` unset to have the module generate one. |
@@ -176,24 +177,61 @@ Full reference: [`modules/cp-cluster/outputs.tf`](modules/cp-cluster/outputs.tf)
   service back off; anything this module doesn't expose as a variable (image tags, resource
   sizing, SMTP servers, etc.) is still a `helm/values.yaml` edit away.
 
-## Security patch schedule
+## Security patches and pre-reboot scripts
 
 The AMI bakes in unattended OS security patching via `dnf-automatic`
 (`packer/common/scripts/install_security_patches.sh`), excluding the pinned `kube*`/`docker*`/
 `container*`/`runc*` packages, on a schedule set at build time by the packer
-`security_patch_schedule` variable (default: weekly, Sunday 03:00 UTC).
+`security_patch_schedule` variable (default: weekly, Sunday 09:00 UTC). AL2023's
+`dnf-automatic` can't reboot on its own, so the AMI also installs `smart-restart` plus a
+`dnf-automatic.service` drop-in that runs `/var/lib/cloud-pipeline/system-updates/reboot.sh`
+whenever a patch actually required a reboot. Before rebooting, `reboot.sh` runs every script it
+finds in `pre_reboot_scripts/<role>/` for this node's role -- see
+[../README.md#platform-configuration](../README.md#platform-configuration) for the full
+mechanism and how those directories are populated.
 
-Setting `var.security_patch_schedule` (a systemd `OnCalendar` expression, e.g.
-`"Sun *-*-* 03:00:00"`) re-applies that schedule to every already-running node -- master and all
-application nodes -- via SSM Run Command, in the same `terraform apply`, without rebuilding the
-AMI or replacing any instance. It's implemented as a `null_resource` per node running
-`aws ssm send-command` / `aws ssm wait command-executed` through a `local-exec` provisioner
-(`modules/cp-cluster/security-patch-schedule.tf`), keyed on the schedule value via `triggers` so
-changing it and re-applying is enough to roll it out everywhere; leaving the variable unset skips
-this entirely.
+Three module variables let you manage all of this on already-running nodes, without rebuilding
+the AMI or replacing any instance:
+
+| Variable | What it does |
+|---|---|
+| `security_patch_schedule` | A systemd `OnCalendar` expression (e.g. `"Sun *-*-* 09:00:00"`) re-applied to the `dnf-automatic` timer on every node. Unset by default, which skips this entirely. |
+| `pre_reboot_scripts` | Per-role `map(map(bool))` toggling the AMI's built-in grace-shutdown scripts on or off -- `true` symlinks `<name>.sh` into that role's `pre_reboot_scripts/` directory, `false` removes the symlink. |
+| `custom_pre_reboot_scripts` | Per-role `map(list(string))` of local file paths. Each file's content is pushed to every matching node, made executable, and symlinked in the same way -- for scripts that aren't baked into the AMI at all. |
+
+All three are implemented the same way, in `modules/cp-cluster/security-patch-schedule.tf` and
+`modules/cp-cluster/pre-reboot-scripts-sync.tf`: each resolves to a list of shell commands (a
+`sed`/`systemctl` pair for the schedule; `ln -sf`/`rm -f` for built-in scripts; `echo | base64 -d`
++ `chmod` + `ln -sf` for custom ones) and hands them to the reusable
+[`modules/ssm-run-command`](modules/ssm-run-command) module -- one instance per target node,
+keyed by `triggers` so changing a value and re-applying is enough to roll it out everywhere.
+`ssm-run-command` itself just waits for the instance to register with SSM, then runs
+`aws ssm send-command` / `aws ssm wait command-executed` through a `local-exec` provisioner.
+A node is only ever targeted when it actually has something to do: `security_patch_schedule`
+is skipped entirely while unset, and `pre_reboot_scripts_sync` skips any node whose resolved
+command list ends up empty (e.g. an `application` node with every `pre_reboot_scripts` toggle
+`false` and no `custom_pre_reboot_scripts` entries for that role).
 
 This requires the `aws` CLI to be installed and authenticated wherever `terraform apply` runs,
 with `ssm:SendCommand` / `ssm:GetCommandInvocation` permissions -- but no SSH, no bastion, and no
 VPC network path to the nodes at all, since SSM traffic goes over the AWS API using the
 `AmazonSSMManagedInstanceCore` permissions every node's instance profile already has (the same
 mechanism behind the `master_node_ssm_session_command` output above).
+
+If the `aws` CLI isn't installed, this fails at `apply` time, not at `plan`/`validate` time --
+Terraform never checks whether a `local-exec` command exists ahead of running it. The script shells
+out to `aws` directly (rather than going through the AWS provider's own credentials/API client), so
+a missing CLI surfaces as a plain `aws: command not found` from the provisioner, which fails that
+`null_resource` (inside `ssm-run-command`) and the `apply` as a whole -- for whichever of the three
+variables above you set. Note that `pre_reboot_scripts` ships with built-in defaults (two scripts
+enabled for `master`), so this can happen even if you never touch any of these three variables
+yourself.
+
+**`enable_ssm_run_commands`** (default `true`) is the master switch for all of the above. Set it
+`false` when the `aws` CLI genuinely isn't available (or wanted) wherever `terraform apply` runs:
+`security_patch_schedule_targets` and `pre_reboot_sync_targets` both become empty regardless of
+every other setting, so neither module ever shells out to `aws`, no matter what
+`security_patch_schedule` / `pre_reboot_scripts` / `custom_pre_reboot_scripts` are set to. Every
+other resource (EC2, EFS/FSx, IAM, S3, etc.) is unaffected -- you'll just need to manage the
+dnf-automatic schedule and pre-reboot script symlinks another way (EC2 user data, or manually
+over SSH/SSM) if you still need them.

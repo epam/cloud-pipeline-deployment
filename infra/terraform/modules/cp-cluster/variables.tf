@@ -111,10 +111,16 @@ variable "key_name" {
   description = "Name of an existing EC2 key pair to use for SSH access. When unset, the module generates a new RSA key pair."
 }
 
+variable "enable_ssm_run_commands" {
+  type        = bool
+  default     = true
+  description = "Master switch for all SSM Run Command automation (security_patch_schedule, pre_reboot_scripts, custom_pre_reboot_scripts) -- each of these shells out to the \"aws\" CLI via a local-exec provisioner during terraform apply. Set to false when that CLI isn't installed/authenticated wherever terraform apply runs, or you simply don't want this automation: every other resource (EC2, EFS/FSx, IAM, S3, etc.) is still created normally -- you'll just need to manage the dnf-automatic schedule and pre-reboot script symlinks another way (e.g. via EC2 user data, or manually over SSH/SSM)."
+}
+
 variable "security_patch_schedule" {
   type        = string
   default     = null
-  description = "systemd OnCalendar expression (e.g. \"Sun *-*-* 03:00:00\") to apply to the dnf-automatic security-patch timer on every already-running node, via SSM Run Command, in this apply -- without rebuilding the AMI or replacing instances (see packer/common/scripts/install_security_patches.sh for the AMI-build-time default). Left unset by default, which skips this entirely."
+  description = "systemd OnCalendar expression (e.g. \"Sun *-*-* 03:00:00\") to apply to the dnf-automatic security-patch timer on every already-running node, via SSM Run Command, in this apply -- without rebuilding the AMI or replacing instances (see packer/common/scripts/install_security_patches.sh for the AMI-build-time default). Left unset by default, which skips this entirely. Also skipped when var.enable_ssm_run_commands is false."
 }
 
 variable "master_node_instance_type" {

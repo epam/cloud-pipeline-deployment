@@ -129,10 +129,31 @@ variable "worker_node_security_group_ids" {
   description = "Security groups attached to dynamically launched worker/run nodes. Defaults to the cluster's own internal security group when unset."
 }
 
+variable "enable_ssm_run_commands" {
+  type        = bool
+  default     = true
+  description = "Master switch for all SSM Run Command automation (security_patch_schedule, pre_reboot_scripts, custom_pre_reboot_scripts). Set to false when the \"aws\" CLI isn't installed/authenticated wherever terraform apply runs -- every other resource is still created normally."
+}
+
 variable "security_patch_schedule" {
   type        = string
   default     = null
   description = "systemd OnCalendar expression (e.g. \"Sun *-*-* 03:00:00\") to apply to the dnf-automatic security-patch timer on every already-running node, via SSM Run Command, in this apply -- without rebuilding the AMI or replacing instances (see packer/common/scripts/install_security_patches.sh for the AMI-build-time default). Left unset by default, which skips this entirely."
+}
+
+variable "pre_reboot_scripts" {
+  type = map(map(bool))
+  default = {
+    master = {
+      grace_shutdown_api_db = true
+      grace_shutdown_git_db = true
+    }
+    application = {
+      grace_shutdown_api_db = false
+      grace_shutdown_git_db = false
+    }
+  }
+  description = "Per-role map of which built-in pre-reboot grace-shutdown scripts run on a node before it reboots (see ../../modules/cp-cluster/variables.tf: pre_reboot_scripts)."
 }
 
 variable "custom_pre_reboot_scripts" {
