@@ -89,3 +89,56 @@ All pods should show `Running` or `Completed` status. If any show an error statu
 
 Open the Cloud Pipeline UI in your browser using the domain you set in `apiSrv.service.host.external` in `values.yaml` —
 this is the address you will type into your browser to access the platform.
+
+---
+
+## Platform configuration
+
+### Configuring automatic security patches install
+
+The AMI ships with `dnf-automatic` configured to install security-only OS patches on a schedule
+(`kube*`, `docker*`, `container*`, `runc*` packages are always excluded). The schedule is a systemd
+`OnCalendar` expression, baked in at build time via the `security_patch_schedule` Packer variable
+(default: `Sun *-*-* 09:00:00 UTC`, i.e. weekly). Set it in
+`packer/aws/application_node/variables.auto.pkrvars.hcl`:
+
+```hcl
+security_patch_schedule = "Sun *-*-* 09:00:00 UTC"
+```
+
+It can also be changed later on an already-running instance, without rebuilding the AMI:
+
+```bash
+sudo systemctl edit dnf-automatic.timer
+# set OnCalendar=<new systemd OnCalendar expression> under [Timer], save and exit
+systemctl list-timers dnf-automatic.timer   # confirm the new next-run time
+```
+
+**Reboot after patching.** AL2023's `dnf-automatic` has no built-in "reboot if needed" option, so
+the AMI additionally installs `smart-restart` and a `dnf-automatic.service` drop-in
+(`/etc/systemd/system/dnf-automatic.service.d/override.conf`) that runs
+`/var/lib/cloud-pipeline/system-updates/reboot.sh` whenever a patch actually required a reboot
+(kernel, glibc, systemd, etc.). `reboot.sh` logs to
+`/opt/system/logs/<node-name>/reboot.log`, then reboots the instance one minute later.
+
+**Graceful shutdown before reboot.** Before rebooting, `reboot.sh` reads this node's `ROLE`
+(`master-node` or `application-node`, from `/etc/environment`) and runs every executable script it
+finds in `/var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/<role>/`.
+The two role directories — `pre_reboot_scripts/master/` and `pre_reboot_scripts/application/` —
+ship empty, so nothing runs there until you put something in them. This is intentional: which
+scripts apply to which role is an infrastructure/deployment decision, not something the AMI itself
+should assume.
+
+You can add your own custom script: make it executable and put it straight into the role
+directory, or keep it wherever you like and symlink it into the role directory instead.
+
+You can also use the built-in default scripts — for example `grace_shutdown_api_db.sh` or
+`grace_shutdown_git_db.sh`, which stop Postgres cleanly inside the relevant pod if (and only if)
+this node is actually labeled to host it. They're stored one level up, in
+`/var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/`, so enable one for a role by
+symlinking it into that role's directory:
+
+```bash
+sudo ln -sf /var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/grace_shutdown_api_db.sh \
+  /var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/master/grace_shutdown_api_db.sh
+```
