@@ -128,9 +128,19 @@ if [ -f "$_BOOTSTRAP_ENV" ]; then
   source "$_BOOTSTRAP_ENV"
 fi
 
+# Persist ROLE in /etc/environment so later, independently-launched processes (e.g. the
+# dnf-automatic reboot hook, reboot.sh) can tell this node's role apart without re-reading
+# bootstrap.env.
+if ! grep -q '^ROLE=' /etc/environment 2>/dev/null; then
+  echo "ROLE=${ROLE:-master-node}" >> /etc/environment
+fi
+
 CP_STORAGE_MOUNTED=0
 CP_STORAGE_TYPE="${CP_STORAGE_TYPE:-efs}"
-if [ "${CP_STORAGE_TYPE}" == "efs" ]; then
+if mountpoint -q /opt; then
+  echo "/opt is already mounted; skipping mount"
+  CP_STORAGE_MOUNTED=1
+elif [ "${CP_STORAGE_TYPE}" == "efs" ]; then
   if [ -n "${CP_STORAGE_ID:-}" ]; then
     mount -t efs -o tls "${CP_STORAGE_ID}:/" /opt
     echo "EFS ${CP_STORAGE_ID} mounted at /opt"
@@ -473,7 +483,7 @@ chmod +x /usr/local/bin/k8s-first-boot.sh
 cat << 'K8SSVC' > /etc/systemd/system/k8s-first-boot.service
 [Unit]
 Description=Kubernetes first-boot init (kubeadm init)
-After=network-online.target docker.service kubelet.service
+After=network-online.target docker.service kubelet.service remote-fs.target
 Wants=network-online.target
 
 [Service]

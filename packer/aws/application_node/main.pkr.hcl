@@ -111,8 +111,7 @@ build {
       "sudo chmod 755 ${var.cloud_pipeline_deploy_dir_path}/k8s-bootstrap/patch-kube-dns.sh",
       "sudo mv /cp_temp/helm ${var.cloud_pipeline_deploy_dir_path}/helm",
       "echo '${var.cloud_pipeline_build_version}' | sudo tee ${var.cloud_pipeline_deploy_dir_path}/helm/CP_BUILD_VERSION.txt",
-      "sudo chmod -R 777 ${var.cloud_pipeline_deploy_dir_path}",
-      "sudo rm -rf /cp_temp"
+      "sudo chmod -R 777 ${var.cloud_pipeline_deploy_dir_path}"
     ]
   }
 
@@ -125,6 +124,28 @@ build {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
     script          = "${path.root}/../../common/scripts/install_kubernetes.sh"
     pause_before    = "30s"
+  }
+
+  provisioner "shell" {
+    environment_vars = [
+      "SECURITY_PATCH_SCHEDULE=${var.security_patch_schedule}",
+    ]
+    execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E {{.Path}}"
+    script          = "${path.root}/../../common/scripts/install_security_patches.sh"
+  }
+
+  provisioner "file" {
+    source      = "${path.root}/../../common/scripts/reboot"
+    destination = "/cp_temp/"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "sudo mkdir -p /var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/master /var/lib/cloud-pipeline/system-updates/pre_reboot_scripts/application",
+      "sudo cp -rf /cp_temp/reboot/. /var/lib/cloud-pipeline/system-updates/",
+      "sudo find /var/lib/cloud-pipeline/system-updates -name '*.sh' -exec chmod +x {} +",
+      "sudo rm -rf /cp_temp"
+    ]
   }
 }
 
