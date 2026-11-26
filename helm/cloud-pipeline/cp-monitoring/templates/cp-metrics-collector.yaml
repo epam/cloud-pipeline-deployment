@@ -1,0 +1,125 @@
+{{- if .Values.metricsCollector.enabled }}
+{{- $namespace := include "lib.application.namespace" . }}
+{{- $collector := .Values.metricsCollector }}
+{{- $index := $collector.index | default "" | toString }}
+{{- if and .Values.heapster.enabled (or (eq $index "") (eq $index "heapster")) }}
+{{- fail "monitoring.heapster.enabled and monitoring.metricsCollector.enabled would both write into the heapster-* indices, and the API would average them: set monitoring.metricsCollector.index to another name (e.g. cp-metrics-collector) to compare the two, or disable heapster" }}
+{{- end }}
+{{- if hasPrefix "heapster-" $index }}
+{{- fail "monitoring.metricsCollector.index must not start with heapster-: the API takes such an index for a day of heapster's and cannot parse its date" }}
+{{- end }}
+{{- $imageRef := "" -}}
+{{- if hasPrefix "sha256:" $collector.image.tag -}}
+{{- $imageRef = printf "%s@%s" $collector.image.repository $collector.image.tag -}}
+{{- else -}}
+{{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce $collector.image.buildVersion .Values.buildVersion "") -}}
+{{- $imageRef = printf "%s:%s-%s" $collector.image.repository $collector.image.tag $imageVersion -}}
+{{- end }}
+---
+# The collector reads the core v1 lists, and the kubelets' /stats/summary (nodes/stats) and /metrics/cadvisor
+# (nodes/metrics). It writes nothing through the Kubernetes API.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $collector.serviceAccount }}
+  namespace: {{ $namespace }}
+  labels:
+    cloud-pipeline/cp-metrics-collector: "true"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $collector.serviceAccount }}
+  labels:
+    cloud-pipeline/cp-metrics-collector: "true"
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "pods", "namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["nodes/stats", "nodes/metrics"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $collector.serviceAccount }}
+  labels:
+    cloud-pipeline/cp-metrics-collector: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $collector.serviceAccount }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $collector.serviceAccount }}
+    namespace: {{ $namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cp-metrics-collector
+  namespace: {{ $namespace }}
+  labels:
+    cloud-pipeline/cp-metrics-collector: "true"
+    cloud-pipeline/core-component: "Deployment"
+spec:
+  selector:
+    matchLabels:
+      cloud-pipeline/cp-metrics-collector: "true"
+  replicas: 1
+  # Recreate: two collectors would write every batch twice.
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        deploy-timestamp: "{{ now | date "2006-01-02_15:04:05" }}"
+      labels:
+        cloud-pipeline/cp-metrics-collector: "true"
+        cloud-pipeline/core-component: "Deployment"
+    spec:
+      serviceAccountName: {{ $collector.serviceAccount }}
+      {{- include "lib.imagePullSecret" . | nindent 6 }}
+      nodeSelector:
+        {{- toYaml $collector.nodeSelector | nindent 8 }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cp-metrics-collector
+          image: {{ $imageRef }}
+          imagePullPolicy: {{ $collector.image.pullPolicy }}
+          env:
+            - name: CP_METRICS_COLLECTOR_ELASTIC_URL
+              value: "http://{{ .Values.heapster.elk.service.name }}.{{ $namespace }}.svc.cluster.local:{{ .Values.heapster.elk.service.port.internal }}"
+            - name: CP_METRICS_COLLECTOR_RESOLUTION
+              value: {{ $collector.metricResolution | quote }}
+            - name: CP_METRICS_COLLECTOR_INDEX
+              value: {{ $index | quote }}
+          ports:
+            - containerPort: 8082
+              name: healthz
+          # Answers 200 while batches keep finishing, whether Elasticsearch took them or not.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml $collector.resources | nindent 12 }}
+          # No seccompProfile: Kubernetes 1.15 does not know the field (kubectl 1.15 rejects it).
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+{{- end }}

@@ -6,8 +6,11 @@ service:
 enabled: true
 # buildVersion: ""  # overrides general.buildVersion for this release
 
+# heapster v1.5.4: retired, and it reads kubelet endpoints that current Kubernetes releases no longer serve. Replaced by
+# metricsCollector below. Enable it again only to run it beside the collector for a comparison, with
+# metricsCollector.index set to another name. heapster.elk is the metrics store of both, and runs when either does.
 heapster:
-  enabled: true
+  enabled: false
 
   metricResolution: "30s"  # Kubernetes metrics scrape interval (e.g. 30s, 1m)
 
@@ -35,6 +38,37 @@ heapster:
 
     dataHostPath: /opt/heapster-elk/data  # Node local path for Elasticsearch data
     readinessTimeoutSec: 300  # Seconds to wait for Elasticsearch readiness before failing
+
+# cp-metrics-collector: reads the kubelets' /stats/summary and /metrics/cadvisor and writes heapster's documents into
+# the heapster-YYYY.MM.dd indices of heapster.elk, where the API and the deployment autoscaler read them.
+# Works on Kubernetes 1.15 and current releases. Source: deploy/docker/cp-metrics-collector in epam/cloud-pipeline.
+metricsCollector:
+  enabled: true
+
+  metricResolution: "30s"  # batch interval (e.g. 30s, 1m), as heapster's metric resolution
+
+  # Empty: `heapster`, the indices the platform reads. Set another name to run beside heapster for a comparison
+  # (e.g. cp-metrics-collector): never one that starts with `heapster-`, which the API's index retention cannot parse.
+  index: ""
+
+  image:
+    repository: quay.io/lifescience/cloud-pipeline
+    tag: metrics-collector
+    # buildVersion: ""  # overrides general.buildVersion for this image
+    pullPolicy: Always  # IfNotPresent | Always | Never
+
+  serviceAccount: cp-metrics-collector  # also the name of its ClusterRole and ClusterRoleBinding
+
+  # Where it runs: heapster's node, whose label existing AMIs set already
+  nodeSelector:
+    cloud-pipeline/cp-heapster: "true"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 1Gi
 
 nodeLogger:
   enabled: true
@@ -68,6 +102,25 @@ vmMonitor:
     pullPolicy: Always  # IfNotPresent | Always | Never
 
   logsHostPath: /opt/vm-monitor/logs  # Node local path for vm-monitor log files
+
+  # The deployments vm-monitor checks (CP_VM_MONITOR_DEPLOY_NAMES): the list built into vm-monitor, with the metrics
+  # deployments left out. cp-heapster and/or cp-metrics-collector are added as they are enabled, so that the
+  # one that does not run is not reported missing. Set CP_VM_MONITOR_DEPLOY_NAMES in `config` to take over the list.
+  deploymentNames:
+    - cp-api-db
+    - cp-api-srv
+    - cp-notifier
+    - cp-git
+    - cp-git-sync
+    - cp-edge
+    - cp-docker-registry
+    - cp-docker-comp
+    - cp-clair
+    - cp-search-elk
+    - cp-search-srv
+    - cp-heapster-elk
+    - cp-share-srv
+    - cp-dav
 
 monitoringSrv:
   enabled: true

@@ -133,8 +133,13 @@ notifier:
 
 monitoring:
   enabled: true
+  # cp-metrics-collector writes the node and run metrics in heapster's place. heapster is retired; enable it only to
+  # run it beside the collector, with metricsCollector.index set to another name (e.g. cp-metrics-collector).
   heapster:
+    enabled: false
+  metricsCollector:
     enabled: true
+    # index: cp-metrics-collector
   nodeLogger:
     enabled: true
   nodeReporter:

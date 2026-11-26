@@ -5,7 +5,8 @@
 {{- $imageVersion := required "buildVersion must be set (set general.buildVersion in values.yaml. You also can override specific value with image.buildVersion value for each service pod)" (coalesce .Values.heapster.elk.image.buildVersion .Values.buildVersion "") -}}
 {{- $imageRef = printf "%s:%s-%s" .Values.heapster.elk.image.repository .Values.heapster.elk.image.tag $imageVersion -}}
 {{- end -}}
-{{- if .Values.heapster.enabled }}
+{{- /* The metrics store of heapster and of cp-metrics-collector */}}
+{{- if or .Values.heapster.enabled .Values.metricsCollector.enabled }}
 ---
 apiVersion: v1
 kind: Service

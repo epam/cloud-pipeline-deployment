@@ -1,14 +1,23 @@
-{{- if .Values.heapster.enabled }}
+{{- if or .Values.heapster.enabled .Values.metricsCollector.enabled }}
 {{- $namespace := include "lib.application.namespace" . }}
 {{- $elkInternalHost := printf "%s.%s.svc.cluster.local" .Values.heapster.elk.service.name $namespace }}
 {{- $elkInternalPort := .Values.heapster.elk.service.port.internal | toString }}
-{{- $heapsterInternalHost := printf "%s.%s.svc.cluster.local" .Values.heapster.service.name $namespace }}
-{{- $heapsterInternalPort := .Values.heapster.service.port.internal | toString }}
 {{- $data := dict -}}
 {{- $_ := set $data "CP_HEAPSTER_ELK_INTERNAL_HOST" $elkInternalHost -}}
 {{- $_ := set $data "CP_HEAPSTER_ELK_INTERNAL_PORT" $elkInternalPort -}}
+{{- if .Values.heapster.enabled }}
+{{- $heapsterInternalHost := printf "%s.%s.svc.cluster.local" .Values.heapster.service.name $namespace }}
+{{- $heapsterInternalPort := .Values.heapster.service.port.internal | toString }}
 {{- $_ := set $data "CP_HEAPSTER_INTERNAL_HOST" $heapsterInternalHost -}}
 {{- $_ := set $data "CP_HEAPSTER_INTERNAL_PORT" $heapsterInternalPort -}}
+{{- end }}
+{{- /* vm-monitor checks the metrics deployment that runs, not the one replaced */}}
+{{- if .Values.vmMonitor.enabled }}
+{{- $deploymentNames := .Values.vmMonitor.deploymentNames | default list -}}
+{{- if .Values.heapster.enabled }}{{ $deploymentNames = append $deploymentNames "cp-heapster" }}{{ end -}}
+{{- if .Values.metricsCollector.enabled }}{{ $deploymentNames = append $deploymentNames "cp-metrics-collector" }}{{ end -}}
+{{- $_ := set $data "CP_VM_MONITOR_DEPLOY_NAMES" (join "," $deploymentNames) -}}
+{{- end }}
 {{- $config := .Values.config | default dict -}}
 {{- range $key, $value := $config -}}
 {{- $_ := set $data $key ($value | toString) -}}
