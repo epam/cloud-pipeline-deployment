@@ -61,74 +61,6 @@ variable "storage_type" {
   description = "Shared filesystem backend: 'efs' or 'fsx'."
 }
 
-variable "api_srv_host" {
-  type        = string
-  description = "External DNS hostname for the Cloud Pipeline API/UI."
-}
-
-variable "docker_registry_host" {
-  type        = string
-  description = "External DNS hostname for the internal Docker registry."
-}
-
-variable "edge_host" {
-  type        = string
-  description = "External DNS hostname for the edge proxy."
-}
-
-variable "git_host" {
-  type        = string
-  description = "External DNS hostname for the bundled GitLab instance."
-}
-
-variable "idp_host" {
-  type        = string
-  default     = null
-  description = "External DNS hostname for the in-cluster SAML IdP. Leave unset to disable it."
-}
-
-variable "share_srv_host" {
-  type        = string
-  default     = null
-  description = "External DNS hostname for the data-sharing service. Leave unset to disable it."
-}
-
-variable "admin_email" {
-  type        = string
-  default     = ""
-  description = "Default Cloud Pipeline administrator email."
-}
-
-variable "admin_password" {
-  type        = string
-  default     = null
-  sensitive   = true
-  description = "Default Cloud Pipeline administrator password. When unset, the module generates a random one and returns it via the sensitive admin_password output."
-}
-
-variable "docker_tools" {
-  type        = list(string)
-  default     = ["library/rockylinux:latest", "library/nextflow:latest"]
-  description = "<group>/<tool>:<tag> entries to register via the RegisterDockerTools post-deploy hook."
-}
-
-variable "worker_node_amis" {
-  type = list(object({
-    ami           = string
-    platform      = optional(string, "linux")
-    instance_mask = optional(string, "*")
-    init_script   = optional(string, "")
-  }))
-  default     = []
-  description = "AMIs built via packer/aws/worker_node (one entry per platform/instance family, e.g. CPU and GPU). Left empty, pipeline runs can't launch until this is set, here or by hand in values.yaml."
-}
-
-variable "worker_node_security_group_ids" {
-  type        = list(string)
-  default     = null
-  description = "Security groups attached to dynamically launched worker/run nodes. Defaults to the cluster's own internal security group when unset."
-}
-
 variable "enable_ssm_run_commands" {
   type        = bool
   default     = true
@@ -153,7 +85,7 @@ variable "pre_reboot_scripts" {
       grace_shutdown_git_db = false
     }
   }
-  description = "Per-role map of which built-in pre-reboot grace-shutdown scripts run on a node before it reboots (see ../../modules/cp-cluster/variables.tf: pre_reboot_scripts)."
+  description = "Per-role map of which built-in pre-reboot grace-shutdown scripts run on a node before it reboots (see ../../modules/cluster-infrastructure/variables.tf: pre_reboot_scripts)."
 }
 
 variable "custom_pre_reboot_scripts" {
@@ -162,5 +94,5 @@ variable "custom_pre_reboot_scripts" {
     master      = []
     application = []
   }
-  description = "Per-role list of script filenames, relative to this directory, to run on a node before it reboots, on top of the module's built-in ones (see ../../modules/cp-cluster/variables.tf: custom_pre_reboot_scripts). main.tf resolves each filename to an absolute path (via path.root) before passing it to the module -- .tfvars files don't support function calls, so that can't be done here."
+  description = "Per-role list of script filenames, relative to this directory, to run on a node before it reboots, on top of the module's built-in ones (see ../../modules/cluster-infrastructure/variables.tf: custom_pre_reboot_scripts). main.tf resolves each filename to an absolute path (via path.root) before passing it to the module -- .tfvars files don't support function calls, so that can't be done here."
 }

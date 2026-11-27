@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Create the cp-cluster-ssh-key secret from an SSH private key -- typically the one
-# infra/terraform/modules/cp-cluster generates for you (see its generated_ssh_private_key_pem
+# infra/terraform/modules/cluster-infrastructure generates for you (see its generated_ssh_private_key_pem
 # output).
 #
 # cp-api-srv mounts this secret at /etc/cp_ssh (read-only) to SSH into dynamically launched
@@ -15,10 +15,10 @@
 # ssh-keygen (requires openssh-client).
 #
 # Example:
-#   cd infra/terraform/examples/single-node
+#   cd infra/terraform/examples/complete
 #   terraform output -raw generated_ssh_private_key_pem > key.pem
 #   cd ../../../../helm/prerequisites
-#   ./create-cp-cluster-ssh-key-secret.sh default ../../infra/terraform/examples/single-node/key.pem
+#   ./create-cp-cluster-ssh-key-secret.sh default ../../infra/terraform/examples/complete/key.pem
 #
 # Environment:
 #   KUBECTL           kubectl binary (default: kubectl)

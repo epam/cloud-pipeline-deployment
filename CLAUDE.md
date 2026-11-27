@@ -225,14 +225,14 @@ cd helm/prerequisites
 ./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" /path/to/your-private-key.pem
 ```
 
-- **Terraform-generated (fallback)** — reuse the key pair `infra/terraform/modules/cp-cluster` generates for you
+- **Terraform-generated (fallback)** — reuse the key pair `infra/terraform/modules/cluster-infrastructure` generates for you
 automatically (its `generated_ssh_private_key_pem` output), rather than creating a separate one by hand:
 
 ```bash
-cd infra/terraform/examples/single-node
+cd infra/terraform/examples/complete
 terraform output -raw generated_ssh_private_key_pem > key.pem
 cd ../../../../helm/prerequisites
-./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" ../../infra/terraform/examples/single-node/key.pem
+./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" ../../infra/terraform/examples/complete/key.pem
 ```
 
 Either way, the public key is derived automatically via `ssh-keygen -y` — pass a third argument instead if you

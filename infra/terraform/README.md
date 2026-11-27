@@ -12,8 +12,13 @@ master plus application nodes.
 
 ```
 infra/terraform/
-├── modules/cp-cluster/        # the reusable module -- no backend/provider blocks
-└── examples/single-node/   # a runnable root module that calls it
+├── modules/
+│   ├── cluster-infrastructure/  # raw AWS infrastructure -- no backend/provider blocks
+│   ├── helm-deployment-values/  # renders a full helm/values.yaml from that infrastructure
+│   └── ssm-run-command/         # internal: used by cluster-infrastructure, not called directly
+└── examples/
+    ├── complete/             # calls both modules: infrastructure + a generated helm/values.yaml
+    └── infrastructure-only/  # calls only cluster-infrastructure, no Cloud Pipeline app values
 ```
 
 ## Prerequisites
@@ -45,23 +50,33 @@ infra/terraform/
 
 ## Usage
 
-Copy [`examples/single-cluster`](examples/single-cluster) into your own repository (or reference
-the module directly over git), fill in `terraform.tfvars`, uncomment the `backend "s3" {}` block
-in `versions.tf`, and run:
+Pick an example based on how much you want Terraform to manage:
+
+- [`examples/complete`](examples/complete) -- calls `cluster-infrastructure` and
+  `helm-deployment-values` together, wiring the latter's inputs from the former's outputs. Produces
+  a fully configured `helm_values_yaml` output, ready for `helmfile apply` (see
+  [below](#from-infrastructure-to-a-running-cluster)).
+- [`examples/infrastructure-only`](examples/infrastructure-only) -- calls only
+  `cluster-infrastructure` (EC2 nodes, shared filesystem, IAM, S3, KMS); no Cloud Pipeline
+  application hostnames, admin credentials, or generated `values.yaml` at all, since
+  `helm-deployment-values` is never invoked.
+
+Copy the chosen example into your own repository (or reference the modules directly over git),
+fill in `terraform.tfvars`, uncomment the `backend "s3" {}` block in `versions.tf`, and run:
 
 ```bash
-cd examples/single-cluster
+cd examples/complete   # or examples/infrastructure-only
 cp terraform.tfvars.example terraform.tfvars   # then edit it
 terraform init
 terraform plan
 terraform apply
 ```
 
-Calling the module directly looks like this:
+Calling the modules directly looks like this:
 
 ```hcl
-module "cp_cluster" {
-  source = "git::https://<your-git-host>/cloud-pipeline-deployment//infra/terraform/modules/cp-cluster?ref=<tag-or-commit>"
+module "cluster_infrastructure" {
+  source = "git::https://github.com/epam/cloud-pipeline-deployment//infra/terraform/modules/cluster-infrastructure?ref=<tag-or-commit>"
 
   deployment_name = "cloud-pipeline"
   deployment_env  = "prod"
@@ -73,6 +88,21 @@ module "cp_cluster" {
 
   application_node_count = 2
   storage_type            = "efs"
+}
+
+module "helm_values" {
+  source = "git::https://github.com/epam/cloud-pipeline-deployment//infra/terraform/modules/helm-deployment-values?ref=<tag-or-commit>"
+
+  aws_region                  = "us-east-1"
+  deployment_id               = module.cluster_infrastructure.deployment_id
+  master_node_private_ip      = module.cluster_infrastructure.master_node_private_ip
+  kms_key_arn                 = module.cluster_infrastructure.kms_key_arn
+  ssh_key_name                = module.cluster_infrastructure.ssh_key_name
+  s3_via_sts_role_arn         = module.cluster_infrastructure.s3_via_sts_role_arn
+  docker_registry_bucket_name = module.cluster_infrastructure.docker_registry_bucket_name
+  system_bucket_name          = module.cluster_infrastructure.system_bucket_name
+  subnet_ids                  = ["subnet-xxxxxxxxxxxxxxxxx"]
+  security_group_ids          = module.cluster_infrastructure.security_group_ids
 
   api_srv_host         = "cp.example.com"
   docker_registry_host = "docker.example.com"
@@ -81,7 +111,7 @@ module "cp_cluster" {
 }
 ```
 
-### Key inputs
+### Key inputs: `cluster-infrastructure`
 
 | Name | Default | Description |
 |---|---|---|
@@ -102,27 +132,37 @@ module "cp_cluster" {
 | `kube_api_access_cidr_blocks` | `[]` | Extra CIDRs allowed ingress to the Kubernetes API port (6443) only, e.g. for Cloud Pipeline run/worker nodes launched outside this security group. |
 | `enable_ssm_run_commands` | `true` | Master switch for `security_patch_schedule` / `pre_reboot_scripts` / `custom_pre_reboot_scripts` below -- set `false` when the `aws` CLI isn't installed/authenticated wherever `terraform apply` runs; every other resource still gets created (see [below](#security-patches-and-pre-reboot-scripts)). |
 | `security_patch_schedule` | `null` (skipped) | systemd `OnCalendar` expression; when set, applies it to the `dnf-automatic` security-patch timer on every already-running node via SSM Run Command in this same apply (see [below](#security-patches-and-pre-reboot-scripts)). |
+
+Full reference: [`modules/cluster-infrastructure/variables.tf`](modules/cluster-infrastructure/variables.tf).
+
+### Key inputs: `helm-deployment-values`
+
+| Name | Default | Description |
+|---|---|---|
+| `aws_region`, `deployment_id`, `master_node_private_ip`, `kms_key_arn`, `ssh_key_name`, `s3_via_sts_role_arn`, `docker_registry_bucket_name`, `system_bucket_name`, `subnet_ids`, `security_group_ids` | — (required) | Infrastructure values -- in `examples/complete`, wired straight from the matching `cluster_infrastructure` module outputs (plus `aws_region`/`subnet_ids`, which both modules take directly). |
 | `api_srv_host`, `docker_registry_host`, `edge_host`, `git_host` | — (required) | External DNS hostnames for the corresponding services. |
 | `idp_host` / `share_srv_host` | unset (disabled) | Supplying a hostname enables the in-cluster IdP / data-sharing service; leaving it unset disables that service. |
 | `admin_name` / `admin_email` / `admin_password` | `pipe_admin` / `""` / generated | Default Cloud Pipeline administrator account. Leave `admin_password` unset to have the module generate one. |
 | `db_password` / `gitlab_root_password` | generated | Internal Postgres and GitLab root passwords. Leave unset to have the module generate them. |
-| `enable_search` / `enable_billing` / `enable_notifier` / `enable_monitoring` / `enable_storage_lifecycle` / `enable_dav` / `enable_run_policy_manager` / `enable_post_deploy` | all `true` | Set any to `false` to skip that service. All default on, so the generated `cp_values_yaml` installs the full Cloud Pipeline service set out of the box. |
-| `worker_node_amis` | `[]` | AMIs (from `packer/aws/worker_node`) Cloud Pipeline launches to run pipeline jobs. Populates `CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC` in `cp_values_yaml`, along with `subnet_ids` (as the region's networks, named by AZ) and `worker_node_security_group_ids`. Left empty, this stays `{}` -- same as upstream's own placeholder -- and pipeline runs can't launch until it's set, here or by hand in `values.yaml`. |
-| `worker_node_security_group_ids` | cluster's own internal security group | Security groups attached to dynamically launched worker/run nodes. Only used when `worker_node_amis` is set. |
+| `enable_search` / `enable_billing` / `enable_notifier` / `enable_monitoring` / `enable_storage_lifecycle` / `enable_dav` / `enable_run_policy_manager` / `enable_post_deploy` | all `true` | Set any to `false` to skip that service. All default on, so the generated `helm_values_yaml` installs the full Cloud Pipeline service set out of the box. |
+| `worker_node_amis` | `[]` | AMIs (from `packer/aws/worker_node`) Cloud Pipeline launches to run pipeline jobs. Populates `CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC` in `helm_values_yaml`, along with `subnet_ids` (as the region's networks, named by AZ) and `worker_node_security_group_ids`. Left empty, this stays `{}` -- same as upstream's own placeholder -- and pipeline runs can't launch until it's set, here or by hand in `values.yaml`. |
+| `worker_node_security_group_ids` | `[]` | Additional security groups attached to dynamically launched worker/run nodes, on top of `security_group_ids`. Only used when `worker_node_amis` is set. |
 
-Full reference: [`modules/cp-cluster/variables.tf`](modules/cp-cluster/variables.tf).
+Full reference: [`modules/helm-deployment-values/variables.tf`](modules/helm-deployment-values/variables.tf).
 
 ### Key outputs
 
-| Name | Description |
-|---|---|
-| `master_node_ssm_session_command` | Ready-to-run `aws ssm start-session` command for the master node. |
-| `docker_registry_bucket_name`, `system_bucket_name` | S3 buckets to reference from `helm/values.yaml`. |
-| `kms_key_arn`, `s3_via_sts_role_arn`, `ssh_key_name` | Values needed by `apiSrv.cloudRegion.*` in `helm/values.yaml`. |
-| `cp_values_yaml` | Sensitive. A full `values.yaml` with every service configured and wired to this infrastructure -- see below. |
-| `generated_ssh_private_key_pem` / `admin_password` / `db_password` / `gitlab_root_password` | Sensitive. Only populated for the credentials you left unset. |
+| Module | Name | Description |
+|---|---|---|
+| `cluster_infrastructure` | `master_node_ssm_session_command` | Ready-to-run `aws ssm start-session` command for the master node. |
+| `cluster_infrastructure` | `docker_registry_bucket_name`, `system_bucket_name` | S3 buckets to reference from `helm/values.yaml`. |
+| `cluster_infrastructure` | `kms_key_arn`, `s3_via_sts_role_arn`, `ssh_key_name` | Values needed by `apiSrv.cloudRegion.*` in `helm/values.yaml`; also feed `helm_values`'s matching inputs in `examples/complete`. |
+| `cluster_infrastructure` | `generated_ssh_private_key_pem` | Sensitive. Only populated when `key_name` was left unset. |
+| `helm_values` | `rendered` | Sensitive. A full `values.yaml` with every service configured and wired to this infrastructure -- see below. |
+| `helm_values` | `admin_password` / `db_password` / `gitlab_root_password` | Sensitive. Only populated for the credentials you left unset. |
 
-Full reference: [`modules/cp-cluster/outputs.tf`](modules/cp-cluster/outputs.tf).
+Full reference: [`modules/cluster-infrastructure/outputs.tf`](modules/cluster-infrastructure/outputs.tf),
+[`modules/helm-deployment-values/outputs.tf`](modules/helm-deployment-values/outputs.tf).
 
 ## From infrastructure to a running cluster
 
@@ -147,7 +187,7 @@ Full reference: [`modules/cp-cluster/outputs.tf`](modules/cp-cluster/outputs.tf)
    configures every service):
 
    ```bash
-   terraform output -raw cp_values_yaml > values.yaml
+   terraform output -raw helm_values_yaml > values.yaml
    ```
 
 5. Continue with [TLS/PKI prerequisites](../../README.md) and `helmfile apply` as described in the
@@ -157,7 +197,7 @@ Full reference: [`modules/cp-cluster/outputs.tf`](modules/cp-cluster/outputs.tf)
 ## Design notes
 
 - **No `backend` or `provider` block in the module itself.** Both are the calling root module's
-  responsibility (see `examples/single-node/versions.tf`) -- a module that hardcodes either
+  responsibility (see `examples/complete/versions.tf`) -- a module that hardcodes either
   cannot be reused across environments or accounts.
 - **Public, versioned registry modules** (`terraform-aws-modules/{kms,s3-bucket,security-group}/aws`)
   are used instead of hand-rolled resources wherever one exists, for the same reason
@@ -167,9 +207,9 @@ Full reference: [`modules/cp-cluster/outputs.tf`](modules/cp-cluster/outputs.tf)
   filesystem, and both S3 buckets.
 - **The shared filesystem backend is pluggable** (`storage_type = "efs" | "fsx"`), matching the two
   options already documented in [../README.md#shared-filesystem-options](../README.md#shared-filesystem-options).
-- **`cp_values_yaml` installs the full Cloud Pipeline service set by default**, mirroring
+- **`helm_values_yaml` installs the full Cloud Pipeline service set by default**, mirroring
   `helm/values.yaml`'s own schema and defaults (see
-  [`templates/cp-values.yaml.tpl`](modules/cp-cluster/templates/cp-values.yaml.tpl)): idp,
+  [`templates/helm-deployment-values.yaml.tpl`](modules/helm-deployment-values/templates/helm-deployment-values.yaml.tpl)): idp,
   apiSrv, dockerRegistry (with Clair), edge, git, search, billing, notifier, monitoring,
   storageLifecycle, dav, shareSrv, runPolicyManager and postDeploy hooks are all wired up and
   enabled, with infrastructure values (KMS key, buckets, roles, master IP) filled in and
@@ -199,8 +239,8 @@ the AMI or replacing any instance:
 | `pre_reboot_scripts` | Per-role `map(map(bool))` toggling the AMI's built-in grace-shutdown scripts on or off -- `true` symlinks `<name>.sh` into that role's `pre_reboot_scripts/` directory, `false` removes the symlink. |
 | `custom_pre_reboot_scripts` | Per-role `map(list(string))` of local file paths. Each file's content is pushed to every matching node, made executable, and symlinked in the same way -- for scripts that aren't baked into the AMI at all. |
 
-All three are implemented the same way, in `modules/cp-cluster/security-patch-schedule.tf` and
-`modules/cp-cluster/pre-reboot-scripts-sync.tf`: each resolves to a list of shell commands (a
+All three are implemented the same way, in `modules/cluster-infrastructure/security-patch-schedule.tf` and
+`modules/cluster-infrastructure/pre-reboot-scripts-sync.tf`: each resolves to a list of shell commands (a
 `sed`/`systemctl` pair for the schedule; `ln -sf`/`rm -f` for built-in scripts; `echo | base64 -d`
 + `chmod` + `ln -sf` for custom ones) and hands them to the reusable
 [`modules/ssm-run-command`](modules/ssm-run-command) module -- one instance per target node,

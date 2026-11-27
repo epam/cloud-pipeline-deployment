@@ -1,4 +1,8 @@
 # Copy this file to terraform.tfvars and fill in real values.
+#
+# This example provisions only the raw AWS infrastructure (EC2 nodes, shared filesystem, IAM, S3,
+# KMS) -- no Cloud Pipeline application hostnames, admin credentials, or generated values.yaml.
+# See ../complete for a helm-ready example instead.
 
 aws_region = "us-east-1"
 
@@ -15,29 +19,11 @@ ami_id = "ami-xxxxxxxxxxxxxxxxx"
 # Leave unset to let the module generate a key pair for you.
 # key_name = "my-existing-key-pair"
 
-master_node_instance_type      = "m5.xlarge"
-application_node_instance_type = "m5.2xlarge"
+master_node_instance_type      = "m6i.2xlarge"
+application_node_instance_type = "m5.xlarge"
 application_node_count         = 0
 
 storage_type = "efs"
-
-api_srv_host         = "cp.example.com"
-docker_registry_host = "docker.example.com"
-edge_host            = "edge.example.com"
-git_host             = "git.example.com"
-
-# Leave unset to disable these optional services.
-# idp_host       = "idp.example.com"
-# share_srv_host = "share.example.com"
-# docker_tools = ["library/rockylinux:latest", "library/nextflow:latest"]
-
-# Built via packer/aws/worker_node -- one entry per platform/instance family. Required for
-# Cloud Pipeline to launch pipeline runs; leave unset/empty and runs simply won't be able to
-# start until this (or the equivalent values.yaml edit) is in place.
-# worker_node_amis = [
-#   { ami = "ami-xxxxxxxxxxxxxxxxx" },                                       # CPU, all instance types (default instance_mask = "*")
-#   { ami = "ami-yyyyyyyyyyyyyyyyy", instance_mask = "p*" },                  # GPU, p-family instances
-# ]
 
 # Additional per-role scripts to run on a node before it reboots, on top of the module's built-in
 # ones. Filenames are relative to this directory -- main.tf resolves them to absolute paths (via

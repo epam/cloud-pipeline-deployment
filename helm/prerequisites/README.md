@@ -306,7 +306,7 @@ public key instead of deriving it, pass it as a third argument:
 ./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" /path/to/your-private-key.pem /path/to/your-public-key.pub
 ```
 
-**Nothing — use the one Terraform already generated**: `infra/terraform/modules/cp-cluster` creates
+**Nothing — use the one Terraform already generated**: `infra/terraform/modules/cluster-infrastructure` creates
 a key pair for you unless you supplied your own, rather than creating a separate one by hand:
 
 ```bash

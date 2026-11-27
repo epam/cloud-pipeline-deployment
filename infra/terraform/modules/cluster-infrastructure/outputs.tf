@@ -3,9 +3,9 @@ output "resource_name_prefix" {
   value       = local.resource_name_prefix
 }
 
-output "cp_deployment_id" {
+output "deployment_id" {
   description = "Cloud Pipeline deployment identifier (CP_DEPLOYMENT_ID)."
-  value       = local.cp_deployment_id
+  value       = local.deployment_id
 }
 
 output "master_node_id" {
@@ -45,15 +45,15 @@ output "storage_type" {
 
 output "storage_id" {
   description = "ID of the shared filesystem (EFS filesystem ID or FSx Lustre filesystem ID)."
-  value       = local.cp_storage_id
+  value       = local.shared_storage_id
 }
 
 output "storage_mount_command" {
   description = "Command to manually mount the shared filesystem at /opt (for reference; nodes mount it automatically via user data)."
   value = (
     var.storage_type == "efs"
-    ? "mount -t efs -o tls ${local.cp_storage_id}:/ /opt"
-    : "mount -t lustre -o relatime,flock ${local.cp_storage_dns_name}@tcp:/${local.cp_storage_mount_name} /opt"
+    ? "mount -t efs -o tls ${local.shared_storage_id}:/ /opt"
+    : "mount -t lustre -o relatime,flock ${local.shared_storage_dns_name}@tcp:/${local.shared_storage_mount_name} /opt"
   )
 }
 
@@ -99,30 +99,7 @@ output "ssh_key_name" {
 
 output "generated_ssh_private_key_pem" {
   description = "PEM-encoded private key, only set when key_name was left unset and this module generated a new key pair. Store it securely (e.g. in a secrets manager) -- it is not retained anywhere else."
-  value       = try(tls_private_key.cp_cluster[0].private_key_pem, null)
+  value       = try(tls_private_key.generated[0].private_key_pem, null)
   sensitive   = true
 }
 
-output "admin_password" {
-  description = "Default Cloud Pipeline administrator password. Only set here when admin_password was left unset and this module generated one."
-  value       = local.admin_password
-  sensitive   = true
-}
-
-output "db_password" {
-  description = "Password for the internal Postgres 'pipeline' database user. Only set here when db_password was left unset and this module generated one."
-  value       = local.db_password
-  sensitive   = true
-}
-
-output "gitlab_root_password" {
-  description = "Password for the GitLab 'root' user. Only set here when gitlab_root_password was left unset and this module generated one."
-  value       = local.gitlab_root_password
-  sensitive   = true
-}
-
-output "cp_values_yaml" {
-  description = "A full values.yaml enabling every Cloud Pipeline service, pre-filled with this infrastructure's values (see infra/terraform/README.md). Sensitive: it embeds the admin/db/GitLab passwords above."
-  value       = local.cp_values_yaml
-  sensitive   = true
-}

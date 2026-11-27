@@ -1,0 +1,54 @@
+# Copy this file to terraform.tfvars and fill in real values.
+
+aws_region = "us-east-1"
+
+deployment_name = "cloud-pipeline"
+deployment_env  = "prod"
+
+vpc_id     = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_ids = ["subnet-xxxxxxxxxxxxxxxxx"]
+external_access_security_group_ids = []
+
+# Built via packer/aws/application_node -- see ../../../packer/README.md
+ami_id = "ami-xxxxxxxxxxxxxxxxx"
+
+# Leave unset to let the module generate a key pair for you.
+# key_name = "my-existing-key-pair"
+
+master_node_instance_type      = "m6i.2xlarge"
+application_node_instance_type = "m5.xlarge"
+application_node_count         = 0
+
+storage_type = "efs"
+
+api_srv_host         = "cp.example.com"
+docker_registry_host = "docker.example.com"
+edge_host            = "edge.example.com"
+git_host             = "git.example.com"
+
+# Leave unset to disable these optional services.
+# idp_host       = "idp.example.com"
+# share_srv_host = "share.example.com"
+# docker_tools = ["library/rockylinux:latest", "library/nextflow:latest"]
+
+# Built via packer/aws/worker_node -- one entry per platform/instance family. Required for
+# Cloud Pipeline to launch pipeline runs; leave unset/empty and runs simply won't be able to
+# start until this (or the equivalent values.yaml edit) is in place.
+# worker_node_amis = [
+#   { ami = "ami-xxxxxxxxxxxxxxxxx" },                                       # CPU, all instance types (default instance_mask = "*")
+#   { ami = "ami-yyyyyyyyyyyyyyyyy", instance_mask = "p*" },                  # GPU, p-family instances
+# ]
+
+# Additional per-role scripts to run on a node before it reboots, on top of the module's built-in
+# ones. Filenames are relative to this directory -- main.tf resolves them to absolute paths (via
+# path.root) before passing them to the module.
+# custom_pre_reboot_scripts = {
+#   master      = ["script1.sh"]
+#   application = ["script1.sh", "script2.sh"]
+# }
+
+# security_patch_schedule / pre_reboot_scripts / custom_pre_reboot_scripts all run via the "aws"
+# CLI (SSM Run Command) during terraform apply. If that CLI isn't installed/authenticated where
+# you run apply, set this to false instead of leaving it at its default -- every other resource
+# (EC2, EFS/FSx, IAM, S3, etc.) is still created normally.
+# enable_ssm_run_commands = false

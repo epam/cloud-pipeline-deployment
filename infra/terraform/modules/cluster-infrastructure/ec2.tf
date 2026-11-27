@@ -7,7 +7,7 @@ resource "aws_instance" "master" {
   iam_instance_profile   = aws_iam_instance_profile.platform_main.name
   user_data              = local.master_node_userdata
 
-  depends_on = [aws_efs_mount_target.cp_storage]
+  depends_on = [aws_efs_mount_target.shared]
 
   root_block_device {
     volume_type           = "gp3"
@@ -34,7 +34,7 @@ resource "aws_instance" "application" {
   iam_instance_profile   = aws_iam_instance_profile.platform_main.name
   user_data              = local.application_node_userdata
 
-  depends_on = [aws_efs_mount_target.cp_storage]
+  depends_on = [aws_efs_mount_target.shared]
 
   root_block_device {
     volume_type           = "gp3"

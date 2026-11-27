@@ -12,7 +12,7 @@ variable "deployment_env" {
   description = "Environment name (e.g. dev, staging, prod). Used as a prefix for the names of created resources."
 }
 
-variable "cp_deployment_id" {
+variable "deployment_id" {
   type        = string
   default     = null
   description = "Cloud Pipeline deployment identifier (CP_DEPLOYMENT_ID). Defaults to '<deployment_name>-<deployment_env>' when unset."
@@ -71,29 +71,6 @@ variable "iam_role_permissions_boundary_arn" {
   type        = string
   default     = null
   description = "ARN of an account-specific IAM permissions boundary to apply to every IAM role created by this module."
-}
-
-variable "worker_node_amis" {
-  type = list(object({
-    ami           = string
-    platform      = optional(string, "linux")
-    instance_mask = optional(string, "*")
-    init_script   = optional(string, "")
-  }))
-  default     = []
-  description = "AMIs Cloud Pipeline launches dynamically to run pipeline jobs (built via packer/aws/worker_node, one entry per platform/instance family -- see CLAUDE.md). Populates CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC in cp_values_yaml, along with var.subnet_ids (as the region's networks, named by availability zone) and var.worker_node_security_group_ids. Left empty by default, which leaves CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC as {} -- pipeline runs can't launch until this is set, by variable or by editing values.yaml directly."
-}
-
-variable "worker_node_security_group_ids" {
-  type        = list(string)
-  default     = []
-  description = "Additional security groups attached to dynamically launched worker/run nodes, as part of CP_POST_DEPLOY_CLUSTER_NETWORKS_SPEC, on top of the cluster's own internal security group (always included). Only used when worker_node_amis is non-empty."
-}
-
-variable "docker_tools" {
-  type        = list(string)
-  default     = ["library/rockylinux:latest", "library/nextflow:latest"]
-  description = "<group>/<tool>:<tag> entries to register via the RegisterDockerTools post-deploy hook (CP_TOOLS_JSON). Each entry must exist as a directory under helm/hooks/post-deploy/assets/dockers-manifest/ with a matching source in manifest.txt -- an entry with no manifest directory (e.g. anything under ngs/) is silently never registered, it isn't an error here or at deploy time."
 }
 
 ###################################################################
@@ -279,137 +256,3 @@ variable "s3_force_destroy" {
   description = "Allow `terraform destroy` to delete created S3 buckets even when they still contain objects. Leave false in production."
 }
 
-###################################################################
-#                Cloud Pipeline service hostnames
-###################################################################
-
-variable "api_srv_host" {
-  type        = string
-  description = "External DNS hostname for the Cloud Pipeline API/UI (apiSrv.service.host.external), e.g. 'cp.example.com'."
-}
-
-variable "docker_registry_host" {
-  type        = string
-  description = "External DNS hostname for the internal Docker registry (dockerRegistry.service.host.external)."
-}
-
-variable "edge_host" {
-  type        = string
-  description = "External DNS hostname for the edge proxy (edge.service.host.external)."
-}
-
-variable "edge_external_ip" {
-  type        = string
-  default     = null
-  description = "Public or routable IP that the above hostnames resolve to (edge.externalIP). Defaults to the master node's private IP, matching a VPN/Direct-Connect-only deployment with no load balancer or Elastic IP."
-}
-
-variable "git_host" {
-  type        = string
-  description = "External DNS hostname for the bundled GitLab instance (git.service.host.external)."
-}
-
-variable "idp_host" {
-  type        = string
-  default     = null
-  description = "External DNS hostname for the in-cluster SAML IdP (idp.service.host.external). Leave unset to disable the in-cluster IdP (idp.enabled = false) and use an external SAML IdP instead."
-}
-
-variable "share_srv_host" {
-  type        = string
-  default     = null
-  description = "External DNS hostname for the data-sharing service (shareSrv.service.host.external). Leave unset to disable cp-share-srv."
-}
-
-###################################################################
-#                Cloud Pipeline credentials
-###################################################################
-
-variable "admin_name" {
-  type        = string
-  default     = "pipe_admin"
-  description = "Default Cloud Pipeline administrator username (CP_DEFAULT_ADMIN_NAME)."
-}
-
-variable "admin_email" {
-  type        = string
-  default     = ""
-  description = "Default Cloud Pipeline administrator email (CP_DEFAULT_ADMIN_EMAIL)."
-}
-
-variable "admin_password" {
-  type        = string
-  default     = null
-  sensitive   = true
-  description = "Default Cloud Pipeline administrator password (CP_DEFAULT_ADMIN_PASS). When unset, the module generates a random one and returns it via the sensitive admin_password output."
-}
-
-variable "db_password" {
-  type        = string
-  default     = null
-  sensitive   = true
-  description = "Password for the internal Postgres 'pipeline' database user (apiSrv.db.pass). When unset, the module generates a random one and returns it via the sensitive db_password output."
-}
-
-variable "gitlab_root_password" {
-  type        = string
-  default     = null
-  sensitive   = true
-  description = "Password for the GitLab 'root' user (git.config.GITLAB_ROOT_PASSWORD). When unset, the module generates a random one and returns it via the sensitive gitlab_root_password output."
-}
-
-###################################################################
-#                Cloud Pipeline optional services
-###################################################################
-# Everything below is enabled by default so that `terraform apply` produces
-# a cp-values.yaml that installs the full Cloud Pipeline service set, matching
-# the release order documented in ../../CLAUDE.md. Flip any of these to false
-# to skip that service.
-
-variable "enable_search" {
-  type        = bool
-  default     = true
-  description = "Enable the search stack (cp-search-srv, cp-search-elk)."
-}
-
-variable "enable_billing" {
-  type        = bool
-  default     = true
-  description = "Enable the billing report agent (cp-billing-srv)."
-}
-
-variable "enable_notifier" {
-  type        = bool
-  default     = true
-  description = "Enable the email/Azure-Graph notifier (cp-notifier). In-app UI notifications only by default -- set SMTP/Azure details directly in helm/values.yaml to also send email."
-}
-
-variable "enable_monitoring" {
-  type        = bool
-  default     = true
-  description = "Enable the monitoring stack (heapster, node-logger, node-reporter, vm-monitor)."
-}
-
-variable "enable_storage_lifecycle" {
-  type        = bool
-  default     = true
-  description = "Enable the storage lifecycle service (cp-storage-lifecycle-service)."
-}
-
-variable "enable_dav" {
-  type        = bool
-  default     = true
-  description = "Enable the WebDAV gateway (cp-dav)."
-}
-
-variable "enable_run_policy_manager" {
-  type        = bool
-  default     = true
-  description = "Enable the run policy manager (cp-run-policy-manager)."
-}
-
-variable "enable_post_deploy" {
-  type        = bool
-  default     = true
-  description = "Run the post-deploy hooks (register Docker tools, apply preferences, register demo pipelines, etc.) after helmfile apply. Requires the Cloud Pipeline API to be reachable at apply time -- set to false for `helmfile template`/`diff` without a live cluster."
-}
