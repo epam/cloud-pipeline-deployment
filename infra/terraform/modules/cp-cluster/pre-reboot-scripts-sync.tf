@@ -21,8 +21,11 @@ locals {
     ]
   }
 
+  # Iterates over an empty list (rather than a `var.enable_ssm_run_commands ? ... : {}` ternary)
+  # when disabled, so that file() below is never evaluated -- unlike a `for`, a ternary's unused
+  # branch is still evaluated by Terraform and would error out anyway.
   custom_pre_reboot_script_contents = {
-    for role in ["master", "application"] :
+    for role in(var.enable_ssm_run_commands ? ["master", "application"] : []) :
     role => { for p in lookup(var.custom_pre_reboot_scripts, role, []) : basename(p) => file(p) }
   }
 
