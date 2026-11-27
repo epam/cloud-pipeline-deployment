@@ -1,0 +1,40 @@
+# Copy this file to terraform.tfvars and fill in real values.
+#
+# This example provisions only the raw AWS infrastructure (EC2 nodes, shared filesystem, IAM, S3,
+# KMS) -- no Cloud Pipeline application hostnames, admin credentials, or generated values.yaml.
+# See ../complete for a helm-ready example instead.
+
+aws_region = "us-east-1"
+
+deployment_name = "cloud-pipeline"
+deployment_env  = "prod"
+
+vpc_id     = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_ids = ["subnet-xxxxxxxxxxxxxxxxx"]
+external_access_security_group_ids = []
+
+# Built via packer/aws/application_node -- see ../../../packer/README.md
+ami_id = "ami-xxxxxxxxxxxxxxxxx"
+
+# Leave unset to let the module generate a key pair for you.
+# key_name = "my-existing-key-pair"
+
+master_node_instance_type      = "m6i.2xlarge"
+application_node_instance_type = "m5.xlarge"
+application_node_count         = 0
+
+storage_type = "efs"
+
+# Additional per-role scripts to run on a node before it reboots, on top of the module's built-in
+# ones. Filenames are relative to this directory -- main.tf resolves them to absolute paths (via
+# path.root) before passing them to the module.
+# custom_pre_reboot_scripts = {
+#   master      = ["script1.sh"]
+#   application = ["script1.sh", "script2.sh"]
+# }
+
+# security_patch_schedule / pre_reboot_scripts / custom_pre_reboot_scripts all run via the "aws"
+# CLI (SSM Run Command) during terraform apply. If that CLI isn't installed/authenticated where
+# you run apply, set this to false instead of leaving it at its default -- every other resource
+# (EC2, EFS/FSx, IAM, S3, etc.) is still created normally.
+# enable_ssm_run_commands = false

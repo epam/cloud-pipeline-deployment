@@ -222,6 +222,35 @@ separately or seeded automatically when `idp.enabled: true`).
 
 ---
 
+## Prerequisite: cluster SSH key secret
+
+A separate, non-PKI secret: `cp-cluster-ssh-key` (keys `deploy.key` / `deploy.pub`), mounted read-only by `cp-api-srv`
+at `/etc/cp_ssh` (see `cp-api-srv/values.yaml`'s `CP_PREF_CLUSTER_SSH_KEY_PATH` / `CP_PREF_COMMIT_DEPLOY_KEY`). It's
+the key pair `cp-api-srv` uses to SSH into dynamically launched worker/run nodes, and for the run "commit" feature.
+It is **required** — `cp-api-srv` will not start without it.
+
+- **Caller-supplied (preferred)** — point the script straight at your own private key file:
+
+```bash
+cd helm/prerequisites
+./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" /path/to/your-private-key.pem
+```
+
+- **Terraform-generated (fallback)** — reuse the key pair `infra/terraform/modules/cluster-infrastructure` generates for you
+automatically (its `generated_ssh_private_key_pem` output), rather than creating a separate one by hand:
+
+```bash
+cd infra/terraform/examples/complete
+terraform output -raw generated_ssh_private_key_pem > key.pem
+cd ../../../../helm/prerequisites
+./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" ../../infra/terraform/examples/complete/key.pem
+```
+
+Either way, the public key is derived automatically via `ssh-keygen -y` — pass a third argument instead if you
+already have one.
+
+---
+
 ## Architecture: release order and dependencies
 
 `helm/helmfile.yaml.gotmpl` is the entrypoint. It reads `helm/values.yaml` (deployment config), merges it with each

@@ -288,6 +288,36 @@ kubectl rollout restart deployment/cp-api-srv -n "$NAMESPACE"
 
 ---
 
+## Cluster SSH key (for cp-api-srv)
+
+A separate, unrelated prerequisite: `cp-api-srv` requires a `cp-cluster-ssh-key` secret to SSH into
+dynamically launched worker/run nodes. It is **required** -- `cp-api-srv` will not start without it.
+
+**I have an SSH key pair** — point the script straight at your own private key file:
+
+```bash
+./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" /path/to/your-private-key.pem
+```
+
+The public key is derived automatically via `ssh-keygen -y`. If you'd rather supply your own
+public key instead of deriving it, pass it as a third argument:
+
+```bash
+./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" /path/to/your-private-key.pem /path/to/your-public-key.pub
+```
+
+**Nothing — use the one Terraform already generated**: `infra/terraform/modules/cluster-infrastructure` creates
+a key pair for you unless you supplied your own, rather than creating a separate one by hand:
+
+```bash
+terraform output -raw generated_ssh_private_key_pem > key.pem   # run from your terraform root
+./create-cp-cluster-ssh-key-secret.sh "$NAMESPACE" key.pem
+```
+
+See the script's header comment for more detail.
+
+---
+
 ## Next steps
 
 With all secrets in place, proceed to `helmfile apply`. See `helm/README.md` for the full

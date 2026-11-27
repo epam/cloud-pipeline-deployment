@@ -1,0 +1,31 @@
+name: Terraform validate
+
+on:
+  pull_request:
+    paths:
+      - 'infra/terraform/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example: [complete, infrastructure-only]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.0"
+
+      - name: Check formatting
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive .
+
+      - name: Init
+        working-directory: infra/terraform/examples/${{ matrix.example }}
+        run: terraform init -backend=false
+
+      - name: Validate syntax
+        working-directory: infra/terraform/examples/${{ matrix.example }}
+        run: terraform validate
